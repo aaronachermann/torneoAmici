@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modifica Giocatore - Gestione Torneo Hockey</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo Hockey</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('teams') }}">Squadre</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('schedule') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                </ul>
+                <ul class="navbar-nav ms-auto">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <span class="nav-link">Ciao, {{ current_user.username }}</span>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('register') }}">Registrati</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Modifica Giocatore</h1>
+            <a href="{{ url_for('team_detail', team_id=player.team_id) }}" class="btn btn-secondary">Torna alla Squadra</a>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-md-6 mx-auto">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0">Modifica {{ player.name }}</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post">
+                            <div class="mb-3">
+                                <label for="player_name" class="form-label">Nome Giocatore</label>
+                                <input type="text" class="form-control" id="player_name" name="player_name" value="{{ player.name }}" required>
+                            </div>
+                            <div class="mb-3 form-check">
+                                <input type="checkbox" class="form-check-input" id="is_registered" name="is_registered" {% if player.is_registered %}checked{% endif %}>
+                                <label class="form-check-label" for="is_registered">Tesserato</label>
+                            </div>
+                            <div class="mb-3" id="category_div" {% if not player.is_registered %}style="display: none;"{% endif %}>
+                                <label for="category" class="form-label">Categoria</label>
+                                <select class="form-select" id="category" name="category">
+                                    <option value="LNA/LNB" {% if player.category == 'LNA/LNB' %}selected{% endif %}>LNA/LNB (5 punti)</option>
+                                    <option value="1a Lega" {% if player.category == '1a Lega' %}selected{% endif %}>1a Lega (3 punti)</option>
+                                    <option value="2a Lega" {% if player.category == '2a Lega' %}selected{% endif %}>2a Lega (2 punti)</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-warning">Aggiorna</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-3 mt-auto">
+        <div class="container text-center">
+            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const isRegisteredCheckbox = document.getElementById('is_registered');
+            const categoryDiv = document.getElementById('category_div');
+            
+            isRegisteredCheckbox.addEventListener('change', function() {
+                categoryDiv.style.display = this.checked ? 'block' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
+

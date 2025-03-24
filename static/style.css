@@ -1,0 +1,74 @@
+/* Custom styles for the hockey tournament app */
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-header {
+  font-weight: 600;
+}
+
+.jumbotron {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.table th {
+  font-weight: 600;
+}
+
+.btn {
+  border-radius: 4px;
+}
+
+footer {
+  margin-top: 2rem;
+}
+
+/* Team colors for groups */
+.group-a {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.group-b {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.group-c {
+  background-color: rgba(255, 193, 7, 0.1);
+}
+
+.group-d {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Match result styling */
+.match-result {
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
+

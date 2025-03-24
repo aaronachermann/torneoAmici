@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dettagli Partita - Gestione Torneo Hockey</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo Hockey</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('teams') }}">Squadre</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('schedule') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-info alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Dettagli Partita</h1>
+            <a href="{{ url_for('schedule') }}" class="btn btn-secondary">Torna al Calendario</a>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ match.team1.name }} vs {{ match.team2.name }}</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p><strong>Data:</strong> {{ match.date|datetime('%d/%m/%Y') }}</p>
+                        <p><strong>Orario:</strong> {{ match.time|timeformat('%H:%M') }}</p>
+                        <p><strong>Fase:</strong> 
+                            {% if match.phase == 'group' %}
+                                Girone {{ match.team1.group }}
+                            {% elif match.phase == 'quarterfinal' %}
+                                Quarti di Finale
+                            {% elif match.phase == 'semifinal' %}
+                                Semifinale
+                            {% elif match.phase == 'placement' %}
+                                Piazzamento
+                            {% elif match.phase == 'final' %}
+                                Finale
+                            {% endif %}
+                        </p>
+                        <p><strong>Categoria:</strong> {{ match.league if match.league else 'N/A' }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        {% if not match.is_completed %}
+                            <form method="post">
+                                <div class="mb-3">
+                                    <label class="form-label">Risultato</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text">{{ match.team1.name }}</span>
+                                        <input type="number" class="form-control" name="team1_score" min="0" required>
+                                        <span class="input-group-text">-</span>
+                                        <input type="number" class="form-control" name="team2_score" min="0" required>
+                                        <span class="input-group-text">{{ match.team2.name }}</span>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-primary">Salva Risultato</button>
+                            </form>
+                        {% else %}
+                            <div class="alert alert-success">
+                                <h4 class="text-center">Risultato Finale</h4>
+                                <h2 class="text-center">{{ match.team1.name }} {{ match.team1_score }} - {{ match.team2_score }} {{ match.team2.name }}</h2>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if 1 %}
+            <div class="card mt-4">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Statistiche Giocatori</h4>
+                </div>
+                <div class="card-body">
+                    <form action="{{ url_for('update_player_stats', match_id=match.id) }}" method="post">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>{{ match.team1.name }}</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Giocatore</th>
+                                                <th>Gol</th>
+                                                <th>Assist</th>
+                                                <th>Penalità</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for player in team1_players %}
+                                                <tr>
+                                                    <td>{{ player.name }}</td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_goals" 
+                                                               value="{{ stats_by_player[player.id].goals if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_assists" 
+                                                               value="{{ stats_by_player[player.id].assists if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_penalties" 
+                                                               value="{{ stats_by_player[player.id].penalties if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>{{ match.team2.name }}</h5>
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Giocatore</th>
+                                                <th>Gol</th>
+                                                <th>Assist</th>
+                                                <th>Penalità</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for player in team2_players %}
+                                                <tr>
+                                                    <td>{{ player.name }}</td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_goals" 
+                                                               value="{{ stats_by_player[player.id].goals if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_assists" 
+                                                               value="{{ stats_by_player[player.id].assists if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="form-control form-control-sm" 
+                                                               name="player_{{ player.id }}_penalties" 
+                                                               value="{{ stats_by_player[player.id].penalties if player.id in stats_by_player else 0 }}" 
+                                                               min="0">
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <button type="submit" class="btn btn-success">Salva Statistiche</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <footer class="bg-dark text-white py-3 mt-auto">
+        <div class="container text-center">
+            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+

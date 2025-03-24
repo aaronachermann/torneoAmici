@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestione Torneo degli Amici dello Skater - Memorial Marzio Camponovo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo Hockey</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('teams') }}">Squadre</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('groups') }}">Gironi</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('schedule') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="jumbotron p-4 bg-light rounded">
+            <h1 class="display-4"> Gestione Torneo degli Amici dello Skater - Memorial Marzio Camponovo</h1>
+            <p class="lead">Benvenuto nell'applicazione per la gestione del Torneo degli Amici dello Skater - Memorial Marzio Camponovo.</p>
+            <hr class="my-4">
+            <p>Utilizza questa applicazione per gestire squadre, giocatori, partite e classifiche del torneo.</p>
+            
+            <div class="row mt-4">
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Gestione Squadre</h5>
+                            <p class="card-text">Aggiungi squadre e gestisci i giocatori.</p>
+                            <a href="{{ url_for('teams') }}" class="btn btn-primary">Vai alle Squadre</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Gironi</h5>
+                            <p class="card-text">Visualizza e gestisci i gironi del torneo.</p>
+                            <a href="{{ url_for('groups') }}" class="btn btn-primary">Vai ai Gironi</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Calendario Partite</h5>
+                            <p class="card-text">Visualizza e gestisci il calendario delle partite.</p>
+                            <a href="{{ url_for('schedule') }}" class="btn btn-primary">Vai al Calendario</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 mb-3">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Classifiche</h5>
+                            <p class="card-text">Visualizza le classifiche delle squadre e dei giocatori.</p>
+                            <a href="{{ url_for('standings') }}" class="btn btn-primary">Vai alle Classifiche</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <h3>Funzioni Amministrative</h3>
+                <div class="d-flex gap-2">
+                    <a href="{{ url_for('init_db') }}" class="btn btn-warning">Inizializza Database</a>
+                    <button type="button" class="btn btn-danger" onclick="confirmResetDB()">Azzera Database</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-3 mt-auto">
+        <div class="container text-center">
+            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function confirmResetDB() {
+            if (confirm('Sei sicuro di voler azzerare il database? Questa azione eliminerà tutti i dati e non può essere annullata.')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '{{ url_for("reset_db") }}';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'confirm';
+                input.value = 'yes';
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+</body>
+</html>
+
