@@ -9,7 +9,6 @@
 </head>
 <body class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('index') }}">Torneo Hockey</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -55,10 +54,20 @@
                         <h4 class="mb-0">Aggiungi Squadra</h4>
                     </div>
                     <div class="card-body">
-                        <form method="post">
+                        <form method="post" action="{{ url_for('add_team') }}">
                             <div class="mb-3">
                                 <label for="team_name" class="form-label">Nome Squadra</label>
                                 <input type="text" class="form-control" id="team_name" name="team_name" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="group" class="form-label">Girone</label>
+                                <select class="form-select" id="group" name="group">
+                                    <option value="">Seleziona girone</option>
+                                    <option value="A">Girone A</option>
+                                    <option value="B">Girone B</option>
+                                    <option value="C">Girone C</option>
+                                    <option value="D">Girone D</option>
+                                </select>
                             </div>
                             <button type="submit" class="btn btn-primary">Aggiungi</button>
                         </form>
@@ -68,8 +77,11 @@
             
             <div class="col-md-6">
                 <div class="card">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                         <h4 class="mb-0">Squadre Registrate</h4>
+                        <span class="badge bg-light text-dark">
+                            {{ team_count }}/{{ max_teams }} squadre
+                        </span>
                     </div>
                     <div class="card-body">
                         {% if teams %}
@@ -78,20 +90,29 @@
                                     <thead>
                                         <tr>
                                             <th>Nome</th>
-                                            <th>Girone</th>
-                                            <th>Giocatori</th>
-                                            <th>Punti Tesserati</th>
+                                            <th width="140">Girone</th>
+                                            <th width="80">Giocatori</th>
+                                            <th width="120">Punti Tesserati</th>
                                             <th>Azioni</th>
                                         </tr>
-                                        <span class="navbar-text">
-                                            {{ team_count }}/{{ max_teams }} squadre
-                                        </span>
                                     </thead>
                                     <tbody>
                                         {% for team in teams %}
                                             <tr>
                                                 <td>{{ team.name }}</td>
-                                                <td>{{ team.group if team.group else 'Non assegnato' }}</td>
+                                                <td>
+                                                    <form method="post" action="{{ url_for('update_team_group', team_id=team.id) }}" class="d-inline">
+                                                        <div class="input-group input-group-sm">
+                                                            <select class="form-select form-select-sm girone-select" name="group" onchange="this.form.submit()">
+                                                                <option value="" {% if not team.group %}selected{% endif %}>Non assegnato</option>
+                                                                <option value="A" {% if team.group == 'A' %}selected{% endif %}>Girone A</option>
+                                                                <option value="B" {% if team.group == 'B' %}selected{% endif %}>Girone B</option>
+                                                                <option value="C" {% if team.group == 'C' %}selected{% endif %}>Girone C</option>
+                                                                <option value="D" {% if team.group == 'D' %}selected{% endif %}>Girone D</option>
+                                                            </select>
+                                                        </div>
+                                                    </form>
+                                                </td>
                                                 <td>{{ team.players|length }}</td>
                                                 <td>
                                                     {{ team.player_points_total }}
@@ -100,14 +121,42 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                    <a href="{{ url_for('edit_team', team_id=team.id) }}" class="btn btn-sm btn-warning">Modifica</a>
-                                                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteTeam('{{ team.id }}', '{{ team.name }}')">Elimina</button>
+                                                    <div class="d-grid gap-1">
+                                                        <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                        <a href="{{ url_for('edit_team', team_id=team.id) }}" class="btn btn-sm btn-warning">Modifica</a>
+                                                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteTeam('{{ team.id }}', '{{ team.name }}')">Elimina</button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
+                            </div>
+                            
+                            <!-- Riepilogo Gironi -->
+                            <div class="mt-4">
+                                <h5>Riepilogo Gironi</h5>
+                                <div class="row">
+                                    {% for group in ['A', 'B', 'C', 'D'] %}
+                                        {% set group_teams = teams | selectattr("group", "equalto", group) | list %}
+                                        <div class="col-md-3 mb-2">
+                                            <div class="card {% if group_teams|length == 4 %}border-success{% elif group_teams|length > 4 %}border-danger{% else %}border-warning{% endif %}">
+                                                <div class="card-body text-center p-2">
+                                                    <h6 class="card-title mb-1">Girone {{ group }}</h6>
+                                                    <span class="badge {% if group_teams|length == 4 %}bg-success{% elif group_teams|length > 4 %}bg-danger{% else %}bg-warning{% endif %}">
+                                                        {{ group_teams|length }}/4 squadre
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% set unassigned_teams = teams | selectattr("group", "none") | list %}
+                                {% if unassigned_teams %}
+                                    <div class="alert alert-warning mt-2">
+                                        <strong>Squadre non assegnate:</strong> {{ unassigned_teams|length }}
+                                    </div>
+                                {% endif %}
                             </div>
                         {% else %}
                             <p>Nessuna squadra registrata.</p>
@@ -145,4 +194,3 @@
     </script>
 </body>
 </html>
-

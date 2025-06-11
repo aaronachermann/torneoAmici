@@ -47,39 +47,133 @@
 
         <div class="d-flex justify-content-between align-items-center">
             <h1>Gironi</h1>
-            <form method="post" action="{{ url_for('regenerate_groups') }}">
-                <button type="submit" class="btn btn-primary">Rigenera Gironi</button>
-            </form>
+            <a href="{{ url_for('teams') }}" class="btn btn-primary">Gestisci Assegnazioni</a>
         </div>
         
+        <!-- <div class="alert alert-info mt-3">
+            <strong>Nota:</strong> Per modificare l'assegnazione delle squadre ai gironi, vai alla pagina <a href="{{ url_for('teams') }}" class="alert-link">Gestione Squadre</a>.
+        </div> -->
+
         <div class="row mt-4">
-            {% for group, teams in groups.items() %}
+            {% for group in ['A', 'B', 'C', 'D'] %}
+                {% set group_teams = groups[group] %}
                 <div class="col-md-3 mb-4">
-                    <div class="card">
+                    <div class="card {% if group_teams|length == 4 %}border-success{% elif group_teams|length > 4 %}border-danger{% else %}border-warning{% endif %}">
                         <div class="card-header bg-primary text-white">
-                            <h4 class="mb-0">Girone {{ group }}</h4>
+                            <h4 class="mb-0 d-flex justify-content-between align-items-center">
+                                Girone {{ group }}
+                                <span class="badge {% if group_teams|length == 4 %}bg-success{% elif group_teams|length > 4 %}bg-danger{% else %}bg-warning{% endif %}">
+                                    {{ group_teams|length }}/4
+                                </span>
+                            </h4>
                         </div>
                         <div class="card-body">
-                            <ul class="list-group list-group-flush">
-                                {% for team in teams %}
-                                    <li class="list-group-item">{{ team.name }}</li>
-                                {% else %}
-                                    <li class="list-group-item">Nessuna squadra assegnata</li>
-                                {% endfor %}
-                            </ul>
+                            {% if group_teams %}
+                                <ul class="list-group list-group-flush">
+                                    {% for team in group_teams %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                                            {{ team.name }}
+                                            <span class="badge bg-secondary">{{ team.players|length }} giocatori</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                <div class="text-center text-muted">
+                                    <i class="fas fa-users"></i>
+                                    <p class="mt-2">Nessuna squadra assegnata</p>
+                                </div>
+                            {% endif %}
                         </div>
+                        {% if group_teams|length != 4 %}
+                            <div class="card-footer text-center">
+                                {% if group_teams|length < 4 %}
+                                    <small class="text-warning">Mancano {{ 4 - group_teams|length }} squadre</small>
+                                {% else %}
+                                    <small class="text-danger">Troppe squadre ({{ group_teams|length - 4 }} in eccesso)</small>
+                                {% endif %}
+                            </div>
+                        {% endif %}
                     </div>
                 </div>
             {% endfor %}
         </div>
 
-        {% if not groups['A'] %}
-            <div class="text-center mt-4">
-                <form action="{{ url_for('generate_groups') }}" method="post">
-                    <button type="submit" class="btn btn-primary">Genera Gironi</button>
-                </form>
+        <!-- Squadre non assegnate -->
+        {% set unassigned_teams = all_teams | selectattr("group", "none") | list %}
+        {% if unassigned_teams %}
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card border-warning">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="mb-0">
+                                Squadre Non Assegnate
+                                <span class="badge bg-dark">{{ unassigned_teams|length }}</span>
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                {% for team in unassigned_teams %}
+                                    <div class="col-md-3 mb-2">
+                                        <div class="card">
+                                            <div class="card-body p-2 text-center">
+                                                <strong>{{ team.name }}</strong><br>
+                                                <small class="text-muted">{{ team.players|length }} giocatori</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <strong>Attenzione:</strong> Queste squadre devono essere assegnate a un girone prima di poter generare il calendario delle partite.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         {% endif %}
+
+        <!-- Statistiche gironi -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h4 class="mb-0">Statistiche Gironi</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <h5 class="text-success">{{ groups_stats.complete }}</h5>
+                                <small>Gironi Completi</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h5 class="text-warning">{{ groups_stats.incomplete }}</h5>
+                                <small>Gironi Incompleti</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h5 class="text-danger">{{ groups_stats.overfull }}</h5>
+                                <small>Gironi Eccedenti</small>
+                            </div>
+                            <div class="col-md-3">
+                                <h5 class="text-info">{{ groups_stats.total_teams }}</h5>
+                                <small>Squadre Totali</small>
+                            </div>
+                        </div>
+                        
+                        {% if groups_stats.complete == 4 %}
+                            <div class="alert alert-success mt-3 mb-0">
+                                <i class="fas fa-check-circle"></i>
+                                <strong>Perfetto!</strong> Tutti i gironi sono completi e pronti per il torneo.
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mt-3 mb-0">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Configurazione in corso:</strong> Completa l'assegnazione delle squadre ai gironi per procedere.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
@@ -91,4 +185,3 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
