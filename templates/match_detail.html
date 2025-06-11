@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Calendario - Gestione Torneo Hockey</title>
+    <title>Dettagli Partita - Gestione Torneo Hockey</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
@@ -46,529 +46,218 @@
         {% endwith %}
 
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Calendario Partite {{ tournament_dates.qualification_day1.date.year }}</h1>
-            <div>
-                <form method="post" class="d-inline">
-                    <button type="submit" class="btn btn-primary">Genera Calendario Completo</button>
-                </form>
-                <form method="post" action="{{ url_for('reset_schedule') }}" class="d-inline ms-2">
-                    <button type="submit" class="btn btn-danger">Azzera Calendario</button>
-                </form>
+            <h1>Dettagli Partita</h1>
+            <a href="{{ url_for('schedule') }}" class="btn btn-secondary">Torna al Calendario</a>
+        </div>
+
+        <!-- Informazioni Partita -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">
+                            {{ match.get_team1_display_name() }} vs {{ match.get_team2_display_name() }}
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5>Informazioni Partita</h5>
+                                <p><strong>Data:</strong> {{ match.date.strftime('%d/%m/%Y') }}</p>
+                                <p><strong>Orario:</strong> {{ match.time.strftime('%H:%M') }}</p>
+                                <p><strong>Fase:</strong> 
+                                    {% if match.phase == 'group' %}
+                                        Qualificazioni
+                                    {% elif match.phase == 'quarterfinal' %}
+                                        Quarti di Finale
+                                    {% elif match.phase == 'semifinal' %}
+                                        Semifinali
+                                    {% elif match.phase == 'final' %}
+                                        Finali
+                                    {% endif %}
+                                </p>
+                                {% if match.league %}
+                                    <p><strong>Lega:</strong> {{ match.league }}</p>
+                                {% endif %}
+                                <p><strong>Partita N°:</strong> {{ match.get_match_number() }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <h5>Risultato</h5>
+                                {% if match.is_completed %}
+                                    <div class="text-center">
+                                        <h2 class="text-success">
+                                            {{ match.team1_score }} - {{ match.team2_score }}
+                                        </h2>
+                                        {% if match.winner %}
+                                            <p><strong>Vincitore:</strong> 
+                                                <span class="text-primary">{{ match.winner.name }}</span>
+                                            </p>
+                                        {% else %}
+                                            <p><strong>Pareggio</strong></p>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <h3 class="text-muted">Partita non ancora giocata</h3>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- Pulsanti di aggiornamento playoff -->
-        {% if matches_by_date %}
-            <div class="row mt-3">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-secondary text-white">
-                            <h5 class="mb-0">🔄 Aggiornamento Fasi Torneo</h5>
-                        </div>
-                        <div class="card-body">
-                            <div class="d-flex gap-2 flex-wrap">
-                                <form method="post" action="{{ url_for('update_playoffs') }}" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-success">Aggiorna Quarti di Finale</button>
-                                </form>
-                                <form method="post" action="{{ url_for('update_semifinals_route') }}" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-info">Aggiorna Semifinali</button>
-                                </form>
-                                <form method="post" action="{{ url_for('update_finals_route') }}" class="d-inline">
-                                    <button type="submit" class="btn btn-sm btn-warning">Aggiorna Finali</button>
-                                </form>
-                            </div>
-                            <small class="text-muted mt-2 d-block">
-                                Usa questi pulsanti per aggiornare manualmente le fasi del torneo quando quelle precedenti sono completate.
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Sezione Qualificazioni -->
-        <h2 class="mt-4">Qualificazioni ({{ tournament_dates.qualification_day1.day_name_it }} e {{ tournament_dates.qualification_day2.day_name_it }}, {{ tournament_dates.qualification_day1.date.day }} e {{ tournament_dates.qualification_day2.date.day }} {{ tournament_dates.qualification_day1.date.strftime('%B')|title }} {{ tournament_dates.qualification_day1.date.year }})</h2>
-        {% for date, matches in matches_by_date.items() %}
-            {% set qual_matches = matches | selectattr("phase", "equalto", "group") | list %}
-            {% if qual_matches|length > 0 %}
-                <div class="card mt-4">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">{{ date }}</h4>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr> 
-                                        <th>Partita N°</th>
-                                        <th>Orario</th>
-                                        <th>Squadra 1</th>
-                                        <th>Squadra 2</th>
-                                        <th>Risultato</th>
-                                        <th>Azioni</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for match in qual_matches %}
-                                        <tr>
-                                            <td><strong>{{ match.get_match_number() }}</strong></td>
-                                            <td>{{ match.time.strftime('%H:%M') }}</td>
-                                            <td>{{ match.get_team1_display_name() }}</td>
-                                            <td>{{ match.get_team2_display_name() }}</td>
-                                            <td>
-                                                {% if match.is_completed %}
-                                                    <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                {% else %}
-                                                    <span class="badge bg-secondary">Non giocata</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>
-                                                <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        {% endfor %}
-        
-
-        <!-- Sezione Playoff - Major League -->
-        <h2 class="mt-4">Playoff - Major League</h2>
-        {% for date, matches in matches_by_date.items() %}
-            {% set major_matches = matches | selectattr("league", "equalto", "Major League") | selectattr("phase", "ne", "group") | list %}
-            {% if major_matches|length > 0 %}
-                <div class="card mt-4">
-                    <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">
-                            {{ date }}
-                            {% set first_match = major_matches[0] %}
-                            {% if first_match.phase == 'quarterfinal' %}
-                                - Quarti di Finale
-                            {% elif first_match.phase == 'semifinal' %}
-                                - Semifinali
-                            {% elif first_match.phase == 'final' %}
-                                - Finali
-                            {% endif %}
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        {% if major_matches[0].phase == 'semifinal' %}
-                            <!-- Raggruppamento semifinali -->
-                            {% set consolation_matches = major_matches[:2] %}
-                            {% set title_matches = major_matches[2:] %}
-                            
-                            <h5 class="text-warning mb-3">🥉 Semifinali 5°-8° posto</h5>
-                            <div class="table-responsive mb-4">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in consolation_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <h5 class="text-primary mb-3">🏆 Semifinali 1°-4° posto</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in title_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% elif major_matches[0].phase == 'final' %}
-                            <!-- Raggruppamento finali -->
-                            <h5 class="text-primary mb-3">🏆 Finali Major League - Piazzamenti</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Piazzamento</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in major_matches %}
-                                            <tr {% if loop.index == 4 %}class="table-warning"{% endif %}>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name().split('(')[0].strip() }}</td>
-                                                <td>{{ match.get_team2_display_name().split('(')[0].strip() }}</td>
-                                                <td>
-                                                    {% if loop.index == 1 %}
-                                                        <span class="badge bg-secondary">7°/8° posto</span>
-                                                    {% elif loop.index == 2 %}
-                                                        <span class="badge bg-warning text-dark">5°/6° posto</span>
-                                                    {% elif loop.index == 3 %}
-                                                        <span class="badge bg-info">3°/4° posto</span>
-                                                    {% elif loop.index == 4 %}
-                                                        <span class="badge bg-primary">🥇 1°/2° posto</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <!-- Tabella normale per quarti di finale -->
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in major_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endif %}
-        {% endfor %}
-
-        <!-- Sezione Playoff - Beer League -->
-        <h2 class="mt-4">Playoff - Beer League</h2>
-        {% for date, matches in matches_by_date.items() %}
-            {% set beer_matches = matches | selectattr("league", "equalto", "Beer League") | selectattr("phase", "ne", "group") | list %}
-            {% if beer_matches|length > 0 %}
-                <div class="card mt-4">
-                    <div class="card-header bg-warning text-dark">
-                        <h4 class="mb-0">
-                            {{ date }}
-                            {% set first_match = beer_matches[0] %}
-                            {% if first_match.phase == 'quarterfinal' %}
-                                - Quarti di Finale
-                            {% elif first_match.phase == 'semifinal' %}
-                                - Semifinali
-                            {% elif first_match.phase == 'final' %}
-                                - Finali
-                            {% endif %}
-                        </h4>
-                    </div>
-                    <div class="card-body">
-                        {% if beer_matches[0].phase == 'semifinal' %}
-                            <!-- Raggruppamento semifinali Beer League -->
-                            {% set consolation_matches = beer_matches[:2] %}
-                            {% set title_matches = beer_matches[2:] %}
-                            
-                            <h5 class="text-warning mb-3">🥉 Semifinali 5°-8° posto</h5>
-                            <div class="table-responsive mb-4">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in consolation_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                            
-                            <h5 class="text-primary mb-3">🏆 Semifinali 1°-4° posto</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in title_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% elif beer_matches[0].phase == 'final' %}
-                            <!-- Raggruppamento finali Beer League -->
-                            <h5 class="text-warning mb-3">🏆 Finali Beer League - Piazzamenti</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Piazzamento</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in beer_matches %}
-                                            <tr {% if loop.index == 4 %}class="table-warning"{% endif %}>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name().split('(')[0].strip() }}</td>
-                                                <td>{{ match.get_team2_display_name().split('(')[0].strip() }}</td>
-                                                <td>
-                                                    {% if loop.index == 1 %}
-                                                        <span class="badge bg-secondary">7°/8° posto</span>
-                                                    {% elif loop.index == 2 %}
-                                                        <span class="badge bg-warning text-dark">5°/6° posto</span>
-                                                    {% elif loop.index == 3 %}
-                                                        <span class="badge bg-info">3°/4° posto</span>
-                                                    {% elif loop.index == 4 %}
-                                                        <span class="badge bg-warning">🥇 1°/2° posto BL</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <!-- Tabella normale per quarti di finale Beer League -->
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in beer_matches %}
-                                            <tr>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endif %}
-        {% endfor %}
-
-        <!-- Messaggio se non ci sono partite -->
-        {% if not matches_by_date %}
-            <div class="alert alert-info mt-4">
-                <h4><i class="fas fa-calendar-alt"></i> Nessuna partita programmata</h4>
-                <p>Il calendario del torneo non è ancora stato generato.</p>
-                <p><strong>Per generare il calendario:</strong></p>
-                <ol>
-                    <li>Assicurati che tutte le 16 squadre siano registrate</li>
-                    <li>Verifica che ogni girone abbia esattamente 4 squadre</li>
-                    <li>Clicca su "Genera Calendario Completo"</li>
-                </ol>
-            </div>
-        {% endif %}
-
-        <!-- Statistiche partite -->
-        {% if matches_by_date %}
+        <!-- Inserimento Risultato -->
+        {% if not match.is_completed and match.team1 and match.team2 %}
             <div class="row mt-4">
-                <div class="col-12">
+                <div class="col-md-6 mx-auto">
                     <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">📊 Statistiche Calendario</h4>
+                        <div class="card-header bg-success text-white">
+                            <h4 class="mb-0">Inserisci Risultato</h4>
                         </div>
                         <div class="card-body">
-                            {% set all_matches = [] %}
-                            {% for date, matches in matches_by_date.items() %}
-                                {% set _ = all_matches.extend(matches) %}
-                            {% endfor %}
-                            
-                            {% set total_matches = all_matches|length %}
-                            {% set completed_matches = all_matches|selectattr("is_completed")|list|length %}
-                            {% set qualification_matches = all_matches|selectattr("phase", "equalto", "group")|list|length %}
-                            {% set playoff_matches = total_matches - qualification_matches %}
-                            
-                            <div class="row text-center">
-                                <div class="col-md-3">
-                                    <h5 class="text-primary">{{ total_matches }}</h5>
-                                    <small>Partite Totali</small>
-                                </div>
-                                <div class="col-md-3">
-                                    <h5 class="text-success">{{ completed_matches }}</h5>
-                                    <small>Partite Giocate</small>
-                                </div>
-                                <div class="col-md-3">
-                                    <h5 class="text-info">{{ qualification_matches }}</h5>
-                                    <small>Qualificazioni</small>
-                                </div>
-                                <div class="col-md-3">
-                                    <h5 class="text-warning">{{ playoff_matches }}</h5>
-                                    <small>Playoff</small>
-                                </div>
-                            </div>
-                            
-                            {% if total_matches > 0 %}
-                                <div class="progress mt-3">
-                                    <div class="progress-bar bg-success" role="progressbar" 
-                                         style="width: {{ (completed_matches / total_matches * 100)|round }}%">
-                                        {{ (completed_matches / total_matches * 100)|round }}% completato
+                            <form method="post">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
+                                        <input type="number" class="form-control" id="team1_score" name="team1_score" min="0" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="team2_score" class="form-label">{{ match.team2.name }}</label>
+                                        <input type="number" class="form-control" id="team2_score" name="team2_score" min="0" required>
                                     </div>
                                 </div>
+                                <div class="mt-3">
+                                    <button type="submit" class="btn btn-success">Salva Risultato</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Modifica Risultato -->
+        {% if match.is_completed and match.team1 and match.team2 %}
+            <div class="row mt-4">
+                <div class="col-md-6 mx-auto">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="mb-0">Modifica Risultato</h4>
+                        </div>
+                        <div class="card-body">
+                            <form method="post">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
+                                        <input type="number" class="form-control" id="team1_score" name="team1_score" value="{{ match.team1_score }}" min="0" required>
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="team2_score" class="form-label">{{ match.team2.name }}</label>
+                                        <input type="number" class="form-control" id="team2_score" name="team2_score" value="{{ match.team2_score }}" min="0" required>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button type="submit" class="btn btn-warning">Aggiorna Risultato</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Statistiche Giocatori -->
+        {% if match.team1 and match.team2 %}
+            <div class="row mt-4">
+                <!-- Squadra 1 -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0">{{ match.team1.name }}</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if team1_players %}
+                                <form method="post" action="{{ url_for('update_player_stats', match_id=match.id) }}">
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Giocatore</th>
+                                                    <th>Gol</th>
+                                                    <th>Assist</th>
+                                                    <th>Penalità</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for player in team1_players %}
+                                                    <tr>
+                                                        <td>{{ player.name }}</td>
+                                                        <td>
+                                                            <input type="number" class="form-control form-control-sm" 
+                                                                   name="player_{{ player.id }}_goals" 
+                                                                   value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                   min="0" max="10" style="width: 60px;">
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" class="form-control form-control-sm" 
+                                                                   name="player_{{ player.id }}_assists" 
+                                                                   value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                   min="0" max="10" style="width: 60px;">
+                                                        </td>
+                                                        <td>
+                                                            <input type="number" class="form-control form-control-sm" 
+                                                                   name="player_{{ player.id }}_penalties" 
+                                                                   value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
+                                                                   min="0" max="10" style="width: 60px;">
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm">Salva Statistiche {{ match.team1.name }}</button>
+                                </form>
+                            {% else %}
+                                <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Squadra 2 -->
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0">{{ match.team2.name }}</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if team2_players %}
+                                <div class="table-responsive">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Giocatore</th>
+                                                <th>Gol</th>
+                                                <th>Assist</th>
+                                                <th>Penalità</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for player in team2_players %}
+                                                <tr>
+                                                    <td>{{ player.name }}</td>
+                                                    <td>{{ match_stats[player.id].goals if player.id in match_stats else 0 }}</td>
+                                                    <td>{{ match_stats[player.id].assists if player.id in match_stats else 0 }}</td>
+                                                    <td>{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
                             {% endif %}
                         </div>
                     </div>
@@ -576,6 +265,14 @@
             </div>
         {% endif %}
 
+        <!-- Messaggio per partite placeholder -->
+        {% if not match.team1 or not match.team2 %}
+            <div class="alert alert-info mt-4">
+                <h4><i class="fas fa-info-circle"></i> Partita in attesa</h4>
+                <p>Questa partita sarà determinata in base ai risultati delle fasi precedenti del torneo.</p>
+                <p><strong>Descrizione:</strong> {{ match.get_team1_display_name() }} vs {{ match.get_team2_display_name() }}</p>
+            </div>
+        {% endif %}
     </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
