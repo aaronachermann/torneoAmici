@@ -47,13 +47,44 @@
 
         <div class="d-flex justify-content-between align-items-center">
             <h1>Calendario Partite {{ tournament_dates.qualification_day1.date.year }}</h1>
-            <form method="post">
-                <button type="submit" class="btn btn-primary">Genera Calendario Completo</button>
-            </form>
+            <div>
+                <form method="post" class="d-inline">
+                    <button type="submit" class="btn btn-primary">Genera Calendario Completo</button>
+                </form>
+                <form method="post" action="{{ url_for('reset_schedule') }}" class="d-inline ms-2">
+                    <button type="submit" class="btn btn-danger">Azzera Calendario</button>
+                </form>
+            </div>
         </div>
-        <form method="post" action="{{ url_for('reset_schedule') }}">
-            <button type="submit" class="btn btn-danger">Azzera Calendario</button>
-        </form>
+
+        <!-- Pulsanti di aggiornamento playoff -->
+        {% if matches_by_date %}
+            <div class="row mt-3">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-secondary text-white">
+                            <h5 class="mb-0">🔄 Aggiornamento Fasi Torneo</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex gap-2 flex-wrap">
+                                <form method="post" action="{{ url_for('update_playoffs') }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-success">Aggiorna Quarti di Finale</button>
+                                </form>
+                                <form method="post" action="{{ url_for('update_semifinals_route') }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-info">Aggiorna Semifinali</button>
+                                </form>
+                                <form method="post" action="{{ url_for('update_finals_route') }}" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-warning">Aggiorna Finali</button>
+                                </form>
+                            </div>
+                            <small class="text-muted mt-2 d-block">
+                                Usa questi pulsanti per aggiornare manualmente le fasi del torneo quando quelle precedenti sono completate.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
 
         <!-- Sezione Qualificazioni -->
         <h2 class="mt-4">Qualificazioni ({{ tournament_dates.qualification_day1.day_name_it }} e {{ tournament_dates.qualification_day2.day_name_it }}, {{ tournament_dates.qualification_day1.date.day }} e {{ tournament_dates.qualification_day2.date.day }} {{ tournament_dates.qualification_day1.date.strftime('%B')|title }} {{ tournament_dates.qualification_day1.date.year }})</h2>

@@ -90,15 +90,63 @@
                 </div>
             </div>
 
-            <div class="mt-4">
+<div class="mt-4">
                 <h3>Funzioni Amministrative</h3>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <a href="{{ url_for('init_db') }}" class="btn btn-warning">Inizializza Database</a>
                     <button type="button" class="btn btn-danger" onclick="confirmResetDB()">Azzera Database</button>
                 </div>
             </div>
+
+            <div class="mt-4">
+                <h3>Dati di Esempio</h3>
+                <div class="d-flex gap-2 flex-wrap mb-2">
+                    <form method="post" action="{{ url_for('populate_sample_data_route') }}" class="d-inline">
+                        <button type="submit" class="btn btn-success" onclick="return confirm('Popolare il database con dati di esempio? Questo aggiungerà giocatori, risultati e statistiche.')">
+                            Popola Dati Esempio
+                        </button>
+                    </form>
+                    <form method="post" action="{{ url_for('reset_and_populate') }}" class="d-inline">
+                        <button type="submit" class="btn btn-info" onclick="return confirm('Resettare tutto e ripopolare con dati freschi? Questo eliminerà tutti i giocatori e risultati esistenti.')">
+                            Reset + Popola
+                        </button>
+                    </form>
+                    <a href="{{ url_for('verify_data') }}" class="btn btn-secondary">Verifica Dati</a>
+                </div>
+                
+                <!-- Pulsanti Debug -->
+                <div class="d-flex gap-1 flex-wrap mb-2">
+                    <small class="text-muted me-2">Debug:</small>
+                    <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
+                        <input type="hidden" name="step" value="1">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">1.Gironi</button>
+                    </form>
+                    <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
+                        <input type="hidden" name="step" value="2">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">2.Giocatori</button>
+                    </form>
+                    <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
+                        <input type="hidden" name="step" value="3">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">3.Calendario</button>
+                    </form>
+                    <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
+                        <input type="hidden" name="step" value="4">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">4.Risultati</button>
+                    </form>
+                    <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
+                        <input type="hidden" name="step" value="5">
+                        <button type="submit" class="btn btn-outline-primary btn-sm">5.Playoff</button>
+                    </form>
+                    <a href="{{ url_for('debug_teams') }}" class="btn btn-outline-secondary btn-sm">Info Teams</a>
+                    <a href="{{ url_for('debug_matches') }}" class="btn btn-outline-secondary btn-sm">Info Matches</a>
+                </div>
+                
+                <small class="text-muted d-block">
+                    ⚠️ <strong>Attenzione:</strong> Questi pulsanti sono solo per test e demo. Rimuovili in produzione.
+                </small>
+            </div>
+            
         </div>
-    </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
