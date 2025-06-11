@@ -138,7 +138,18 @@ class Match(db.Model):
     @property
     def is_completed(self):
         return self.team1_score is not None and self.team2_score is not None
-    
+    @property
+    def team1_name(self):
+        if self.team1_id and self.team1:
+            return self.team1.name
+        return "TBD"  # To Be Determined
+
+    @property  
+    def team2_name(self):
+        if self.team2_id and self.team2:
+            return self.team2.name
+        return "TBD"  # To Be Determined
+
     
     @property
     def winner(self):
@@ -212,8 +223,15 @@ class MatchDescription(db.Model):
     
     match = db.relationship('Match', backref='description', lazy=True)
 
+
 class PlayerMatchStats(db.Model):
     """Statistiche di un giocatore in una singola partita."""
+    __tablename__ = 'player_match_stats'
+    __table_args__ = (
+        db.UniqueConstraint('player_id', 'match_id', name='_player_match_uc'),
+        {'extend_existing': True}  # Questo risolve l'errore
+    )
+    
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
@@ -224,84 +242,6 @@ class PlayerMatchStats(db.Model):
     # Relazioni
     player = db.relationship('Player', backref='match_stats')
     match = db.relationship('Match', backref='player_stats')
-    
-    # Indice univoco per evitare duplicati
-    __table_args__ = (db.UniqueConstraint('player_id', 'match_id', name='_player_match_uc'),)
-
-
-
-    def _is_placeholder_team(self):
-        """Verifica se le squadre assegnate sono ancora placeholder."""
-        if not all_group_matches_completed():
-            return True
-        
-        # Ottieni le squadre che dovrebbero essere nei playoff
-        qualified_teams = set()
-        
-        # Aggiungi tutte le squadre qualificate per Major League e Beer League
-        for group in ['A', 'B', 'C', 'D']:
-            teams = Team.query.filter_by(group=group).order_by(
-                Team.points.desc(), 
-                (Team.goals_for - Team.goals_against).desc(),
-                Team.goals_for.desc()
-            ).all()
-            
-            if len(teams) >= 4:
-                # Prime 2 per Major League, ultime 2 per Beer League
-                qualified_teams.update([team.id for team in teams[:2]])  # ML
-                qualified_teams.update([team.id for team in teams[2:4]])  # BL
-        
-        # Se questa partita ha squadre che non sono nelle qualificate, sono placeholder
-        if self.league == 'Major League':
-            # Per Major League, controlla se le squadre sono nelle prime 2 di ogni girone
-            expected_teams = set()
-            for group in ['A', 'B', 'C', 'D']:
-                teams = Team.query.filter_by(group=group).order_by(
-                    Team.points.desc(), 
-                    (Team.goals_for - Team.goals_against).desc(),
-                    Team.goals_for.desc()
-                ).limit(2).all()
-                expected_teams.update([team.id for team in teams])
-            
-            return self.team1_id not in expected_teams or self.team2_id not in expected_teams
-        
-        elif self.league == 'Beer League':
-            # Per Beer League, controlla se le squadre sono nelle ultime 2 di ogni girone
-            expected_teams = set()
-            for group in ['A', 'B', 'C', 'D']:
-                teams = Team.query.filter_by(group=group).order_by(
-                    Team.points.desc(), 
-                    (Team.goals_for - Team.goals_against).desc(),
-                    Team.goals_for.desc()
-                ).all()
-                if len(teams) >= 4:
-                    expected_teams.update([teams[2].id, teams[3].id])
-            
-            return self.team1_id not in expected_teams or self.team2_id not in expected_teams
-        
-        return False
-
-
-
-
-class PlayerMatchStats(db.Model):
-    """Statistiche di un giocatore in una singola partita."""
-    id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
-    goals = db.Column(db.Integer, default=0)
-    assists = db.Column(db.Integer, default=0)
-    penalties = db.Column(db.Integer, default=0)
-    
-    # Relazioni
-    player = db.relationship('Player', backref='match_stats')
-    match = db.relationship('Match', backref='player_stats')
-    
-    # Indice univoco per evitare duplicati
-    __table_args__ = (db.UniqueConstraint('player_id', 'match_id', name='_player_match_uc'),)
-
-
-
 
 
 
@@ -802,20 +742,56 @@ def validate_groups_for_tournament():
 @app.route('/schedule', methods=['GET', 'POST'])
 def schedule():
     if request.method == 'POST':
-        # Verifica che i gironi siano completi prima di generare il calendario
-        is_valid, message = validate_groups_for_tournament()
-        if not is_valid:
-            flash(f'Impossibile generare il calendario: {message}')
-            return redirect(url_for('schedule'))
+        # Reset + genera qualificazioni
+        Match.query.delete()
         
-        # Genera l'intero calendario del torneo (versione semplificata)
-        generate_complete_tournament_simple()
+        # Reset team stats
+        teams = Team.query.all()
+        for team in teams:
+            team.wins = 0
+            team.losses = 0
+            team.draws = 0
+            team.goals_for = 0
+            team.goals_against = 0
+            team.points = 0
+        
+        db.session.commit()
+        
+        generate_qualification_matches()
+        flash('Il calendario delle partite di qualificazione è stato generato')
         return redirect(url_for('schedule'))
     
-    # NON chiamare update_playoff_brackets automaticamente
-    # Questo impedisce di assegnare squadre prima che le qualificazioni siano complete
+    # Logica per generare automaticamente i playoff quando necessario
+    if all_group_matches_completed():
+        qf_count = Match.query.filter_by(phase='quarterfinal').count()
+        if qf_count == 0:
+            if generate_quarterfinals():
+                flash("Quarti di finale generati automaticamente!")
     
-    # Recupera tutti i match per la visualizzazione
+    if all_quarterfinals_completed('Major League') and all_quarterfinals_completed('Beer League'):
+        sf_count = Match.query.filter_by(phase='semifinal').count()
+        if sf_count == 0:
+            if generate_semifinals():
+                flash("Semifinali generate automaticamente!")
+    
+    if all_semifinals_completed('Major League') and all_semifinals_completed('Beer League'):
+        # Verifica anche che le partite di piazzamento siano completate
+        ml_placement = Match.query.filter_by(phase='placement', league='Major League').all()
+        bl_placement = Match.query.filter_by(phase='placement', league='Beer League').all()
+        
+        placement_completed = True
+        for match in ml_placement + bl_placement:
+            if not match.is_completed:
+                placement_completed = False
+                break
+        
+        if placement_completed:
+            f_count = Match.query.filter_by(phase='final').count()
+            if f_count == 0:
+                if generate_finals():
+                    flash("Finali generate automaticamente!")
+    
+    # Recupera tutti i match
     matches = Match.query.order_by(Match.date, Match.time).all()
     matches_by_date = {}
     for match in matches:
@@ -825,6 +801,11 @@ def schedule():
         matches_by_date[date_str].append(match)
     
     return render_template('schedule.html', matches_by_date=matches_by_date)
+
+
+
+
+
 
 def generate_complete_tournament():
     """Genera l'intero calendario del torneo con descrizioni per le partite future."""
@@ -1822,41 +1803,82 @@ def all_quarterfinals_completed(league):
     
     return incomplete_matches == 0
 
+
 def update_semifinals(league):
-    # Get completed quarterfinal matches
+    """Aggiorna le semifinali con vincitori e perdenti dei quarti di finale."""
+    
+    # Ottieni i quarti di finale completati
     quarterfinals = Match.query.filter_by(
         phase='quarterfinal', league=league
     ).order_by(Match.time).all()
     
-    # Get semifinal matches
+    # Ottieni le semifinali
     semifinals = Match.query.filter_by(
         phase='semifinal', league=league
     ).order_by(Match.time).all()
     
-    if len(quarterfinals) >= 4 and len(semifinals) >= 2:
-        # Winners of first two quarterfinals go to first semifinal
-        semifinals[0].team1_id = quarterfinals[0].winner.id
-        semifinals[0].team2_id = quarterfinals[1].winner.id
+    print(f"\n=== DEBUG update_semifinals for {league} ===")
+    print(f"Quarti trovati: {len(quarterfinals)}")
+    print(f"Semifinali trovate: {len(semifinals)}")
+    
+    # Verifica che tutti i quarti siano completati
+    if len(quarterfinals) < 4:
+        print(f"Errore: Trovati solo {len(quarterfinals)} quarti invece di 4")
+        return
+    
+    for i, qf in enumerate(quarterfinals):
+        print(f"Quarto {i+1}: {qf.team1.name} {qf.team1_score}-{qf.team2_score} {qf.team2.name}, Vincitore: {qf.winner.name if qf.winner else 'Nessuno'}")
+    
+    # Verifica che tutti i quarti siano completati
+    for qf in quarterfinals:
+        if not qf.is_completed:
+            print(f"Errore: Quarto {qf.team1.name} vs {qf.team2.name} non completato")
+            return
+    
+    if len(semifinals) >= 4:
+        # Le prime 2 semifinali sono per i perdenti (5°-8° posto)
+        # Le ultime 2 semifinali sono per i vincitori (1°-4° posto)
         
-        # Winners of second two quarterfinals go to second semifinal
-        semifinals[1].team1_id = quarterfinals[2].winner.id
-        semifinals[1].team2_id = quarterfinals[3].winner.id
+        # SEMIFINALI PERDENTI (5°-8° posto)
+        # Semifinale 1: Perdente quarto 3 vs Perdente quarto 4 (21:00 vs 21:45)
+        loser_qf3 = quarterfinals[2].team1 if quarterfinals[2].winner == quarterfinals[2].team2 else quarterfinals[2].team2
+        loser_qf4 = quarterfinals[3].team1 if quarterfinals[3].winner == quarterfinals[3].team2 else quarterfinals[3].team2
         
-        # Losers go to placement matches
-        placement_matches = Match.query.filter_by(
-            phase='placement', league=league
-        ).order_by(Match.time).all()
+        semifinals[0].team1_id = loser_qf3.id
+        semifinals[0].team2_id = loser_qf4.id
+        print(f"Semifinale 0 (perdenti): {loser_qf3.name} vs {loser_qf4.name}")
         
-        if len(placement_matches) >= 2:
-            # Losers of first two quarterfinals
-            placement_matches[0].team1_id = quarterfinals[0].team1_id if quarterfinals[0].winner.id == quarterfinals[0].team2_id else quarterfinals[0].team2_id
-            placement_matches[0].team2_id = quarterfinals[1].team1_id if quarterfinals[1].winner.id == quarterfinals[1].team2_id else quarterfinals[1].team2_id
-            
-            # Losers of second two quarterfinals
-            placement_matches[1].team1_id = quarterfinals[2].team1_id if quarterfinals[2].winner.id == quarterfinals[2].team2_id else quarterfinals[2].team2_id
-            placement_matches[1].team2_id = quarterfinals[3].team1_id if quarterfinals[3].winner.id == quarterfinals[3].team2_id else quarterfinals[3].team2_id
+        # Semifinale 2: Perdente quarto 1 vs Perdente quarto 2 (19:30 vs 20:15)
+        loser_qf1 = quarterfinals[0].team1 if quarterfinals[0].winner == quarterfinals[0].team2 else quarterfinals[0].team2
+        loser_qf2 = quarterfinals[1].team1 if quarterfinals[1].winner == quarterfinals[1].team2 else quarterfinals[1].team2
+        
+        semifinals[1].team1_id = loser_qf1.id
+        semifinals[1].team2_id = loser_qf2.id
+        print(f"Semifinale 1 (perdenti): {loser_qf1.name} vs {loser_qf2.name}")
+        
+        # SEMIFINALI VINCITORI (1°-4° posto)
+        # Semifinale 3: Vincitore quarto 3 vs Vincitore quarto 4
+        winner_qf3 = quarterfinals[2].winner
+        winner_qf4 = quarterfinals[3].winner
+        
+        semifinals[2].team1_id = winner_qf3.id
+        semifinals[2].team2_id = winner_qf4.id
+        print(f"Semifinale 2 (vincitori): {winner_qf3.name} vs {winner_qf4.name}")
+        
+        # Semifinale 4: Vincitore quarto 1 vs Vincitore quarto 2
+        winner_qf1 = quarterfinals[0].winner
+        winner_qf2 = quarterfinals[1].winner
+        
+        semifinals[3].team1_id = winner_qf1.id
+        semifinals[3].team2_id = winner_qf2.id
+        print(f"Semifinale 3 (vincitori): {winner_qf1.name} vs {winner_qf2.name}")
+        
+        print("Semifinali aggiornate con successo!")
+    else:
+        print(f"Errore: Trovate solo {len(semifinals)} semifinali invece di 4")
     
     db.session.commit()
+
 
 def all_semifinals_completed(league):
     incomplete_matches = Match.query.filter_by(
@@ -1866,41 +1888,119 @@ def all_semifinals_completed(league):
     ).count()
     
     return incomplete_matches == 0
-
 def update_finals(league):
-    # Get completed semifinal matches
+    """Aggiorna le finali con vincitori e perdenti delle semifinali."""
+    
+    # Ottieni le semifinali completate
     semifinals = Match.query.filter_by(
         phase='semifinal', league=league
     ).order_by(Match.time).all()
     
-    # Get completed placement matches
-    placement_matches = Match.query.filter_by(
-        phase='placement', league=league
-    ).order_by(Match.time).all()
-    
-    # Get final matches
+    # Ottieni le finali
     finals = Match.query.filter_by(
         phase='final', league=league
     ).order_by(Match.time).all()
     
-    if len(semifinals) >= 2 and len(placement_matches) >= 2 and len(finals) >= 4:
-        # 1st-2nd place match (winners of semifinals)
-        finals[0].team1_id = semifinals[0].winner.id
-        finals[0].team2_id = semifinals[1].winner.id
+    print(f"\n=== DEBUG update_finals for {league} ===")
+    print(f"Semifinali trovate: {len(semifinals)}")
+    print(f"Finali trovate: {len(finals)}")
+    
+    # Verifica che tutte le semifinali siano completate
+    if len(semifinals) < 4:
+        print(f"Errore: Trovate solo {len(semifinals)} semifinali invece di 4")
+        return
+    
+    for i, sf in enumerate(semifinals):
+        if sf.is_completed:
+            print(f"Semifinale {i+1}: {sf.team1.name} {sf.team1_score}-{sf.team2_score} {sf.team2.name}, Vincitore: {sf.winner.name}")
+        else:
+            print(f"Semifinale {i+1}: {sf.team1.name} vs {sf.team2.name} - NON COMPLETATA")
+            return
+    
+    if len(finals) >= 4:
+        # Finali nell'ordine: 7°/8°, 5°/6°, 3°/4°, 1°/2°
         
-        # 3rd-4th place match (losers of semifinals)
-        finals[1].team1_id = semifinals[0].team1_id if semifinals[0].winner.id == semifinals[0].team2_id else semifinals[0].team2_id
-        finals[1].team2_id = semifinals[1].team1_id if semifinals[1].winner.id == semifinals[1].team2_id else semifinals[1].team2_id
+        # FINALE 7°/8° posto: Perdenti delle semifinali perdenti
+        loser_sf_losers_1 = semifinals[0].team1 if semifinals[0].winner == semifinals[0].team2 else semifinals[0].team2
+        loser_sf_losers_2 = semifinals[1].team1 if semifinals[1].winner == semifinals[1].team2 else semifinals[1].team2
         
-        # 5th-6th place match (winners of placement matches)
-        finals[2].team1_id = placement_matches[0].winner.id
-        finals[2].team2_id = placement_matches[1].winner.id
+        finals[0].team1_id = loser_sf_losers_1.id
+        finals[0].team2_id = loser_sf_losers_2.id
+        print(f"Finale 7°/8°: {loser_sf_losers_1.name} vs {loser_sf_losers_2.name}")
         
-        # 7th-8th place match (losers of placement matches)
-        finals[3].team1_id = placement_matches[0].team1_id if placement_matches[0].winner.id == placement_matches[0].team2_id else placement_matches[0].team2_id
-        finals[3].team2_id = placement_matches[1].team1_id if placement_matches[1].winner.id == placement_matches[1].team2_id else placement_matches[1].team2_id
+        # FINALE 5°/6° posto: Vincitori delle semifinali perdenti
+        winner_sf_losers_1 = semifinals[0].winner
+        winner_sf_losers_2 = semifinals[1].winner
+        
+        finals[1].team1_id = winner_sf_losers_1.id
+        finals[1].team2_id = winner_sf_losers_2.id
+        print(f"Finale 5°/6°: {winner_sf_losers_1.name} vs {winner_sf_losers_2.name}")
+        
+        # FINALE 3°/4° posto: Perdenti delle semifinali vincitori
+        loser_sf_winners_1 = semifinals[2].team1 if semifinals[2].winner == semifinals[2].team2 else semifinals[2].team2
+        loser_sf_winners_2 = semifinals[3].team1 if semifinals[3].winner == semifinals[3].team2 else semifinals[3].team2
+        
+        finals[2].team1_id = loser_sf_winners_1.id
+        finals[2].team2_id = loser_sf_winners_2.id
+        print(f"Finale 3°/4°: {loser_sf_winners_1.name} vs {loser_sf_winners_2.name}")
+        
+        # FINALE 1°/2° posto: Vincitori delle semifinali vincitori
+        winner_sf_winners_1 = semifinals[2].winner
+        winner_sf_winners_2 = semifinals[3].winner
+        
+        finals[3].team1_id = winner_sf_winners_1.id
+        finals[3].team2_id = winner_sf_winners_2.id
+        print(f"Finale 1°/2°: {winner_sf_winners_1.name} vs {winner_sf_winners_2.name}")
+        
+        print("Finali aggiornate con successo!")
+    else:
+        print(f"Errore: Trovate solo {len(finals)} finali invece di 4")
     
     db.session.commit()
+
+@app.route('/debug_playoff_progression')
+def debug_playoff_progression():
+    """Debug: mostra la progressione dei playoff."""
+    
+    info = []
+    
+    for league in ['Major League', 'Beer League']:
+        league_info = {'league': league, 'quarterfinals': [], 'semifinals': [], 'finals': []}
+        
+        # Quarti
+        quarterfinals = Match.query.filter_by(phase='quarterfinal', league=league).order_by(Match.time).all()
+        for qf in quarterfinals:
+            qf_info = {
+                'teams': f"{qf.team1.name} vs {qf.team2.name}",
+                'score': f"{qf.team1_score}-{qf.team2_score}" if qf.is_completed else "Non giocata",
+                'winner': qf.winner.name if qf.winner else "Nessuno"
+            }
+            league_info['quarterfinals'].append(qf_info)
+        
+        # Semifinali
+        semifinals = Match.query.filter_by(phase='semifinal', league=league).order_by(Match.time).all()
+        for sf in semifinals:
+            sf_info = {
+                'teams': f"{sf.team1.name} vs {sf.team2.name}",
+                'score': f"{sf.team1_score}-{sf.team2_score}" if sf.is_completed else "Non giocata",
+                'winner': sf.winner.name if sf.winner else "Nessuno"
+            }
+            league_info['semifinals'].append(sf_info)
+        
+        # Finali
+        finals = Match.query.filter_by(phase='final', league=league).order_by(Match.time).all()
+        for f in finals:
+            f_info = {
+                'teams': f"{f.team1.name} vs {f.team2.name}",
+                'score': f"{f.team1_score}-{f.team2_score}" if f.is_completed else "Non giocata",
+                'winner': f.winner.name if f.winner else "Nessuno"
+            }
+            league_info['finals'].append(f_info)
+        
+        info.append(league_info)
+    
+    flash(f'Debug playoff progression: {info}', 'info')
+    return redirect(url_for('schedule'))
 
 @app.route('/standings')
 def standings():
@@ -2202,152 +2302,336 @@ def insert_random_results():
     return redirect(url_for('schedule'))
 
 
+
+
+
+
 def generate_quarterfinals():
-    """Crea i match placeholder dei quarti di finale con date dinamiche."""
+    """Genera i quarti di finale solo dopo che tutte le qualificazioni sono completate"""
+    if not all_group_matches_completed():
+        return False
     
-    # Ottieni le date e orari dinamici
-    tournament_dates = get_tournament_dates()
-    tournament_times = get_tournament_times()
-    
+    # Date dei playoff
     playoff_dates = {
-        'ML_quarterfinals': tournament_dates['quarterfinals_ml'],
-        'BL_quarterfinals': tournament_dates['quarterfinals_bl'],
+        'ML_quarterfinals': datetime(2025, 7, 15).date(),  # Lunedì  
+        'BL_quarterfinals': datetime(2025, 7, 16).date(),  # Martedì
     }
-    quarterfinal_times = tournament_times['playoff_times']
+    quarterfinal_times = [time(19, 30), time(20, 15), time(21, 0), time(21, 45)]
     
     # Elimina eventuali quarti di finale già esistenti
     Match.query.filter_by(phase='quarterfinal').delete()
     
-    # Major League
-    for match_time in quarterfinal_times:
+    # Ottieni le classifiche dei gironi
+    standings = {}
+    for group in ['A', 'B', 'C', 'D']:
+        teams = Team.query.filter_by(group=group).order_by(
+            Team.points.desc(), 
+            (Team.goals_for - Team.goals_against).desc(),
+            Team.goals_for.desc()
+        ).all()
+        standings[group] = teams
+    
+    # Verifica che ogni girone abbia almeno 4 squadre
+    for group in ['A', 'B', 'C', 'D']:
+        if len(standings[group]) < 4:
+            print(f"Errore: Il girone {group} ha solo {len(standings[group])} squadre")
+            return False
+    
+    # Major League Quarterfinals
+    ml_matchups = [
+        (standings['C'][0], standings['D'][1]),  # 1C vs 2D
+        (standings['B'][0], standings['C'][1]),  # 1B vs 2C  
+        (standings['D'][0], standings['A'][1]),  # 1D vs 2A
+        (standings['A'][0], standings['B'][1]),  # 1A vs 2B
+    ]
+    
+    for i, (team1, team2) in enumerate(ml_matchups):
         match = Match(
-            team1_id=1,  # placeholder
-            team2_id=2,  # placeholder
+            team1_id=team1.id,
+            team2_id=team2.id,
             date=playoff_dates['ML_quarterfinals'],
-            time=match_time,
+            time=quarterfinal_times[i],
             phase='quarterfinal',
             league='Major League'
         )
         db.session.add(match)
     
-    # Beer League
-    for match_time in quarterfinal_times:
+    # Beer League Quarterfinals  
+    bl_matchups = [
+        (standings['B'][2], standings['C'][3]),  # 3B vs 4C
+        (standings['D'][2], standings['A'][3]),  # 3D vs 4A
+        (standings['A'][2], standings['B'][3]),  # 3A vs 4B
+        (standings['C'][2], standings['D'][3]),  # 3C vs 4D
+    ]
+    
+    for i, (team1, team2) in enumerate(bl_matchups):
         match = Match(
-            team1_id=1,
-            team2_id=2,
+            team1_id=team1.id,
+            team2_id=team2.id,
             date=playoff_dates['BL_quarterfinals'],
-            time=match_time,
+            time=quarterfinal_times[i],
             phase='quarterfinal',
             league='Beer League'
         )
         db.session.add(match)
     
     db.session.commit()
-    # A questo punto puoi chiamare update_playoff_brackets() per assegnare le squadre
-    update_playoff_brackets()
+    return True
+
 
 def generate_semifinals():
-    """Crea i match placeholder delle semifinali con date dinamiche."""
+    """Genera le semifinali solo dopo che tutti i quarti sono completati"""
+    if not (all_quarterfinals_completed('Major League') and all_quarterfinals_completed('Beer League')):
+        return False
     
-    # Ottieni le date e orari dinamici
-    tournament_dates = get_tournament_dates()
-    tournament_times = get_tournament_times()
-    
+    # Date dei playoff
     playoff_dates = {
-        'ML_semifinals': tournament_dates['semifinals_ml'],
-        'BL_semifinals': tournament_dates['semifinals_bl'],
+        'ML_semifinals': datetime(2025, 7, 18).date(),
+        'BL_semifinals': datetime(2025, 7, 19).date(),
     }
-    semifinal_times = tournament_times['playoff_times']
     
     # Elimina eventuali semifinali già esistenti
     Match.query.filter_by(phase='semifinal').delete()
+    Match.query.filter_by(phase='placement').delete()  # Anche le partite di piazzamento
     
-    # Major League
-    for match_time in semifinal_times:
-        match = Match(
-            team1_id=1,
-            team2_id=2,
-            date=playoff_dates['ML_semifinals'],
-            time=match_time,
-            phase='semifinal',
-            league='Major League'
-        )
-        db.session.add(match)
+    # Ottieni i risultati dei quarti di finale
+    ml_quarterfinals = Match.query.filter_by(
+        phase='quarterfinal', league='Major League'
+    ).order_by(Match.time).all()
     
-    # Beer League
-    for match_time in semifinal_times:
-        match = Match(
-            team1_id=1,
-            team2_id=2,
-            date=playoff_dates['BL_semifinals'],
-            time=match_time,
-            phase='semifinal',
-            league='Beer League'
-        )
-        db.session.add(match)
+    bl_quarterfinals = Match.query.filter_by(
+        phase='quarterfinal', league='Beer League'
+    ).order_by(Match.time).all()
+    
+    if len(ml_quarterfinals) != 4 or len(bl_quarterfinals) != 4:
+        return False
+    
+    # Verifica che tutti i quarti siano completati
+    for match in ml_quarterfinals + bl_quarterfinals:
+        if not match.is_completed:
+            return False
+    
+    semifinal_times = [time(19, 30), time(20, 15), time(21, 0), time(21, 45)]
+    
+    # Major League Semifinals
+    # SF1: Vincitore QF1 vs Vincitore QF2
+    sf1 = Match(
+        team1_id=ml_quarterfinals[0].winner.id,
+        team2_id=ml_quarterfinals[1].winner.id,
+        date=playoff_dates['ML_semifinals'],
+        time=semifinal_times[2],  # 21:00
+        phase='semifinal',
+        league='Major League'
+    )
+    db.session.add(sf1)
+    
+    # SF2: Vincitore QF3 vs Vincitore QF4
+    sf2 = Match(
+        team1_id=ml_quarterfinals[2].winner.id,
+        team2_id=ml_quarterfinals[3].winner.id,
+        date=playoff_dates['ML_semifinals'],
+        time=semifinal_times[3],  # 21:45
+        phase='semifinal',
+        league='Major League'
+    )
+    db.session.add(sf2)
+    
+    # Major League Placement matches (5°-8° posto)
+    # PM1: Perdente QF1 vs Perdente QF2
+    pm1 = Match(
+        team1_id=ml_quarterfinals[0].team1_id if ml_quarterfinals[0].winner.id == ml_quarterfinals[0].team2_id else ml_quarterfinals[0].team2_id,
+        team2_id=ml_quarterfinals[1].team1_id if ml_quarterfinals[1].winner.id == ml_quarterfinals[1].team2_id else ml_quarterfinals[1].team2_id,
+        date=playoff_dates['ML_semifinals'],
+        time=semifinal_times[0],  # 19:30
+        phase='placement',
+        league='Major League'
+    )
+    db.session.add(pm1)
+    
+    # PM2: Perdente QF3 vs Perdente QF4  
+    pm2 = Match(
+        team1_id=ml_quarterfinals[2].team1_id if ml_quarterfinals[2].winner.id == ml_quarterfinals[2].team2_id else ml_quarterfinals[2].team2_id,
+        team2_id=ml_quarterfinals[3].team1_id if ml_quarterfinals[3].winner.id == ml_quarterfinals[3].team2_id else ml_quarterfinals[3].team2_id,
+        date=playoff_dates['ML_semifinals'],
+        time=semifinal_times[1],  # 20:15
+        phase='placement',
+        league='Major League'
+    )
+    db.session.add(pm2)
+    
+    # Beer League Semifinals (stesso schema)
+    sf3 = Match(
+        team1_id=bl_quarterfinals[0].winner.id,
+        team2_id=bl_quarterfinals[1].winner.id,
+        date=playoff_dates['BL_semifinals'],
+        time=semifinal_times[2],
+        phase='semifinal',
+        league='Beer League'
+    )
+    db.session.add(sf3)
+    
+    sf4 = Match(
+        team1_id=bl_quarterfinals[2].winner.id,
+        team2_id=bl_quarterfinals[3].winner.id,
+        date=playoff_dates['BL_semifinals'],
+        time=semifinal_times[3],
+        phase='semifinal',
+        league='Beer League'
+    )
+    db.session.add(sf4)
+    
+    # Beer League Placement matches
+    pm3 = Match(
+        team1_id=bl_quarterfinals[0].team1_id if bl_quarterfinals[0].winner.id == bl_quarterfinals[0].team2_id else bl_quarterfinals[0].team2_id,
+        team2_id=bl_quarterfinals[1].team1_id if bl_quarterfinals[1].winner.id == bl_quarterfinals[1].team2_id else bl_quarterfinals[1].team2_id,
+        date=playoff_dates['BL_semifinals'],
+        time=semifinal_times[0],
+        phase='placement',
+        league='Beer League'
+    )
+    db.session.add(pm3)
+    
+    pm4 = Match(
+        team1_id=bl_quarterfinals[2].team1_id if bl_quarterfinals[2].winner.id == bl_quarterfinals[2].team2_id else bl_quarterfinals[2].team2_id,
+        team2_id=bl_quarterfinals[3].team1_id if bl_quarterfinals[3].winner.id == bl_quarterfinals[3].team2_id else bl_quarterfinals[3].team2_id,
+        date=playoff_dates['BL_semifinals'],
+        time=semifinal_times[1],
+        phase='placement',
+        league='Beer League'
+    )
+    db.session.add(pm4)
     
     db.session.commit()
-    # Ora aggiorna le semifinali
-    update_semifinals('Major League')
-    update_semifinals('Beer League')
+    return True
 
-# Sostituisci la funzione generate_finals esistente
+
 def generate_finals():
-    """Crea i match placeholder delle finali con date dinamiche."""
+    """Genera le finali solo dopo che tutte le semifinali sono completate"""
+    if not (all_semifinals_completed('Major League') and all_semifinals_completed('Beer League')):
+        return False
     
-    # Ottieni le date e orari dinamici
-    tournament_dates = get_tournament_dates()
-    tournament_times = get_tournament_times()
+    # Verifica che anche le partite di piazzamento siano completate
+    ml_placement = Match.query.filter_by(phase='placement', league='Major League').all()
+    bl_placement = Match.query.filter_by(phase='placement', league='Beer League').all()
+    
+    for match in ml_placement + bl_placement:
+        if not match.is_completed:
+            return False
     
     playoff_dates = {
-        'finals': tournament_dates['finals']
-    }
-    final_times = {
-        'Major League': tournament_times['final_times_ml'],
-        'Beer League': tournament_times['final_times_bl']
+        'finals': datetime(2025, 7, 20).date()
     }
     
     # Elimina eventuali finali già esistenti
     Match.query.filter_by(phase='final').delete()
     
-    # Major League
-    for match_time in final_times['Major League']:
-        match = Match(
-            team1_id=1,
-            team2_id=2,
-            date=playoff_dates['finals'],
-            time=match_time,
-            phase='final',
-            league='Major League'
-        )
-        db.session.add(match)
+    # Ottieni i risultati delle semifinali e piazzamenti
+    ml_semifinals = Match.query.filter_by(phase='semifinal', league='Major League').order_by(Match.time).all()
+    bl_semifinals = Match.query.filter_by(phase='semifinal', league='Beer League').order_by(Match.time).all()
     
-    # Beer League
-    for match_time in final_times['Beer League']:
-        match = Match(
-            team1_id=1,
-            team2_id=2,
-            date=playoff_dates['finals'],
-            time=match_time,
-            phase='final',
-            league='Beer League'
-        )
-        db.session.add(match)
+    if len(ml_semifinals) != 2 or len(bl_semifinals) != 2:
+        return False
+    
+    if len(ml_placement) != 2 or len(bl_placement) != 2:
+        return False
+    
+    final_times = {
+        'Major League': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)],
+        'Beer League': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)]
+    }
+    
+    # Major League Finals
+    # 7°/8° posto
+    f1 = Match(
+        team1_id=ml_placement[0].team1_id if ml_placement[0].winner.id == ml_placement[0].team2_id else ml_placement[0].team2_id,
+        team2_id=ml_placement[1].team1_id if ml_placement[1].winner.id == ml_placement[1].team2_id else ml_placement[1].team2_id,
+        date=playoff_dates['finals'],
+        time=final_times['Major League'][0],
+        phase='final',
+        league='Major League'
+    )
+    db.session.add(f1)
+    
+    # 5°/6° posto
+    f2 = Match(
+        team1_id=ml_placement[0].winner.id,
+        team2_id=ml_placement[1].winner.id,
+        date=playoff_dates['finals'],
+        time=final_times['Major League'][1],
+        phase='final',
+        league='Major League'
+    )
+    db.session.add(f2)
+    
+    # 3°/4° posto
+    f3 = Match(
+        team1_id=ml_semifinals[0].team1_id if ml_semifinals[0].winner.id == ml_semifinals[0].team2_id else ml_semifinals[0].team2_id,
+        team2_id=ml_semifinals[1].team1_id if ml_semifinals[1].winner.id == ml_semifinals[1].team2_id else ml_semifinals[1].team2_id,
+        date=playoff_dates['finals'],
+        time=final_times['Major League'][2],
+        phase='final',
+        league='Major League'
+    )
+    db.session.add(f3)
+    
+    # 1°/2° posto
+    f4 = Match(
+        team1_id=ml_semifinals[0].winner.id,
+        team2_id=ml_semifinals[1].winner.id,
+        date=playoff_dates['finals'],
+        time=final_times['Major League'][3],
+        phase='final',
+        league='Major League'
+    )
+    db.session.add(f4)
+    
+    # Beer League Finals (stesso schema)
+    # 7°/8° posto
+    f5 = Match(
+        team1_id=bl_placement[0].team1_id if bl_placement[0].winner.id == bl_placement[0].team2_id else bl_placement[0].team2_id,
+        team2_id=bl_placement[1].team1_id if bl_placement[1].winner.id == bl_placement[1].team2_id else bl_placement[1].team2_id,
+        date=playoff_dates['finals'],
+        time=final_times['Beer League'][0],
+        phase='final',
+        league='Beer League'
+    )
+    db.session.add(f5)
+    
+    # 5°/6° posto
+    f6 = Match(
+        team1_id=bl_placement[0].winner.id,
+        team2_id=bl_placement[1].winner.id,
+        date=playoff_dates['finals'],
+        time=final_times['Beer League'][1],
+        phase='final',
+        league='Beer League'
+    )
+    db.session.add(f6)
+    
+    # 3°/4° posto
+    f7 = Match(
+        team1_id=bl_semifinals[0].team1_id if bl_semifinals[0].winner.id == bl_semifinals[0].team2_id else bl_semifinals[0].team2_id,
+        team2_id=bl_semifinals[1].team1_id if bl_semifinals[1].winner.id == bl_semifinals[1].team2_id else bl_semifinals[1].team2_id,
+        date=playoff_dates['finals'],
+        time=final_times['Beer League'][2],
+        phase='final',
+        league='Beer League'
+    )
+    db.session.add(f7)
+    
+    # 1°/2° posto
+    f8 = Match(
+        team1_id=bl_semifinals[0].winner.id,
+        team2_id=bl_semifinals[1].winner.id,
+        date=playoff_dates['finals'],
+        time=final_times['Beer League'][3],
+        phase='final',
+        league='Beer League'
+    )
+    db.session.add(f8)
     
     db.session.commit()
-    # Aggiorna le finali
-    update_finals('Major League')
-    update_finals('Beer League')
-
-
-
-
-
-
-
-
-
-
+    return True
 
 
 
