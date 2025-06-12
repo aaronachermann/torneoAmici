@@ -95,6 +95,10 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{{ url_for('init_db') }}" class="btn btn-warning">Inizializza Database</a>
                     <button type="button" class="btn btn-danger" onclick="confirmResetDB()">Azzera Database</button>
+                    <form method="post" action="{{ url_for('fix_complete_playoff_system') }}" class="d-inline">
+                        <button type="submit" class="btn btn-success">🔧 Fix Completo Sistema Playoff</button>
+                    </form>
+                </div>
                 </div>
             </div>
 
@@ -137,6 +141,7 @@
                         <input type="hidden" name="step" value="5">
                         <button type="submit" class="btn btn-outline-primary btn-sm">5.Playoff</button>
                     </form>
+                    
                     <a href="{{ url_for('debug_teams') }}" class="btn btn-outline-secondary btn-sm">Info Teams</a>
                     <a href="{{ url_for('debug_matches') }}" class="btn btn-outline-secondary btn-sm">Info Matches</a>
                 </div>

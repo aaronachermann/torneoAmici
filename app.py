@@ -118,8 +118,8 @@ class Player(db.Model):
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
-    team1_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
-    team2_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    team1_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)  # NULL per placeholder
+    team2_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=True)  # NULL per placeholder
     
     team1 = db.relationship('Team', foreign_keys=[team1_id], overlaps="matches")
     team2 = db.relationship('Team', foreign_keys=[team2_id], overlaps="matches")
@@ -149,7 +149,6 @@ class Match(db.Model):
 
     def get_match_number(self):
         """Restituisce il numero progressivo della partita."""
-        # Conta tutte le partite precedenti a questa per data e ora
         earlier_matches = Match.query.filter(
             (Match.date < self.date) | 
             ((Match.date == self.date) & (Match.time < self.time))
@@ -157,33 +156,37 @@ class Match(db.Model):
         return earlier_matches + 1
 
     def get_team1_display_name(self):
-        """Restituisce il nome della squadra 1 - SEMPRE nomi reali se disponibili."""
-        # Se la squadra esiste, mostra sempre il nome reale
+        """Restituisce il nome della squadra 1 o descrizione playoff."""
+        # Se team1_id è NULL, mostra sempre la descrizione playoff
+        if self.team1_id is None:
+            if self.phase != 'group':
+                description = self.get_playoff_description()
+                return description['team1']
+            return "TBD"
+        
+        # Se la squadra esiste, mostra il nome reale
         if self.team1:
             return self.team1.name
-        
-        # Solo se non c'è la squadra, mostra la descrizione playoff
-        if self.phase != 'group':
-            description = self.get_playoff_description()
-            return description['team1']
         
         return "TBD"
 
     def get_team2_display_name(self):
-        """Restituisce il nome della squadra 2 - SEMPRE nomi reali se disponibili."""
-        # Se la squadra esiste, mostra sempre il nome reale
+        """Restituisce il nome della squadra 2 o descrizione playoff."""
+        # Se team2_id è NULL, mostra sempre la descrizione playoff
+        if self.team2_id is None:
+            if self.phase != 'group':
+                description = self.get_playoff_description()
+                return description['team2']
+            return "TBD"
+        
+        # Se la squadra esiste, mostra il nome reale
         if self.team2:
             return self.team2.name
-        
-        # Solo se non c'è la squadra, mostra la descrizione playoff
-        if self.phase != 'group':
-            description = self.get_playoff_description()
-            return description['team2']
         
         return "TBD"
 
     def get_playoff_description(self):
-        """Genera descrizioni per le partite playoff - SOLO quando le squadre non sono ancora determinate."""
+        """Genera descrizioni per le partite playoff."""
         match_number = self.get_match_number()
         
         if self.phase == 'quarterfinal':
@@ -193,11 +196,7 @@ class Match(db.Model):
         elif self.phase == 'final':
             return self._get_final_descriptions(match_number)
         
-        # Fallback
-        return {
-            'team1': "TBD",
-            'team2': "TBD"
-        }
+        return {'team1': "TBD", 'team2': "TBD"}
 
     def _get_quarterfinal_descriptions(self, match_number):
         """Descrizioni per i quarti di finale."""
@@ -257,47 +256,89 @@ class Match(db.Model):
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
 
 
-# RIMUOVI tutti i metodi duplicati e le funzioni ridondanti dal file
-# Cancella queste righe duplicate dal tuo codice:
-# - def get_team1_display_name(self): (versione duplicata)
-# - def get_team2_display_name(self): (versione duplicata)  
-# - def get_match_number(self): (versione duplicata)
-# - def get_playoff_description(self): (versione duplicata)
-# - Tutte le funzioni globali duplicate come get_match_description(), get_playoff_description(), ecc.
 
-# Aggiungi queste funzioni al tuo app.py
 
-def get_match_description(match):
-    """Restituisce la descrizione appropriata per una partita playoff."""
+def generate_all_playoff_matches_with_null_teams():
+    """Genera tutte le partite playoff con team_id NULL invece di placeholder."""
     
-    if match.phase == 'group':
-        # Per le qualificazioni, mostra sempre i nomi delle squadre
-        return {
-            'team1': match.team1.name if match.team1 else "TBD",
-            'team2': match.team2.name if match.team2 else "TBD"
-        }
+    tournament_dates = get_tournament_dates()
+    tournament_times = get_tournament_times()
     
-    # Per i playoff, usa le descrizioni basate sui piazzamenti
-    return get_playoff_description(match)
+    # MAJOR LEAGUE - Quarti di finale (Lunedì)
+    for i, match_time in enumerate(tournament_times['playoff_times']):
+        match = Match(
+            team1_id=None,  # NULL invece di placeholder
+            team2_id=None,  # NULL invece di placeholder
+            date=tournament_dates['quarterfinals_ml'],
+            time=match_time,
+            phase='quarterfinal',
+            league='Major League'
+        )
+        db.session.add(match)
+    
+    # BEER LEAGUE - Quarti di finale (Martedì)
+    for i, match_time in enumerate(tournament_times['playoff_times']):
+        match = Match(
+            team1_id=None,
+            team2_id=None,
+            date=tournament_dates['quarterfinals_bl'],
+            time=match_time,
+            phase='quarterfinal',
+            league='Beer League'
+        )
+        db.session.add(match)
+    
+    # MAJOR LEAGUE - Semifinali (Giovedì)
+    for i, match_time in enumerate(tournament_times['playoff_times']):
+        match = Match(
+            team1_id=None,
+            team2_id=None,
+            date=tournament_dates['semifinals_ml'],
+            time=match_time,
+            phase='semifinal',
+            league='Major League'
+        )
+        db.session.add(match)
+    
+    # BEER LEAGUE - Semifinali (Venerdì)
+    for i, match_time in enumerate(tournament_times['playoff_times']):
+        match = Match(
+            team1_id=None,
+            team2_id=None,
+            date=tournament_dates['semifinals_bl'],
+            time=match_time,
+            phase='semifinal',
+            league='Beer League'
+        )
+        db.session.add(match)
+    
+    # FINALI (Sabato) - Major League
+    for i, match_time in enumerate(tournament_times['final_times_ml']):
+        match = Match(
+            team1_id=None,
+            team2_id=None,
+            date=tournament_dates['finals'],
+            time=match_time,
+            phase='final',
+            league='Major League'
+        )
+        db.session.add(match)
+    
+    # FINALI (Sabato) - Beer League
+    for i, match_time in enumerate(tournament_times['final_times_bl']):
+        match = Match(
+            team1_id=None,
+            team2_id=None,
+            date=tournament_dates['finals'],
+            time=match_time,
+            phase='final',
+            league='Beer League'
+        )
+        db.session.add(match)
 
-def get_playoff_description(match):
-    """Genera descrizioni per le partite playoff basate sulla fase e numero partita."""
-    
-    # Calcola il numero della partita (assumendo numerazione progressiva)
-    match_number = get_progressive_match_number(match)
-    
-    if match.phase == 'quarterfinal':
-        return get_quarterfinal_descriptions(match, match_number)
-    elif match.phase == 'semifinal':
-        return get_semifinal_descriptions(match, match_number)
-    elif match.phase == 'final':
-        return get_final_descriptions(match, match_number)
-    
-    # Fallback ai nomi delle squadre se non si può determinare
-    return {
-        'team1': match.team1.name if match.team1 else "TBD",
-        'team2': match.team2.name if match.team2 else "TBD"
-    }
+
+
+
 
 def get_progressive_match_number(match):
     """Calcola il numero progressivo della partita nel torneo."""
@@ -385,16 +426,8 @@ def get_final_descriptions(match, match_number):
         'team2': match.team2.name if match.team2 else "TBD"
     })
 
-# Modifica i metodi della classe Match per usare le nuove descrizioni
-def get_team1_display_name_new(self):
-    """Restituisce il nome della squadra 1 o descrizione playoff."""
-    description = get_match_description(self)
-    return description['team1']
 
-def get_team2_display_name_new(self):
-    """Restituisce il nome della squadra 2 o descrizione playoff."""  
-    description = get_match_description(self)
-    return description['team2']
+
 
 
 class MatchDescription(db.Model):
@@ -428,21 +461,6 @@ class PlayerMatchStats(db.Model):
 
 
 
-def generate_complete_tournament_simple():
-    """Genera l'intero calendario del torneo senza dipendere da MatchDescription."""
-    
-    # Elimina tutte le partite esistenti
-    Match.query.delete()
-    db.session.commit()
-    
-    # Genera le qualificazioni
-    generate_qualification_matches_simple()
-    
-    # Genera tutti i playoff
-    generate_all_playoff_matches_simple()
-    
-    db.session.commit()
-    flash('Calendario completo del torneo generato con successo!')
 
 def generate_qualification_matches_simple():
     """Genera partite round-robin per gironi."""
@@ -522,27 +540,18 @@ def generate_qualification_matches_simple():
         )
         db.session.add(match)
 
-
+# 3. MODIFICA la funzione generate_all_playoff_matches_simple per usare ID placeholder diversi
 def generate_all_playoff_matches_simple():
-    """Genera tutte le partite playoff con placeholder validi."""
+    """Genera tutte le partite playoff con team_id NULL."""
     
     tournament_dates = get_tournament_dates()
     tournament_times = get_tournament_times()
     
-    # Ottieni le prime due squadre come placeholder (assumendo che esistano)
-    teams = Team.query.limit(2).all()
-    if len(teams) < 2:
-        flash('Errore: Servono almeno 2 squadre per generare i playoff', 'danger')
-        return
-    
-    placeholder_team1_id = teams[0].id
-    placeholder_team2_id = teams[1].id
-    
     # MAJOR LEAGUE - Quarti di finale (Lunedì)
     for i, match_time in enumerate(tournament_times['playoff_times']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,  # NULL invece di ID fittizio
+            team2_id=None,  # NULL invece di ID fittizio
             date=tournament_dates['quarterfinals_ml'],
             time=match_time,
             phase='quarterfinal',
@@ -553,8 +562,8 @@ def generate_all_playoff_matches_simple():
     # BEER LEAGUE - Quarti di finale (Martedì)
     for i, match_time in enumerate(tournament_times['playoff_times']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,
+            team2_id=None,
             date=tournament_dates['quarterfinals_bl'],
             time=match_time,
             phase='quarterfinal',
@@ -565,8 +574,8 @@ def generate_all_playoff_matches_simple():
     # MAJOR LEAGUE - Semifinali (Giovedì)
     for i, match_time in enumerate(tournament_times['playoff_times']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,
+            team2_id=None,
             date=tournament_dates['semifinals_ml'],
             time=match_time,
             phase='semifinal',
@@ -577,8 +586,8 @@ def generate_all_playoff_matches_simple():
     # BEER LEAGUE - Semifinali (Venerdì)
     for i, match_time in enumerate(tournament_times['playoff_times']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,
+            team2_id=None,
             date=tournament_dates['semifinals_bl'],
             time=match_time,
             phase='semifinal',
@@ -589,8 +598,8 @@ def generate_all_playoff_matches_simple():
     # FINALI (Sabato) - Major League
     for i, match_time in enumerate(tournament_times['final_times_ml']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,
+            team2_id=None,
             date=tournament_dates['finals'],
             time=match_time,
             phase='final',
@@ -601,14 +610,19 @@ def generate_all_playoff_matches_simple():
     # FINALI (Sabato) - Beer League
     for i, match_time in enumerate(tournament_times['final_times_bl']):
         match = Match(
-            team1_id=placeholder_team1_id,  # Placeholder valido
-            team2_id=placeholder_team2_id,  # Placeholder valido
+            team1_id=None,
+            team2_id=None,
             date=tournament_dates['finals'],
             time=match_time,
             phase='final',
             league='Beer League'
         )
         db.session.add(match)
+
+
+# 3. AGGIUNGI la funzione mancante
+
+
 
 
 
@@ -634,6 +648,9 @@ def all_phase_matches_completed(phase, league=None):
     ).count()
     
     return incomplete_matches == 0
+
+
+
 
 @app.route('/update_semifinals', methods=['POST'])
 def update_semifinals_route():
@@ -666,6 +683,65 @@ def update_finals_route():
     
     return redirect(url_for('schedule'))
 
+
+def generate_complete_tournament_simple():
+    """Genera l'intero calendario del torneo."""
+    
+    # Elimina tutte le partite esistenti
+    Match.query.delete()
+    db.session.commit()
+    
+
+    # Genera le qualificazioni
+    generate_qualification_matches_simple()
+    
+    # Genera i playoff
+    generate_all_playoff_matches_simple()
+    
+    db.session.commit()
+    flash('Calendario completo del torneo generato!')
+
+# Aggiungi questa nuova route per generare il calendario corretto
+@app.route('/generate_complete_tournament_fixed', methods=['POST'])
+def generate_complete_tournament_fixed():
+    """Genera calendario completo con sistema playoff corretto."""
+    try:
+        generate_complete_tournament_simple()
+        return redirect(url_for('schedule'))
+    except Exception as e:
+        flash(f'Errore durante la generazione: {str(e)}', 'danger')
+        return redirect(url_for('schedule'))
+
+
+
+
+
+# 4. AGGIUNGI questa route per applicare il fix
+@app.route('/fix_playoff_descriptions', methods=['POST'])
+def fix_playoff_descriptions():
+    """Applica il fix per le descrizioni dei playoff."""
+    try:
+
+        # Aggiorna tutti i playoff per usare ID placeholder fittizi
+        playoff_matches = Match.query.filter(Match.phase != 'group').all()
+        
+        for match in playoff_matches:
+            # Se la partita usa gli ID placeholder originali (1 e 2), aggiornali
+            if match.team1_id in [1, 2] and match.team2_id in [1, 2]:
+                match.team1_id = 999  # ID fittizio
+                match.team2_id = 998  # ID fittizio
+        
+        db.session.commit()
+        flash('Fix applicato con successo! Le descrizioni dei playoff ora funzionano correttamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante il fix: {str(e)}', 'danger')
+    
+    return redirect(url_for('schedule'))
+
+
+
 # Aggiorna la funzione reset_matches per non toccare MatchDescription
 def reset_matches():
     """Elimina tutte le partite."""
@@ -685,18 +761,26 @@ def reset_matches():
     db.session.commit()
     flash('Il calendario delle partite e le statistiche delle squadre sono stati azzerati con successo')
 
-def get_match_description(match):
-    """Restituisce la descrizione appropriata per una partita playoff."""
+
+# 5. ROUTE per il fix completo
+@app.route('/fix_complete_playoff_system', methods=['POST'])
+def fix_complete_playoff_system():
+    """Fix completo del sistema playoff."""
+    try:
+        # Elimina playoff esistenti
+        Match.query.filter(Match.phase != 'group').delete()
+        
+        # Rigenera i playoff con NULL
+        generate_all_playoff_matches_simple()
+        
+        db.session.commit()
+        flash('🎯 Sistema playoff completamente riparato! Ora vedrai le descrizioni corrette.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante il fix: {str(e)}', 'danger')
     
-    if match.phase == 'group':
-        # Per le qualificazioni, mostra sempre i nomi delle squadre
-        return {
-            'team1': match.team1.name if match.team1 else "TBD",
-            'team2': match.team2.name if match.team2 else "TBD"
-        }
-    
-    # Per i playoff, usa le descrizioni basate sui piazzamenti
-    return get_playoff_description(match)
+    return redirect(url_for('schedule'))
 
 def get_tournament_dates():
     """
@@ -1084,10 +1168,14 @@ def fix_descriptions():
     flash('Descrizioni verificate - vedi console per dettagli', 'info')
     return redirect(url_for('schedule'))
 
+
+
 @app.route('/schedule', methods=['GET', 'POST'])
 def schedule():
+
+    
     if request.method == 'POST':
-        # Reset + genera tutto il calendario con descrizioni
+        # Reset + genera tutto il calendario
         Match.query.delete()
         
         # Reset team stats
@@ -1102,8 +1190,8 @@ def schedule():
         
         db.session.commit()
         
-        # Usa la nuova funzione
-        generate_complete_tournament_with_descriptions()
+        # Usa la funzione corretta
+        generate_complete_tournament_simple()
         return redirect(url_for('schedule'))
     
     # Il resto della logica rimane uguale
@@ -1116,6 +1204,7 @@ def schedule():
         matches_by_date[date_str].append(match)
     
     return render_template('schedule.html', matches_by_date=matches_by_date)
+
 
 
 def generate_complete_tournament():
@@ -3114,11 +3203,6 @@ def generate_finals():
     
     db.session.commit()
     return True
-
-
-
-
-
 
 
 
