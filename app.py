@@ -157,12 +157,14 @@ class Match(db.Model):
 
     def get_team1_display_name(self):
         """Restituisce il nome della squadra 1 o descrizione playoff."""
-        # Se team1_id è NULL, mostra sempre la descrizione playoff
-        if self.team1_id is None:
-            if self.phase != 'group':
-                description = self.get_playoff_description()
-                return description['team1']
-            return "TBD"
+        # Se la partita è di gruppo e ha team reali, mostra il nome
+        if self.phase == 'group' and self.team1:
+            return self.team1.name
+        
+        # Per le partite playoff, usa sempre le descrizioni se team1_id è NULL
+        if self.team1_id is None and self.phase != 'group':
+            description = self.get_playoff_description()
+            return description['team1']
         
         # Se la squadra esiste, mostra il nome reale
         if self.team1:
@@ -172,12 +174,14 @@ class Match(db.Model):
 
     def get_team2_display_name(self):
         """Restituisce il nome della squadra 2 o descrizione playoff."""
-        # Se team2_id è NULL, mostra sempre la descrizione playoff
-        if self.team2_id is None:
-            if self.phase != 'group':
-                description = self.get_playoff_description()
-                return description['team2']
-            return "TBD"
+        # Se la partita è di gruppo e ha team reali, mostra il nome
+        if self.phase == 'group' and self.team2:
+            return self.team2.name
+        
+        # Per le partite playoff, usa sempre le descrizioni se team2_id è NULL
+        if self.team2_id is None and self.phase != 'group':
+            description = self.get_playoff_description()
+            return description['team2']
         
         # Se la squadra esiste, mostra il nome reale
         if self.team2:
@@ -197,6 +201,7 @@ class Match(db.Model):
             return self._get_final_descriptions(match_number)
         
         return {'team1': "TBD", 'team2': "TBD"}
+
 
     def _get_quarterfinal_descriptions(self, match_number):
         """Descrizioni per i quarti di finale."""
@@ -237,23 +242,25 @@ class Match(db.Model):
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
 
     def _get_final_descriptions(self, match_number):
-        """Descrizioni per le finali."""
+        """Descrizioni per le finali - VERSIONE CORRETTA."""
         if self.league == 'Major League':
             descriptions = {
-                41: {'team1': 'Perdente partita 33', 'team2': 'Perdente partita 34'},
-                42: {'team1': 'Vincente partita 33', 'team2': 'Vincente partita 34'},
-                43: {'team1': 'Perdente partita 35', 'team2': 'Perdente partita 36'},
-                44: {'team1': 'Vincente partita 35', 'team2': 'Vincente partita 36'}
+                42: {'team1': 'Perdente partita 33', 'team2': 'Perdente partita 34'},    # 7°/8° ML
+                44: {'team1': 'Vincente partita 33', 'team2': 'Vincente partita 34'},    # 5°/6° ML
+                46: {'team1': 'Perdente partita 35', 'team2': 'Perdente partita 36'},    # 3°/4° ML
+                48: {'team1': 'Vincente partita 35', 'team2': 'Vincente partita 36'}     # 1°/2° ML
             }
         else:  # Beer League
+            # Beer League ha le partite 41, 43, 45, 47 (dispari)
             descriptions = {
-                45: {'team1': 'Perdente partita 37', 'team2': 'Perdente partita 38'},
-                46: {'team1': 'Vincente partita 37', 'team2': 'Vincente partita 38'},
-                47: {'team1': 'Perdente partita 39', 'team2': 'Perdente partita 40'},
-                48: {'team1': 'Vincente partita 39', 'team2': 'Vincente partita 40'}
+                41: {'team1': 'Perdente partita 37', 'team2': 'Perdente partita 38'},    # 7°/8° BL
+                43: {'team1': 'Vincente partita 37', 'team2': 'Vincente partita 38'},    # 5°/6° BL
+                45: {'team1': 'Perdente partita 39', 'team2': 'Perdente partita 40'},    # 3°/4° BL
+                47: {'team1': 'Vincente partita 39', 'team2': 'Vincente partita 40'}     # 1°/2° BL
             }
         
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
+
 
 
 
@@ -339,7 +346,6 @@ def generate_all_playoff_matches_with_null_teams():
 
 
 
-
 def get_progressive_match_number(match):
     """Calcola il numero progressivo della partita nel torneo."""
     
@@ -376,6 +382,8 @@ def get_quarterfinal_descriptions(match, match_number):
         'team2': match.team2.name if match.team2 else "TBD"
     })
 
+
+
 def get_semifinal_descriptions(match, match_number):
     """Descrizioni per le semifinali."""
     
@@ -401,30 +409,6 @@ def get_semifinal_descriptions(match, match_number):
         'team2': match.team2.name if match.team2 else "TBD"
     })
 
-def get_final_descriptions(match, match_number):
-    """Descrizioni per le finali."""
-    
-    if match.league == 'Major League':
-        # Major League: Partite 41-44
-        descriptions = {
-            41: {'team1': 'Perdente partita 33', 'team2': 'Perdente partita 34'},
-            42: {'team1': 'Vincente partita 33', 'team2': 'Vincente partita 34'},
-            43: {'team1': 'Perdente partita 35', 'team2': 'Perdente partita 36'},
-            44: {'team1': 'Vincente partita 35', 'team2': 'Vincente partita 36'}
-        }
-    else:  # Beer League
-        # Beer League: Partite 45-48
-        descriptions = {
-            45: {'team1': 'Perdente partita 37', 'team2': 'Perdente partita 38'},
-            46: {'team1': 'Vincente partita 37', 'team2': 'Vincente partita 38'},
-            47: {'team1': 'Perdente partita 39', 'team2': 'Perdente partita 40'},
-            48: {'team1': 'Vincente partita 39', 'team2': 'Vincente partita 40'}
-        }
-    
-    return descriptions.get(match_number, {
-        'team1': match.team1.name if match.team1 else "TBD",
-        'team2': match.team2.name if match.team2 else "TBD"
-    })
 
 
 
@@ -637,18 +621,21 @@ def update_playoffs():
     
     return redirect(url_for('schedule'))
 
+
 def all_phase_matches_completed(phase, league=None):
-    """Verifica se tutte le partite di una fase sono completate."""
+    """Verifica se tutte le partite di una fase sono completate per una lega specifica."""
     query = Match.query.filter_by(phase=phase)
     if league:
         query = query.filter_by(league=league)
     
+    # Conta partite incomplete (con team reali, non NULL)
     incomplete_matches = query.filter(
-        Match.team1_score.is_(None) | Match.team2_score.is_(None)
+        Match.team1_id.isnot(None),  # Solo partite con squadre reali
+        Match.team2_id.isnot(None),
+        (Match.team1_score.is_(None) | Match.team2_score.is_(None))
     ).count()
     
     return incomplete_matches == 0
-
 
 
 
@@ -713,6 +700,35 @@ def generate_complete_tournament_fixed():
         return redirect(url_for('schedule'))
 
 
+@app.route('/debug_finals_mapping')
+def debug_finals_mapping():
+    """Debug: controlla la mappatura delle finali Beer League."""
+    
+    # Trova le finali Beer League
+    bl_finals = Match.query.filter_by(
+        phase='final', 
+        league='Beer League'
+    ).order_by(Match.time).all()
+    
+    debug_info = []
+    
+    for match in bl_finals:
+        match_number = match.get_match_number()
+        description = match.get_playoff_description()
+        
+        debug_info.append({
+            'match_number': match_number,
+            'time': match.time.strftime('%H:%M'),
+            'team1_id': match.team1_id,
+            'team2_id': match.team2_id,
+            'expected_team1': description['team1'],
+            'expected_team2': description['team2'],
+            'actual_display_team1': match.get_team1_display_name(),
+            'actual_display_team2': match.get_team2_display_name()
+        })
+    
+    flash(f'Debug Beer League Finals: {debug_info}', 'info')
+    return redirect(url_for('schedule'))
 
 
 
@@ -781,6 +797,28 @@ def fix_complete_playoff_system():
         flash(f'❌ Errore durante il fix: {str(e)}', 'danger')
     
     return redirect(url_for('schedule'))
+
+
+@app.route('/debug_semifinal_numbers')
+def debug_semifinal_numbers():
+    """Debug: controlla i numeri delle semifinali Beer League."""
+    
+    bl_semifinals = Match.query.filter_by(
+        phase='semifinal', 
+        league='Beer League'
+    ).order_by(Match.time).all()
+    
+    debug_info = []
+    for match in bl_semifinals:
+        debug_info.append({
+            'match_number': match.get_match_number(),
+            'time': match.time.strftime('%H:%M'),
+            'description': f"{match.get_team1_display_name()} vs {match.get_team2_display_name()}"
+        })
+    
+    flash(f'Semifinali Beer League: {debug_info}', 'info')
+    return redirect(url_for('schedule'))
+
 
 def get_tournament_dates():
     """
@@ -860,6 +898,50 @@ def format_tournament_dates():
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+
+# Aggiungi questa route di debug in app.py
+@app.route('/debug_playoff_teams')
+def debug_playoff_teams():
+    playoff_matches = Match.query.filter(Match.phase != 'group').order_by(Match.date, Match.time).all()
+    info = []
+    
+    for match in playoff_matches:
+        info.append({
+            'match_number': match.get_match_number(),
+            'phase': match.phase,
+            'league': match.league,
+            'team1_id': match.team1_id,
+            'team2_id': match.team2_id,
+            'expected_team1': match.get_playoff_description()['team1'],
+            'expected_team2': match.get_playoff_description()['team2']
+        })
+    
+    flash(f'Debug playoff teams: {info[:10]}', 'info')  # Solo prime 10
+    return redirect(url_for('schedule'))
+
+
+@app.route('/reset_playoff_teams_to_null', methods=['POST'])
+def reset_playoff_teams_to_null():
+    """Reset dei team_id dei playoff a NULL per mostrare le descrizioni."""
+    try:
+        playoff_matches = Match.query.filter(Match.phase != 'group').all()
+        
+        for match in playoff_matches:
+            match.team1_id = None
+            match.team2_id = None
+        
+        db.session.commit()
+        flash('Team ID dei playoff resettati a NULL. Ora dovresti vedere le descrizioni corrette!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante il reset: {str(e)}', 'danger')
+    
+    return redirect(url_for('schedule'))
+
+
 
 @app.route('/teams')
 def teams():
@@ -2235,7 +2317,10 @@ def get_player_total_stats():
     
     return player_stats
 
+
+
 def update_team_stats(match, old_team1_score=None, old_team2_score=None):
+    """Aggiorna le statistiche delle squadre e controlla aggiornamenti playoff automatici."""
     team1 = match.team1
     team2 = match.team2
 
@@ -2280,14 +2365,38 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
         team1.points += 1
         team2.points += 1
 
-    # *** AGGIUNTA: Controlla se tutte le qualificazioni sono finite ***
+    # *** AGGIORNAMENTI AUTOMATICI PLAYOFF ***
+    
+    # 1. QUALIFICAZIONI COMPLETATE → AGGIORNA QUARTI
     if match.phase == 'group' and all_group_matches_completed():
-        print("🎯 Tutte le qualificazioni completate! Aggiornamento playoff...")
+        print("🎯 Tutte le qualificazioni completate! Aggiornamento quarti automatico...")
         try:
             update_playoff_brackets()
-            print("✅ Playoff aggiornati automaticamente!")
+            print("✅ Quarti aggiornati automaticamente!")
         except Exception as e:
-            print(f"❌ Errore aggiornamento playoff: {e}")
+            print(f"❌ Errore aggiornamento quarti: {e}")
+    
+    # 2. QUARTI COMPLETATI PER UNA LEGA → AGGIORNA SEMIFINALI DI QUELLA LEGA
+    if match.phase == 'quarterfinal':
+        league = match.league
+        if league and all_phase_matches_completed('quarterfinal', league):
+            print(f"🎯 Quarti {league} completati! Aggiornamento semifinali automatico...")
+            try:
+                update_semifinals(league)
+                print(f"✅ Semifinali {league} aggiornate automaticamente!")
+            except Exception as e:
+                print(f"❌ Errore aggiornamento semifinali {league}: {e}")
+    
+    # 3. SEMIFINALI COMPLETATE PER UNA LEGA → AGGIORNA FINALI DI QUELLA LEGA
+    if match.phase == 'semifinal':
+        league = match.league
+        if league and all_phase_matches_completed('semifinal', league):
+            print(f"🎯 Semifinali {league} completate! Aggiornamento finali automatico...")
+            try:
+                update_finals(league)
+                print(f"✅ Finali {league} aggiornate automaticamente!")
+            except Exception as e:
+                print(f"❌ Errore aggiornamento finali {league}: {e}")
 
 
 
@@ -2409,16 +2518,15 @@ def all_quarterfinals_completed(league):
     
     return incomplete_matches == 0
 
-
 def update_semifinals(league):
-    """Aggiorna le semifinali con vincitori e perdenti dei quarti di finale."""
+    """Aggiorna le semifinali con vincitori e perdenti dei quarti di finale per una specifica lega."""
     
-    # Ottieni i quarti di finale completati
+    # Ottieni i quarti di finale completati per questa lega
     quarterfinals = Match.query.filter_by(
         phase='quarterfinal', league=league
     ).order_by(Match.time).all()
     
-    # Ottieni le semifinali
+    # Ottieni le semifinali per questa lega
     semifinals = Match.query.filter_by(
         phase='semifinal', league=league
     ).order_by(Match.time).all()
@@ -2433,20 +2541,16 @@ def update_semifinals(league):
         return
     
     for i, qf in enumerate(quarterfinals):
-        print(f"Quarto {i+1}: {qf.team1.name} {qf.team1_score}-{qf.team2_score} {qf.team2.name}, Vincitore: {qf.winner.name if qf.winner else 'Nessuno'}")
-    
-    # Verifica che tutti i quarti siano completati
-    for qf in quarterfinals:
         if not qf.is_completed:
             print(f"Errore: Quarto {qf.team1.name} vs {qf.team2.name} non completato")
             return
+        print(f"Quarto {i+1}: {qf.team1.name} {qf.team1_score}-{qf.team2_score} {qf.team2.name}, Vincitore: {qf.winner.name if qf.winner else 'Nessuno'}")
     
     if len(semifinals) >= 4:
         # Le prime 2 semifinali sono per i perdenti (5°-8° posto)
         # Le ultime 2 semifinali sono per i vincitori (1°-4° posto)
         
         # SEMIFINALI PERDENTI (5°-8° posto)
-        # Semifinale 1: Perdente quarto 3 vs Perdente quarto 4 (21:00 vs 21:45)
         loser_qf3 = quarterfinals[2].team1 if quarterfinals[2].winner == quarterfinals[2].team2 else quarterfinals[2].team2
         loser_qf4 = quarterfinals[3].team1 if quarterfinals[3].winner == quarterfinals[3].team2 else quarterfinals[3].team2
         
@@ -2454,7 +2558,6 @@ def update_semifinals(league):
         semifinals[0].team2_id = loser_qf4.id
         print(f"Semifinale 0 (perdenti): {loser_qf3.name} vs {loser_qf4.name}")
         
-        # Semifinale 2: Perdente quarto 1 vs Perdente quarto 2 (19:30 vs 20:15)
         loser_qf1 = quarterfinals[0].team1 if quarterfinals[0].winner == quarterfinals[0].team2 else quarterfinals[0].team2
         loser_qf2 = quarterfinals[1].team1 if quarterfinals[1].winner == quarterfinals[1].team2 else quarterfinals[1].team2
         
@@ -2463,7 +2566,6 @@ def update_semifinals(league):
         print(f"Semifinale 1 (perdenti): {loser_qf1.name} vs {loser_qf2.name}")
         
         # SEMIFINALI VINCITORI (1°-4° posto)
-        # Semifinale 3: Vincitore quarto 3 vs Vincitore quarto 4
         winner_qf3 = quarterfinals[2].winner
         winner_qf4 = quarterfinals[3].winner
         
@@ -2471,7 +2573,6 @@ def update_semifinals(league):
         semifinals[2].team2_id = winner_qf4.id
         print(f"Semifinale 2 (vincitori): {winner_qf3.name} vs {winner_qf4.name}")
         
-        # Semifinale 4: Vincitore quarto 1 vs Vincitore quarto 2
         winner_qf1 = quarterfinals[0].winner
         winner_qf2 = quarterfinals[1].winner
         
@@ -2479,7 +2580,7 @@ def update_semifinals(league):
         semifinals[3].team2_id = winner_qf2.id
         print(f"Semifinale 3 (vincitori): {winner_qf1.name} vs {winner_qf2.name}")
         
-        print("Semifinali aggiornate con successo!")
+        print(f"Semifinali {league} aggiornate con successo!")
     else:
         print(f"Errore: Trovate solo {len(semifinals)} semifinali invece di 4")
     
@@ -2494,15 +2595,17 @@ def all_semifinals_completed(league):
     ).count()
     
     return incomplete_matches == 0
+
+
 def update_finals(league):
-    """Aggiorna le finali con vincitori e perdenti delle semifinali."""
+    """Aggiorna le finali con vincitori e perdenti delle semifinali per una specifica lega."""
     
-    # Ottieni le semifinali completate
+    # Ottieni le semifinali completate per questa lega
     semifinals = Match.query.filter_by(
         phase='semifinal', league=league
     ).order_by(Match.time).all()
     
-    # Ottieni le finali
+    # Ottieni le finali per questa lega
     finals = Match.query.filter_by(
         phase='final', league=league
     ).order_by(Match.time).all()
@@ -2517,11 +2620,10 @@ def update_finals(league):
         return
     
     for i, sf in enumerate(semifinals):
-        if sf.is_completed:
-            print(f"Semifinale {i+1}: {sf.team1.name} {sf.team1_score}-{sf.team2_score} {sf.team2.name}, Vincitore: {sf.winner.name}")
-        else:
+        if not sf.is_completed:
             print(f"Semifinale {i+1}: {sf.team1.name} vs {sf.team2.name} - NON COMPLETATA")
             return
+        print(f"Semifinale {i+1}: {sf.team1.name} {sf.team1_score}-{sf.team2_score} {sf.team2.name}, Vincitore: {sf.winner.name}")
     
     if len(finals) >= 4:
         # Finali nell'ordine: 7°/8°, 5°/6°, 3°/4°, 1°/2°
@@ -2558,11 +2660,15 @@ def update_finals(league):
         finals[3].team2_id = winner_sf_winners_2.id
         print(f"Finale 1°/2°: {winner_sf_winners_1.name} vs {winner_sf_winners_2.name}")
         
-        print("Finali aggiornate con successo!")
+        print(f"Finali {league} aggiornate con successo!")
     else:
         print(f"Errore: Trovate solo {len(finals)} finali invece di 4")
     
     db.session.commit()
+
+
+
+
 
 @app.route('/debug_playoff_progression')
 def debug_playoff_progression():

@@ -114,8 +114,8 @@
                                         <tr>
                                             <td><strong>{{ match.get_match_number() }}</strong></td>
                                             <td>{{ match.time.strftime('%H:%M') }}</td>
-                                            <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                            <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
+                                            <td>{{ match.get_team1_display_name() }}</td>
+                                            <td>{{ match.get_team2_display_name() }}</td>
                                             <td>
                                                 {% if match.is_completed %}
                                                     <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -140,7 +140,7 @@
         <!-- Sezione Playoff - Major League -->
         <h2 class="mt-4">Playoff - Major League</h2>
         {% for date, matches in matches_by_date.items() %}
-            {% set major_matches = matches | selectattr("league", "equalto", "Major League") | selectattr("phase", "ne", "group") | list %}
+            {% set major_matches = matches | selectattr("league", "equalto", "Major League") | selectattr("phase", "ne", "group") | selectattr("phase", "ne", "final") | list %}
             {% if major_matches|length > 0 %}
                 <div class="card mt-4">
                     <div class="card-header bg-success text-white">
@@ -151,8 +151,6 @@
                                 - Quarti di Finale
                             {% elif first_match.phase == 'semifinal' %}
                                 - Semifinali
-                            {% elif first_match.phase == 'final' %}
-                                - Finali
                             {% endif %}
                         </h4>
                     </div>
@@ -180,8 +178,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -216,57 +214,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% elif major_matches[0].phase == 'final' %}
-                            <!-- Raggruppamento finali -->
-                            <h5 class="text-primary mb-3">🏆 Finali Major League - Piazzamenti</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Piazzamento</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in major_matches %}
-                                            <tr {% if loop.index == 4 %}class="table-warning"{% endif %}>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name().split('(')[0].strip() }}</td>
-                                                <td>{{ match.get_team2_display_name().split('(')[0].strip() }}</td>
-                                                <td>
-                                                    {% if loop.index == 1 %}
-                                                        <span class="badge bg-secondary">7°/8° posto</span>
-                                                    {% elif loop.index == 2 %}
-                                                        <span class="badge bg-warning text-dark">5°/6° posto</span>
-                                                    {% elif loop.index == 3 %}
-                                                        <span class="badge bg-info">3°/4° posto</span>
-                                                    {% elif loop.index == 4 %}
-                                                        <span class="badge bg-primary">🥇 1°/2° posto</span>
-                                                    {% endif %}
-                                                </td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -301,8 +250,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -327,7 +276,7 @@
         <!-- Sezione Playoff - Beer League -->
         <h2 class="mt-4">Playoff - Beer League</h2>
         {% for date, matches in matches_by_date.items() %}
-            {% set beer_matches = matches | selectattr("league", "equalto", "Beer League") | selectattr("phase", "ne", "group") | list %}
+            {% set beer_matches = matches | selectattr("league", "equalto", "Beer League") | selectattr("phase", "ne", "group") | selectattr("phase", "ne", "final") | list %}
             {% if beer_matches|length > 0 %}
                 <div class="card mt-4">
                     <div class="card-header bg-warning text-dark">
@@ -338,8 +287,6 @@
                                 - Quarti di Finale
                             {% elif first_match.phase == 'semifinal' %}
                                 - Semifinali
-                            {% elif first_match.phase == 'final' %}
-                                - Finali
                             {% endif %}
                         </h4>
                     </div>
@@ -367,8 +314,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -403,57 +350,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
-                                                <td>
-                                                    {% if match.is_completed %}
-                                                        <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
-                                                    {% else %}
-                                                        <span class="badge bg-secondary">Non giocata</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
-                                                </td>
-                                            </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% elif beer_matches[0].phase == 'final' %}
-                            <!-- Raggruppamento finali Beer League -->
-                            <h5 class="text-warning mb-3">🏆 Finali Beer League - Piazzamenti</h5>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Piazzamento</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for match in beer_matches %}
-                                            <tr {% if loop.index == 4 %}class="table-warning"{% endif %}>
-                                                <td><strong>{{ match.get_match_number() }}</strong></td>
-                                                <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name().split('(')[0].strip() }}</td>
-                                                <td>{{ match.get_team2_display_name().split('(')[0].strip() }}</td>
-                                                <td>
-                                                    {% if loop.index == 1 %}
-                                                        <span class="badge bg-secondary">7°/8° posto</span>
-                                                    {% elif loop.index == 2 %}
-                                                        <span class="badge bg-warning text-dark">5°/6° posto</span>
-                                                    {% elif loop.index == 3 %}
-                                                        <span class="badge bg-info">3°/4° posto</span>
-                                                    {% elif loop.index == 4 %}
-                                                        <span class="badge bg-warning">🥇 1°/2° posto BL</span>
-                                                    {% endif %}
-                                                </td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -488,8 +386,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
-                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
+                                                <td>{{ match.get_team1_display_name() }}</td>
+                                                <td>{{ match.get_team2_display_name() }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -506,6 +404,83 @@
                                 </table>
                             </div>
                         {% endif %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Sezione Finali Unificate -->
+        <h2 class="mt-4">Finali - Sabato {{ tournament_dates.finals.date.day }} {{ tournament_dates.finals.date.strftime('%B')|title }}</h2>
+        {% for date, matches in matches_by_date.items() %}
+            {% set final_matches = matches | selectattr("phase", "equalto", "final") | list %}
+            {% if final_matches|length > 0 %}
+                <div class="card mt-4">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0">
+                            🏆 Finali {{ date }} - Piazzamenti
+                        </h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <span class="badge bg-success me-2">■ Major League</span>
+                            <span class="badge bg-warning text-dark">■ Beer League</span>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Partita N°</th>
+                                        <th>Orario</th>
+                                        <th>Lega</th>
+                                        <th>Squadra 1</th>
+                                        <th>Squadra 2</th>
+                                        <th>Piazzamento</th>
+                                        <th>Risultato</th>
+                                        <th>Azioni</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for match in final_matches | sort(attribute='time') %}
+                                        <tr {% if match.league == 'Major League' %}class="table-success"{% else %}class="table-warning"{% endif %}>
+                                            <td><strong>{{ match.get_match_number() }}</strong></td>
+                                            <td>{{ match.time.strftime('%H:%M') }}</td>
+                                            <td>
+                                                {% if match.league == 'Major League' %}
+                                                    <span class="badge bg-success">ML</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">BL</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ match.get_team1_display_name() }}</td>
+                                            <td>{{ match.get_team2_display_name() }}</td>
+                                            <td>
+                                                {% set match_number = match.get_match_number() %}
+                                                {% if match_number in [41, 42] %}
+                                                    <span class="badge bg-secondary">7°/8° posto</span>
+                                                {% elif match_number in [43, 44] %}
+                                                    <span class="badge bg-warning text-dark">5°/6° posto</span>
+                                                {% elif match_number in [45, 46] %}
+                                                    <span class="badge bg-info">3°/4° posto</span>
+                                                {% elif match_number in [47, 48] %}
+                                                    <span class="badge bg-primary">🥇 1°/2° posto</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if match.is_completed %}
+                                                    <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
+                                                {% else %}
+                                                    <span class="badge bg-secondary">Non giocata</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             {% endif %}
