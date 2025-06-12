@@ -115,14 +115,12 @@ class Player(db.Model):
         
         return stats
 
-
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     
     team1_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     team2_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     
-    # Aggiungi overlaps="matches" per evitare l’avviso di conflitto con la relazione Team.matches
     team1 = db.relationship('Team', foreign_keys=[team1_id], overlaps="matches")
     team2 = db.relationship('Team', foreign_keys=[team2_id], overlaps="matches")
     
@@ -132,24 +130,12 @@ class Match(db.Model):
     team1_score = db.Column(db.Integer, default=None)
     team2_score = db.Column(db.Integer, default=None)
     
-    phase = db.Column(db.String(20), nullable=False)  # 'group', 'quarterfinal', 'semifinal', 'final'
-    league = db.Column(db.String(20))  # 'Major League' or 'Beer League'
+    phase = db.Column(db.String(20), nullable=False)
+    league = db.Column(db.String(20))
     
     @property
     def is_completed(self):
         return self.team1_score is not None and self.team2_score is not None
-    @property
-    def team1_name(self):
-        if self.team1_id and self.team1:
-            return self.team1.name
-        return "TBD"  # To Be Determined
-
-    @property  
-    def team2_name(self):
-        if self.team2_id and self.team2:
-            return self.team2.name
-        return "TBD"  # To Be Determined
-
     
     @property
     def winner(self):
@@ -161,102 +147,6 @@ class Match(db.Model):
             return self.team2
         return None  # Draw
 
-
-    def get_match_number(self):
-        """Restituisce il numero progressivo della partita."""
-        return self.id
-
-    def get_team1_display_name(self):
-        """Restituisce il nome della squadra 1 o descrizione playoff."""
-        if self.phase == 'group':
-            return self.team1.name if self.team1 else "TBD"
-        
-        # Per TUTTI i playoff, usa SEMPRE le descrizioni
-        description = self.get_playoff_description()
-        return description['team1']
-
-    def get_team2_display_name(self):
-        """Restituisce il nome della squadra 2 o descrizione playoff."""
-        if self.phase == 'group':
-            return self.team2.name if self.team2 else "TBD"
-        
-        # Per TUTTI i playoff, usa SEMPRE le descrizioni
-        description = self.get_playoff_description()
-        return description['team2']
-
-    def get_playoff_description(self):
-        """Genera descrizioni per le partite playoff - SEMPRE descrizioni, mai nomi squadre."""
-        
-        match_number = self.get_match_number()
-        
-        if self.phase == 'quarterfinal':
-            return self._get_quarterfinal_descriptions(match_number)
-        elif self.phase == 'semifinal':
-            return self._get_semifinal_descriptions(match_number)
-        elif self.phase == 'final':
-            return self._get_final_descriptions(match_number)
-        
-        # Fallback SOLO per descrizioni, non nomi squadre
-        return {
-            'team1': "TBD",
-            'team2': "TBD"
-        }
-
-    def _get_final_descriptions(self, match_number):
-        """Descrizioni per le finali - SENZA fallback ai nomi squadre."""
-        
-        if self.league == 'Major League':
-            descriptions = {
-                41: {'team1': 'Perdente partita 33', 'team2': 'Perdente partita 34'},
-                42: {'team1': 'Vincente partita 33', 'team2': 'Vincente partita 34'},  
-                43: {'team1': 'Perdente partita 35', 'team2': 'Perdente partita 36'},
-                44: {'team1': 'Vincente partita 35', 'team2': 'Vincente partita 36'}
-            }
-        else:  # Beer League
-            descriptions = {
-                45: {'team1': 'Perdente partita 37', 'team2': 'Perdente partita 38'},
-                46: {'team1': 'Vincente partita 37', 'team2': 'Vincente partita 38'},
-                47: {'team1': 'Perdente partita 39', 'team2': 'Perdente partita 40'},
-                48: {'team1': 'Vincente partita 39', 'team2': 'Vincente partita 40'}
-            }
-        
-        # RITORNA SEMPRE una descrizione, anche se il numero non corrisponde
-        return descriptions.get(match_number, {
-            'team1': f'TBD Finale {self.league}',
-            'team2': f'TBD Finale {self.league}'
-        })
-
-    # Metodo di debug per verificare i numeri delle partite
-    def debug_match_info(self):
-        """Debug: mostra informazioni sulla partita."""
-        return {
-            'id': self.id,
-            'phase': self.phase,
-            'league': self.league,
-            'match_number': self.get_match_number(),
-            'date': self.date.strftime('%Y-%m-%d'),
-            'time': self.time.strftime('%H:%M')
-        }
-        
-        return "TBD"
-    def get_team1_display_name(self):
-        """Restituisce il nome della squadra 1 o descrizione playoff."""
-        if self.phase == 'group':
-            return self.team1.name if self.team1 else "TBD"
-        
-        # Per i playoff, usa le descrizioni
-        description = self.get_playoff_description()
-        return description['team1']
-
-    def get_team2_display_name(self):
-        """Restituisce il nome della squadra 2 o descrizione playoff."""
-        if self.phase == 'group':
-            return self.team2.name if self.team2 else "TBD"
-        
-        # Per i playoff, usa le descrizioni
-        description = self.get_playoff_description()
-        return description['team2']
-
     def get_match_number(self):
         """Restituisce il numero progressivo della partita."""
         # Conta tutte le partite precedenti a questa per data e ora
@@ -264,12 +154,36 @@ class Match(db.Model):
             (Match.date < self.date) | 
             ((Match.date == self.date) & (Match.time < self.time))
         ).count()
-        
         return earlier_matches + 1
 
-    def get_playoff_description(self):
-        """Genera descrizioni per le partite playoff."""
+    def get_team1_display_name(self):
+        """Restituisce il nome della squadra 1 - SEMPRE nomi reali se disponibili."""
+        # Se la squadra esiste, mostra sempre il nome reale
+        if self.team1:
+            return self.team1.name
         
+        # Solo se non c'è la squadra, mostra la descrizione playoff
+        if self.phase != 'group':
+            description = self.get_playoff_description()
+            return description['team1']
+        
+        return "TBD"
+
+    def get_team2_display_name(self):
+        """Restituisce il nome della squadra 2 - SEMPRE nomi reali se disponibili."""
+        # Se la squadra esiste, mostra sempre il nome reale
+        if self.team2:
+            return self.team2.name
+        
+        # Solo se non c'è la squadra, mostra la descrizione playoff
+        if self.phase != 'group':
+            description = self.get_playoff_description()
+            return description['team2']
+        
+        return "TBD"
+
+    def get_playoff_description(self):
+        """Genera descrizioni per le partite playoff - SOLO quando le squadre non sono ancora determinate."""
         match_number = self.get_match_number()
         
         if self.phase == 'quarterfinal':
@@ -281,16 +195,13 @@ class Match(db.Model):
         
         # Fallback
         return {
-            'team1': self.team1.name if self.team1 else "TBD",
-            'team2': self.team2.name if self.team2 else "TBD"
+            'team1': "TBD",
+            'team2': "TBD"
         }
 
     def _get_quarterfinal_descriptions(self, match_number):
         """Descrizioni per i quarti di finale."""
-        
         if self.league == 'Major League':
-            # Assumendo che le partite di qualificazione siano 24 (1-24)
-            # I quarti ML iniziano dalla partita 25
             descriptions = {
                 25: {'team1': '1° gruppo C', 'team2': '2° gruppo D'},
                 26: {'team1': '1° gruppo B', 'team2': '2° gruppo C'},
@@ -298,7 +209,6 @@ class Match(db.Model):
                 28: {'team1': '1° gruppo A', 'team2': '2° gruppo B'}
             }
         else:  # Beer League
-            # I quarti BL iniziano dalla partita 29
             descriptions = {
                 29: {'team1': '3° gruppo B', 'team2': '4° gruppo C'},
                 30: {'team1': '3° gruppo D', 'team2': '4° gruppo A'},
@@ -306,14 +216,10 @@ class Match(db.Model):
                 32: {'team1': '3° gruppo C', 'team2': '4° gruppo D'}
             }
         
-        return descriptions.get(match_number, {
-            'team1': self.team1.name if self.team1 else "TBD",
-            'team2': self.team2.name if self.team2 else "TBD"
-        })
+        return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
 
     def _get_semifinal_descriptions(self, match_number):
         """Descrizioni per le semifinali."""
-        
         if self.league == 'Major League':
             descriptions = {
                 33: {'team1': 'Perdente partita 27', 'team2': 'Perdente partita 28'},
@@ -329,14 +235,10 @@ class Match(db.Model):
                 40: {'team1': 'Vincente partita 29', 'team2': 'Vincente partita 30'}
             }
         
-        return descriptions.get(match_number, {
-            'team1': self.team1.name if self.team1 else "TBD",
-            'team2': self.team2.name if self.team2 else "TBD"
-        })
+        return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
 
     def _get_final_descriptions(self, match_number):
         """Descrizioni per le finali."""
-        
         if self.league == 'Major League':
             descriptions = {
                 41: {'team1': 'Perdente partita 33', 'team2': 'Perdente partita 34'},
@@ -352,11 +254,16 @@ class Match(db.Model):
                 48: {'team1': 'Vincente partita 39', 'team2': 'Vincente partita 40'}
             }
         
-        return descriptions.get(match_number, {
-            'team1': self.team1.name if self.team1 else "TBD",
-            'team2': self.team2.name if self.team2 else "TBD"
-        })
-        
+        return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
+
+
+# RIMUOVI tutti i metodi duplicati e le funzioni ridondanti dal file
+# Cancella queste righe duplicate dal tuo codice:
+# - def get_team1_display_name(self): (versione duplicata)
+# - def get_team2_display_name(self): (versione duplicata)  
+# - def get_match_number(self): (versione duplicata)
+# - def get_playoff_description(self): (versione duplicata)
+# - Tutte le funzioni globali duplicate come get_match_description(), get_playoff_description(), ecc.
 
 # Aggiungi queste funzioni al tuo app.py
 
@@ -1962,7 +1869,225 @@ def match_detail(match_id):
                            match_stats=match_stats)
 
 
+@app.route('/match/<int:match_id>/update_player_stats', methods=['POST'])
+def update_player_stats(match_id):
+    """Aggiorna le statistiche dei giocatori SOLO per questa partita specifica."""
+    match = Match.query.get_or_404(match_id)
+    
+    try:
+        # Assicurati che la tabella PlayerMatchStats esista
+        if not db.inspect(db.engine).has_table('player_match_stats'):
+            flash('Errore: Sistema statistiche per partita non disponibile', 'danger')
+            return redirect(url_for('match_detail', match_id=match_id))
+        
+        # Ottieni tutti i giocatori di entrambe le squadre
+        all_players = []
+        if match.team1:
+            all_players.extend(match.team1.players)
+        if match.team2:
+            all_players.extend(match.team2.players)
+        
+        # Aggiorna le statistiche SOLO per questa partita
+        for player in all_players:
+            # Leggi i valori dal form
+            goals = int(request.form.get(f'player_{player.id}_goals', 0))
+            assists = int(request.form.get(f'player_{player.id}_assists', 0))
+            penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
+            
+            # Trova o crea le statistiche per questo giocatore in questa partita
+            stats = PlayerMatchStats.query.filter_by(
+                player_id=player.id,
+                match_id=match_id
+            ).first()
+            
+            if not stats:
+                # Crea nuove statistiche per questa partita
+                stats = PlayerMatchStats(
+                    player_id=player.id,
+                    match_id=match_id,
+                    goals=goals,
+                    assists=assists,
+                    penalties=penalties
+                )
+                db.session.add(stats)
+            else:
+                # Aggiorna le statistiche esistenti per questa partita
+                stats.goals = goals
+                stats.assists = assists
+                stats.penalties = penalties
+        
+        db.session.commit()
+        flash('Statistiche della partita aggiornate con successo!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nell\'aggiornamento delle statistiche: {str(e)}', 'danger')
+    
+    return redirect(url_for('match_detail', match_id=match_id))
 
+
+# Aggiorna anche la funzione per il calcolo dei totali nelle classifiche
+def get_player_statistics_for_standings():
+    """Calcola le statistiche totali dei giocatori sommando tutte le partite."""
+    
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            # Nuovo sistema: calcola totali dalle statistiche per partita
+            players_stats = []
+            
+            # Query per ottenere i totali per ogni giocatore
+            from sqlalchemy import func
+            totals = db.session.query(
+                PlayerMatchStats.player_id,
+                func.sum(PlayerMatchStats.goals).label('total_goals'),
+                func.sum(PlayerMatchStats.assists).label('total_assists'),
+                func.sum(PlayerMatchStats.penalties).label('total_penalties')
+            ).group_by(PlayerMatchStats.player_id).all()
+            
+            for total in totals:
+                player = Player.query.get(total.player_id)
+                if player and (total.total_goals > 0 or total.total_assists > 0 or total.total_penalties > 0):
+                    # Aggiungi proprietà temporanee per il template
+                    player.display_goals = total.total_goals or 0
+                    player.display_assists = total.total_assists or 0
+                    player.display_penalties = total.total_penalties or 0
+                    players_stats.append(player)
+            
+            return players_stats
+        else:
+            # Fallback al sistema vecchio
+            return Player.query.filter(
+                (Player.goals > 0) | (Player.assists > 0) | (Player.penalties > 0)
+            ).all()
+    
+    except Exception as e:
+        print(f"Errore nel calcolo statistiche: {e}")
+        # Fallback completo
+        return Player.query.filter(
+            (Player.goals > 0) | (Player.assists > 0) | (Player.penalties > 0)
+        ).all()
+
+
+# Aggiorna la route standings per usare il nuovo sistema
+@app.route('/standings')
+def standings():
+    # Group stage standings
+    group_standings = {}
+    for group in ['A', 'B', 'C', 'D']:
+        teams = Team.query.filter_by(group=group).order_by(
+            Team.points.desc(), 
+            (Team.goals_for - Team.goals_against).desc(),
+            Team.goals_for.desc()
+        ).all()
+        group_standings[group] = teams
+    
+    # Player statistics - usa il nuovo sistema
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            # Nuovo sistema: calcola totali dalle partite
+            from sqlalchemy import func
+            
+            # Query per i migliori marcatori
+            top_scorers_query = db.session.query(
+                Player,
+                func.sum(PlayerMatchStats.goals).label('total_goals')
+            ).join(PlayerMatchStats).group_by(Player.id).having(
+                func.sum(PlayerMatchStats.goals) > 0
+            ).order_by(func.sum(PlayerMatchStats.goals).desc()).limit(10)
+            
+            top_scorers = []
+            for player, total_goals in top_scorers_query:
+                player.display_goals = total_goals
+                top_scorers.append(player)
+            
+            # Query per i migliori assistman
+            top_assists_query = db.session.query(
+                Player,
+                func.sum(PlayerMatchStats.assists).label('total_assists')
+            ).join(PlayerMatchStats).group_by(Player.id).having(
+                func.sum(PlayerMatchStats.assists) > 0
+            ).order_by(func.sum(PlayerMatchStats.assists).desc()).limit(10)
+            
+            top_assists = []
+            for player, total_assists in top_assists_query:
+                player.display_assists = total_assists
+                top_assists.append(player)
+            
+            # Query per le penalità
+            most_penalties_query = db.session.query(
+                Player,
+                func.sum(PlayerMatchStats.penalties).label('total_penalties')
+            ).join(PlayerMatchStats).group_by(Player.id).having(
+                func.sum(PlayerMatchStats.penalties) > 0
+            ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(10)
+            
+            most_penalties = []
+            for player, total_penalties in most_penalties_query:
+                player.display_penalties = total_penalties
+                most_penalties.append(player)
+                
+        else:
+            # Fallback al sistema vecchio
+            top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
+            top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
+            most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
+            
+            for player in top_scorers:
+                player.display_goals = player.goals
+            for player in top_assists:
+                player.display_assists = player.assists
+            for player in most_penalties:
+                player.display_penalties = player.penalties
+    
+    except Exception as e:
+        print(f"Errore nelle statistiche: {e}")
+        # Fallback completo
+        top_scorers = []
+        top_assists = []
+        most_penalties = []
+    
+    return render_template('standings.html', 
+                          group_standings=group_standings,
+                          top_scorers=top_scorers,
+                          top_assists=top_assists,
+                          most_penalties=most_penalties)
+
+
+# Funzione helper per verificare le statistiche di un giocatore
+def get_player_match_stats_summary(player_id):
+    """Ottiene un riassunto delle statistiche di un giocatore in tutte le partite."""
+    
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            stats = PlayerMatchStats.query.filter_by(player_id=player_id).all()
+            
+            summary = {
+                'matches_played': len(stats),
+                'total_goals': sum(stat.goals for stat in stats),
+                'total_assists': sum(stat.assists for stat in stats),
+                'total_penalties': sum(stat.penalties for stat in stats),
+                'match_details': []
+            }
+            
+            for stat in stats:
+                match = Match.query.get(stat.match_id)
+                if match:
+                    summary['match_details'].append({
+                        'match_id': match.id,
+                        'opponent': 'vs TBD' if not match.team1 or not match.team2 else 
+                                   f"vs {match.team2.name}" if match.team1_id == Player.query.get(player_id).team_id 
+                                   else f"vs {match.team1.name}",
+                        'goals': stat.goals,
+                        'assists': stat.assists,
+                        'penalties': stat.penalties,
+                        'date': match.date.strftime('%d/%m/%Y')
+                    })
+            
+            return summary
+    except Exception as e:
+        print(f"Errore nel calcolo summary: {e}")
+    
+    return None
 
 @app.template_filter('datetime')
 def format_datetime(value, format='%d/%m/%Y'):
@@ -1971,61 +2096,6 @@ def format_datetime(value, format='%d/%m/%Y'):
 @app.template_filter('timeformat')
 def format_time(value, format='%H:%M'):
     return value.strftime(format)
-
-
-@app.route('/match/<int:match_id>/update_player_stats', methods=['POST'])
-def update_player_stats(match_id):
-    """Aggiorna le statistiche dei giocatori per questa partita."""
-    match = Match.query.get_or_404(match_id)
-    
-    try:
-        # Se la tabella PlayerMatchStats esiste, usala
-        if db.inspect(db.engine).has_table('player_match_stats'):
-            # Nuovo sistema
-            for player in match.team1.players + match.team2.players:
-                goals = int(request.form.get(f'player_{player.id}_goals', 0))
-                assists = int(request.form.get(f'player_{player.id}_assists', 0))
-                penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
-                
-                # Trova o crea le statistiche per questa partita
-                stats = PlayerMatchStats.query.filter_by(
-                    player_id=player.id,
-                    match_id=match_id
-                ).first()
-                
-                if not stats:
-                    stats = PlayerMatchStats(
-                        player_id=player.id,
-                        match_id=match_id
-                    )
-                    db.session.add(stats)
-                
-                stats.goals = goals
-                stats.assists = assists
-                stats.penalties = penalties
-            
-            flash('Statistiche della partita salvate!', 'success')
-        else:
-            # Sistema vecchio (fallback)
-            for player in match.team1.players + match.team2.players:
-                goals = int(request.form.get(f'player_{player.id}_goals', 0))
-                assists = int(request.form.get(f'player_{player.id}_assists', 0))
-                penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
-                
-                # Aggiorna le statistiche cumulative (vecchio sistema)
-                player.goals += goals
-                player.assists += assists
-                player.penalties += penalties
-            
-            flash('Statistiche aggiornate (sistema legacy)', 'warning')
-        
-        db.session.commit()
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Errore: {str(e)}', 'danger')
-    
-    return redirect(url_for('match_detail', match_id=match_id))
 
 @app.template_filter('player_total_goals')
 def player_total_goals(player):
@@ -2080,8 +2150,7 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
     team1 = match.team1
     team2 = match.team2
 
-    # Se esistono vecchi punteggi (ovvero il match aveva già un risultato),
-    # sottraiamo quei valori dalle statistiche delle squadre.
+    # Se esistono vecchi punteggi, sottraiamo quei valori dalle statistiche delle squadre
     if old_team1_score is not None and old_team2_score is not None:
         team1.goals_for -= old_team1_score
         team1.goals_against -= old_team2_score
@@ -2122,6 +2191,17 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
         team1.points += 1
         team2.points += 1
 
+    # *** AGGIUNTA: Controlla se tutte le qualificazioni sono finite ***
+    if match.phase == 'group' and all_group_matches_completed():
+        print("🎯 Tutte le qualificazioni completate! Aggiornamento playoff...")
+        try:
+            update_playoff_brackets()
+            print("✅ Playoff aggiornati automaticamente!")
+        except Exception as e:
+            print(f"❌ Errore aggiornamento playoff: {e}")
+
+
+
 
 def all_group_matches_completed():
     incomplete_matches = Match.query.filter_by(phase='group').filter(
@@ -2129,8 +2209,33 @@ def all_group_matches_completed():
     ).count()
     
     return incomplete_matches == 0
+    
+
+@app.route('/force_update_playoffs', methods=['POST'])
+def force_update_playoffs():
+    """Forza l'aggiornamento dei playoff."""
+    try:
+        if all_group_matches_completed():
+            update_playoff_brackets()
+            flash('🎯 Playoff aggiornati con successo!', 'success')
+        else:
+            flash('⚠️ Le qualificazioni devono essere completate prima di aggiornare i playoff.', 'warning')
+    except Exception as e:
+        flash(f'❌ Errore durante l\'aggiornamento: {str(e)}', 'danger')
+    
+    return redirect(url_for('schedule'))
+
 
 def update_playoff_brackets():
+    """Aggiorna i tabelloni playoff con le squadre reali qualificate."""
+    
+    print("🔄 Inizio aggiornamento playoff brackets...")
+    
+    # Verifica che tutte le qualificazioni siano completate
+    if not all_group_matches_completed():
+        print("❌ Le qualificazioni non sono ancora completate")
+        return False
+    
     # Get team standings by group
     standings = {}
     for group in ['A', 'B', 'C', 'D']:
@@ -2139,64 +2244,72 @@ def update_playoff_brackets():
             (Team.goals_for - Team.goals_against).desc(),
             Team.goals_for.desc()
         ).all()
-        
         standings[group] = teams
+        print(f"📊 Girone {group}: {[f'{t.name}({t.points}pts)' for t in teams]}")
     
-    # Assign teams to Major League (top 2 from each group)
-    major_league_teams = []
+    # Verifica che ogni girone abbia almeno 4 squadre
     for group in ['A', 'B', 'C', 'D']:
-        major_league_teams.extend(standings[group][:2])
-    
-    # Assign teams to Beer League (bottom 2 from each group)
-    beer_league_teams = []
-    for group in ['A', 'B', 'C', 'D']:
-        beer_league_teams.extend(standings[group][2:])
+        if len(standings[group]) < 4:
+            print(f"❌ Girone {group} ha solo {len(standings[group])} squadre!")
+            return False
     
     # Update Major League quarterfinals
-    # 1C vs 2D, 1B vs 2C, 1D vs 2A, 1A vs 2B
     major_quarterfinals = Match.query.filter_by(
         phase='quarterfinal', league='Major League'
     ).order_by(Match.time).all()
 
-    # print("Standings Gruppo A:", [(t.name, t.points) for t in standings['A']])
-    # print("Standings Gruppo B:", [(t.name, t.points) for t in standings['B']])
-    # print("Standings Gruppo C:", [(t.name, t.points) for t in standings['C']])
-    # print("Standings Gruppo D:", [(t.name, t.points) for t in standings['D']])
-
+    print(f"🏆 Trovati {len(major_quarterfinals)} quarti ML da aggiornare")
     
     if len(major_quarterfinals) >= 4:
-        # QF1
-        major_quarterfinals[0].team1_id = standings['C'][0].id
-        major_quarterfinals[0].team2_id = standings['D'][1].id
-        # QF2
-        major_quarterfinals[1].team1_id = standings['B'][0].id
-        major_quarterfinals[1].team2_id = standings['C'][1].id
-        # QF3
-        major_quarterfinals[2].team1_id = standings['D'][0].id
-        major_quarterfinals[2].team2_id = standings['A'][1].id
-        # QF4
-        major_quarterfinals[3].team1_id = standings['A'][0].id
-        major_quarterfinals[3].team2_id = standings['B'][1].id
+        # Accoppiamenti Major League (primi 2 di ogni girone)
+        matchups = [
+            (standings['C'][0], standings['D'][1]),  # 1°C vs 2°D
+            (standings['B'][0], standings['C'][1]),  # 1°B vs 2°C
+            (standings['D'][0], standings['A'][1]),  # 1°D vs 2°A
+            (standings['A'][0], standings['B'][1])   # 1°A vs 2°B
+        ]
         
-    # Update Beer League quarterfinals
-    # 3B vs 4C, 3D vs 4A, 3A vs 4B, 3C vs 4D
+        for i, (team1, team2) in enumerate(matchups):
+            if i < len(major_quarterfinals):
+                match = major_quarterfinals[i]
+                old_team1 = match.team1.name if match.team1 else "TBD"
+                old_team2 = match.team2.name if match.team2 else "TBD"
+                
+                match.team1_id = team1.id
+                match.team2_id = team2.id
+                
+                print(f"🔄 Quarto ML {i+1}: {old_team1} vs {old_team2} → {team1.name} vs {team2.name}")
+        
+    # Update Beer League quarterfinals  
     beer_quarterfinals = Match.query.filter_by(
         phase='quarterfinal', league='Beer League'
     ).order_by(Match.time).all()
+
+    print(f"🍺 Trovati {len(beer_quarterfinals)} quarti BL da aggiornare")
     
     if len(beer_quarterfinals) >= 4:
-        beer_quarterfinals[0].team1_id = standings['B'][2].id
-        beer_quarterfinals[0].team2_id = standings['C'][3].id
+        # Accoppiamenti Beer League (3° e 4° di ogni girone)
+        matchups = [
+            (standings['B'][2], standings['C'][3]),  # 3°B vs 4°C
+            (standings['D'][2], standings['A'][3]),  # 3°D vs 4°A
+            (standings['A'][2], standings['B'][3]),  # 3°A vs 4°B
+            (standings['C'][2], standings['D'][3])   # 3°C vs 4°D
+        ]
         
-        beer_quarterfinals[1].team1_id = standings['D'][2].id
-        beer_quarterfinals[1].team2_id = standings['A'][3].id
-        
-        beer_quarterfinals[2].team1_id = standings['A'][2].id
-        beer_quarterfinals[2].team2_id = standings['B'][3].id
-        
-        beer_quarterfinals[3].team1_id = standings['C'][2].id
-        beer_quarterfinals[3].team2_id = standings['D'][3].id
+        for i, (team1, team2) in enumerate(matchups):
+            if i < len(beer_quarterfinals):
+                match = beer_quarterfinals[i]
+                old_team1 = match.team1.name if match.team1 else "TBD"
+                old_team2 = match.team2.name if match.team2 else "TBD"
+                
+                match.team1_id = team1.id
+                match.team2_id = team2.id
+                
+                print(f"🔄 Quarto BL {i+1}: {old_team1} vs {old_team2} → {team1.name} vs {team2.name}")
+    
     db.session.commit()
+    print("✅ Playoff brackets aggiornati con successo!")
+    return True
 
 def all_quarterfinals_completed(league):
     incomplete_matches = Match.query.filter_by(
@@ -2406,76 +2519,41 @@ def debug_playoff_progression():
     flash(f'Debug playoff progression: {info}', 'info')
     return redirect(url_for('schedule'))
 
-@app.route('/standings')
-def standings():
-    # Group stage standings
-    group_standings = {}
-    for group in ['A', 'B', 'C', 'D']:
-        teams = Team.query.filter_by(group=group).order_by(
-            Team.points.desc(), 
-            (Team.goals_for - Team.goals_against).desc(),
-            Team.goals_for.desc()
-        ).all()
-        group_standings[group] = teams
+
+def get_player_match_stats_summary(player_id):
+    """Ottiene un riassunto delle statistiche di un giocatore in tutte le partite."""
     
-    # Player statistics - usa il sistema appropriato
-    all_players = Player.query.all()
-    
-    # Prova a usare il nuovo sistema, fallback al vecchio
     try:
         if db.inspect(db.engine).has_table('player_match_stats'):
-            # Nuovo sistema - calcola totali dalle partite
-            players_with_stats = []
-            for player in all_players:
-                total_goals = sum(stat.goals for stat in player.match_stats) if hasattr(player, 'match_stats') else player.goals
-                total_assists = sum(stat.assists for stat in player.match_stats) if hasattr(player, 'match_stats') else player.assists
-                total_penalties = sum(stat.penalties for stat in player.match_stats) if hasattr(player, 'match_stats') else player.penalties
-                
-                if total_goals > 0 or total_assists > 0 or total_penalties > 0:
-                    # Aggiungi proprietà temporanee
-                    player.display_goals = total_goals
-                    player.display_assists = total_assists
-                    player.display_penalties = total_penalties
-                    players_with_stats.append(player)
+            stats = PlayerMatchStats.query.filter_by(player_id=player_id).all()
             
-            top_scorers = sorted(players_with_stats, key=lambda p: p.display_goals, reverse=True)[:10]
-            top_assists = sorted(players_with_stats, key=lambda p: p.display_assists, reverse=True)[:10]
-            most_penalties = sorted(players_with_stats, key=lambda p: p.display_penalties, reverse=True)[:10]
-        else:
-            # Sistema vecchio
-            top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
-            top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
-            most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
+            summary = {
+                'matches_played': len(stats),
+                'total_goals': sum(stat.goals for stat in stats),
+                'total_assists': sum(stat.assists for stat in stats),
+                'total_penalties': sum(stat.penalties for stat in stats),
+                'match_details': []
+            }
             
-            # Aggiungi proprietà per compatibilità con il template
-            for player in top_scorers:
-                player.display_goals = player.goals
-            for player in top_assists:
-                player.display_assists = player.assists
-            for player in most_penalties:
-                player.display_penalties = player.penalties
-                
+            for stat in stats:
+                match = Match.query.get(stat.match_id)
+                if match:
+                    summary['match_details'].append({
+                        'match_id': match.id,
+                        'opponent': 'vs TBD' if not match.team1 or not match.team2 else 
+                                   f"vs {match.team2.name}" if match.team1_id == Player.query.get(player_id).team_id 
+                                   else f"vs {match.team1.name}",
+                        'goals': stat.goals,
+                        'assists': stat.assists,
+                        'penalties': stat.penalties,
+                        'date': match.date.strftime('%d/%m/%Y')
+                    })
+            
+            return summary
     except Exception as e:
-        # Fallback completo al sistema vecchio
-        top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
-        top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
-        most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
-        
-        for player in top_scorers:
-            player.display_goals = player.goals
-        for player in top_assists:
-            player.display_assists = player.assists
-        for player in most_penalties:
-            player.display_penalties = player.penalties
+        print(f"Errore nel calcolo summary: {e}")
     
-    return render_template('standings.html', 
-                          group_standings=group_standings,
-                          top_scorers=top_scorers,
-                          top_assists=top_assists,
-                          most_penalties=most_penalties)
-
-
-
+    return None
 
 @app.route('/migrate_player_stats', methods=['POST'])
 def migrate_player_stats():

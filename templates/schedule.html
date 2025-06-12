@@ -113,8 +113,8 @@
                                         <tr>
                                             <td><strong>{{ match.get_match_number() }}</strong></td>
                                             <td>{{ match.time.strftime('%H:%M') }}</td>
-                                            <td>{{ match.get_team1_display_name() }}</td>
-                                            <td>{{ match.get_team2_display_name() }}</td>
+                                            <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                            <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                             <td>
                                                 {% if match.is_completed %}
                                                     <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -179,8 +179,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -215,8 +215,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -300,8 +300,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -366,8 +366,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -402,8 +402,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>
@@ -487,8 +487,8 @@
                                             <tr>
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
-                                                <td>{{ match.get_team1_display_name() }}</td>
-                                                <td>{{ match.get_team2_display_name() }}</td>
+                                                <td>{{ match.team1.name if match.team1 else 'TBD' }}</td>
+                                                <td>{{ match.team2.name if match.team2 else 'TBD' }}</td>
                                                 <td>
                                                     {% if match.is_completed %}
                                                         <span class="badge bg-success">{{ match.team1_score }} - {{ match.team2_score }}</span>

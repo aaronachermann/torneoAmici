@@ -168,97 +168,118 @@
             </div>
         {% endif %}
 
-        <!-- Statistiche Giocatori -->
+        <!-- Statistiche Giocatori - FORM UNICO PER ENTRAMBE LE SQUADRE -->
         {% if match.team1 and match.team2 %}
             <div class="row mt-4">
-                <!-- Squadra 1 -->
-                <div class="col-md-6">
+                <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">{{ match.team1.name }}</h4>
+                            <h4 class="mb-0">Statistiche Giocatori</h4>
                         </div>
                         <div class="card-body">
-                            {% if team1_players %}
-                                <form method="post" action="{{ url_for('update_player_stats', match_id=match.id) }}">
-                                    <div class="table-responsive">
-                                        <table class="table table-sm">
-                                            <thead>
-                                                <tr>
-                                                    <th>Giocatore</th>
-                                                    <th>Gol</th>
-                                                    <th>Assist</th>
-                                                    <th>Penalità</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for player in team1_players %}
-                                                    <tr>
-                                                        <td>{{ player.name }}</td>
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm" 
-                                                                   name="player_{{ player.id }}_goals" 
-                                                                   value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
-                                                                   min="0" max="10" style="width: 60px;">
-                                                        </td>
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm" 
-                                                                   name="player_{{ player.id }}_assists" 
-                                                                   value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
-                                                                   min="0" max="10" style="width: 60px;">
-                                                        </td>
-                                                        <td>
-                                                            <input type="number" class="form-control form-control-sm" 
-                                                                   name="player_{{ player.id }}_penalties" 
-                                                                   value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                   min="0" max="10" style="width: 60px;">
-                                                        </td>
-                                                    </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
+                            <!-- FORM UNICO PER ENTRAMBE LE SQUADRE -->
+                            <form method="post" action="{{ url_for('update_player_stats', match_id=match.id) }}">
+                                <div class="row">
+                                    <!-- Squadra 1 -->
+                                    <div class="col-md-6">
+                                        <h5 class="text-primary">{{ match.team1.name }}</h5>
+                                        {% if team1_players %}
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Giocatore</th>
+                                                            <th>Gol</th>
+                                                            <th>Assist</th>
+                                                            <th>Penalità</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for player in team1_players %}
+                                                            <tr>
+                                                                <td>{{ player.name }}</td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_goals" 
+                                                                           value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_assists" 
+                                                                           value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_penalties" 
+                                                                           value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
+                                        {% endif %}
                                     </div>
-                                    <button type="submit" class="btn btn-primary btn-sm">Salva Statistiche {{ match.team1.name }}</button>
-                                </form>
-                            {% else %}
-                                <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Squadra 2 -->
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">{{ match.team2.name }}</h4>
-                        </div>
-                        <div class="card-body">
-                            {% if team2_players %}
-                                <div class="table-responsive">
-                                    <table class="table table-sm">
-                                        <thead>
-                                            <tr>
-                                                <th>Giocatore</th>
-                                                <th>Gol</th>
-                                                <th>Assist</th>
-                                                <th>Penalità</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {% for player in team2_players %}
-                                                <tr>
-                                                    <td>{{ player.name }}</td>
-                                                    <td>{{ match_stats[player.id].goals if player.id in match_stats else 0 }}</td>
-                                                    <td>{{ match_stats[player.id].assists if player.id in match_stats else 0 }}</td>
-                                                    <td>{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}</td>
-                                                </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
+                                    <!-- Squadra 2 -->
+                                    <div class="col-md-6">
+                                        <h5 class="text-success">{{ match.team2.name }}</h5>
+                                        {% if team2_players %}
+                                            <div class="table-responsive">
+                                                <table class="table table-sm">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Giocatore</th>
+                                                            <th>Gol</th>
+                                                            <th>Assist</th>
+                                                            <th>Penalità</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for player in team2_players %}
+                                                            <tr>
+                                                                <td>{{ player.name }}</td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_goals" 
+                                                                           value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_assists" 
+                                                                           value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                                <td>
+                                                                    <input type="number" class="form-control form-control-sm" 
+                                                                           name="player_{{ player.id }}_penalties" 
+                                                                           value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
+                                                                           min="0" max="10" style="width: 60px;">
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
+                                        {% endif %}
+                                    </div>
                                 </div>
-                            {% else %}
-                                <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
-                            {% endif %}
+                                
+                                <!-- Bottone unico per salvare tutte le statistiche -->
+                                <div class="text-center mt-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        💾 Salva Statistiche di Entrambe le Squadre
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
