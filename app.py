@@ -208,17 +208,17 @@ class Match(db.Model):
         """Descrizioni per i quarti di finale."""
         if self.league == 'Major League':
             descriptions = {
-                25: {'team1': '1° gruppo C', 'team2': '2° gruppo D'},
-                26: {'team1': '1° gruppo B', 'team2': '2° gruppo C'},
-                27: {'team1': '1° gruppo D', 'team2': '2° gruppo A'},
-                28: {'team1': '1° gruppo A', 'team2': '2° gruppo B'}
+                25: {'team1': '1° gruppo D', 'team2': '2° gruppo C'},  # ✅ CORRETTO
+                26: {'team1': '1° gruppo A', 'team2': '2° gruppo B'},  # ✅ CORRETTO
+                27: {'team1': '1° gruppo C', 'team2': '2° gruppo A'},  # ✅ CORRETTO
+                28: {'team1': '1° gruppo B', 'team2': '2° gruppo D'}   # ✅ CORRETTO
             }
         else:  # Beer League
             descriptions = {
-                29: {'team1': '3° gruppo B', 'team2': '4° gruppo C'},
-                30: {'team1': '3° gruppo D', 'team2': '4° gruppo A'},
-                31: {'team1': '3° gruppo A', 'team2': '4° gruppo B'},
-                32: {'team1': '3° gruppo C', 'team2': '4° gruppo D'}
+                29: {'team1': '3° gruppo B', 'team2': '4° gruppo A'},  # ✅ CORRETTO
+                30: {'team1': '3° gruppo D', 'team2': '4° gruppo C'},  # ✅ CORRETTO
+                31: {'team1': '3° gruppo A', 'team2': '4° gruppo D'},  # ✅ CORRETTO
+                32: {'team1': '3° gruppo C', 'team2': '4° gruppo B'}   # ✅ CORRETTO
             }
         
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
@@ -446,9 +446,87 @@ class PlayerMatchStats(db.Model):
 
 
 
+#round robin
+# def generate_qualification_matches_simple():
+#     """Genera partite round-robin per gironi."""
+    
+#     tournament_dates = get_tournament_dates()
+#     tournament_times = get_tournament_times()
+    
+#     qualification_dates = [
+#         tournament_dates['qualification_day1'],  # Sabato
+#         tournament_dates['qualification_day2']   # Domenica
+#     ]
+#     match_times = tournament_times['qualification_times']
+    
+#     groups = ['A', 'B', 'C', 'D']
+    
+#     # Recupera le squadre per girone
+#     teams_by_group = { group: Team.query.filter_by(group=group).all() for group in groups }
+    
+#     # Genera le partite round-robin per ogni girone
+#     group_matches = {}
+#     for group, teams in teams_by_group.items():
+#         from itertools import combinations
+#         tutte_partite = list(combinations(teams, 2))
+#         ordered_matches = []
+        
+#         if len(teams) >= 2:
+#             first_match = (teams[0], teams[1])
+#             if first_match in tutte_partite:
+#                 ordered_matches.append(first_match)
+#                 tutte_partite.remove(first_match)
+        
+#         if len(teams) > 2:
+#             last_match = (teams[-2], teams[-1])
+#             if last_match in tutte_partite:
+#                 ordered_matches.append(last_match)
+#                 tutte_partite.remove(last_match)
+        
+#         def match_key(match):
+#             idx1 = teams.index(match[0])
+#             idx2 = teams.index(match[1])
+#             return (idx1, idx2)
+#         remaining = sorted(tutte_partite, key=match_key)
+#         ordered_matches.extend(remaining)
+#         group_matches[group] = ordered_matches
+    
+#     # Intercala le partite dei gironi
+#     interleaved_matches = []
+#     max_rounds = max(len(matches) for matches in group_matches.values())
+#     for round_index in range(max_rounds):
+#         for group in groups:
+#             if round_index < len(group_matches[group]):
+#                 interleaved_matches.append((group_matches[group][round_index], group))
+    
+#     # Assegna le partite agli orari
+#     scheduled_matches = []
+#     total_slots = len(qualification_dates) * len(match_times)
+#     slot_index = 0
+    
+#     for (team1, team2), group in interleaved_matches:
+#         if slot_index >= total_slots:
+#             break
+#         day_index = slot_index // len(match_times)
+#         time_index = slot_index % len(match_times)
+#         match_date = qualification_dates[day_index]
+#         match_time = match_times[time_index]
+#         scheduled_matches.append((team1, team2, match_date, match_time, group))
+#         slot_index += 1
+    
+#     # Salva le partite nel database
+#     for team1, team2, match_date, match_time, group in scheduled_matches:
+#         match = Match(
+#             team1=team1,
+#             team2=team2,
+#             date=match_date,
+#             time=match_time,
+#             phase='group'
+#         )
+#         db.session.add(match)
 
 def generate_qualification_matches_simple():
-    """Genera partite round-robin per gironi."""
+    """Genera partite di qualificazione seguendo la logica esatta del torneo reale."""
     
     tournament_dates = get_tournament_dates()
     tournament_times = get_tournament_times()
@@ -459,63 +537,74 @@ def generate_qualification_matches_simple():
     ]
     match_times = tournament_times['qualification_times']
     
-    groups = ['A', 'B', 'C', 'D']
-    
-    # Recupera le squadre per girone
-    teams_by_group = { group: Team.query.filter_by(group=group).all() for group in groups }
-    
-    # Genera le partite round-robin per ogni girone
-    group_matches = {}
-    for group, teams in teams_by_group.items():
-        from itertools import combinations
-        tutte_partite = list(combinations(teams, 2))
-        ordered_matches = []
+    # Sequenza ESATTA delle partite basata sulle immagini del torneo
+    QUALIFICATION_SEQUENCE = [
+        # SABATO - Partite 1-12
+        ('A1', 'A3'),  # Partita 1: 10:00 - Barrhock vs Yellowstone Team
+        ('B1', 'B3'),  # Partita 2: 10:50 - Original Twins vs Arosio Capital  
+        ('C1', 'C3'),  # Partita 3: 11:40 - Peppa Beer vs Tirabüscion
+        ('D1', 'D3'),  # Partita 4: 12:30 - Drunk Junior vs Tre Sejdlar
+        ('A3', 'A4'),  # Partita 5: 13:20 - Flory Motos vs Hocktail
+        ('B3', 'B4'),  # Partita 6: 14:10 - I Gamb Rott vs Animal's team
+        ('C3', 'C4'),  # Partita 7: 15:00 - Bardolino vs Le Padelle
+        ('D3', 'D4'),  # Partita 8: 15:50 - HC Caterpillars vs Giügaduu dala Lippa
+        ('A1', 'A2'),  # Partita 9: 16:40 - Barrhock vs Flory Motos
+        ('B1', 'B2'),  # Partita 10: 17:30 - Original Twins vs I Gamb Rott
+        ('C4', 'C1'),  # Partita 11: 18:20 - Peppa Beer vs Bardolino
+        ('D1', 'D2'),  # Partita 12: 19:10 - Drunk Junior vs HC Caterpillars
         
-        if len(teams) >= 2:
-            first_match = (teams[0], teams[1])
-            if first_match in tutte_partite:
-                ordered_matches.append(first_match)
-                tutte_partite.remove(first_match)
+        # DOMENICA - Partite 13-24
+        ('C2', 'C4'),  # Partita 13: 10:00 - Barrhock vs Hocktail
+        ('D2', 'D4'),  # Partita 14: 10:50 - Original Twins vs Animal's team
+        ('A2', 'A4'),  # Partita 15: 11:40 - Peppa Beer vs Le Padelle
+        ('B2', 'B4'),  # Partita 16: 12:30 - Drunk Junior vs Giügaduu dala Lippa
+        ('C3', 'C2'),  # Partita 17: 13:20 - Yellowstone Team vs Flory Motos
+        ('D3', 'D2'),  # Partita 18: 14:10 - Arosio Capital vs I Gamb Rott
+        ('A3', 'A2'),  # Partita 19: 15:00 - Tirabüscion vs Bardolino
+        ('B3', 'B2'),  # Partita 20: 15:50 - Tre Sejdlar vs HC Caterpillars
+        ('C1', 'C2'),  # Partita 21: 16:40 - Yellowstone Team vs Hocktail
+        ('D4', 'D1'),  # Partita 22: 17:30 - Arosio Capital vs Animal's team
+        ('A4', 'A1'),  # Partita 23: 18:20 - Tirabüscion vs Le Padelle
+        ('B4', 'B1'),  # Partita 24: 19:10 - Tre Sejdlar vs Giügaduu dala Lippa
+    ]
+    
+    # Recupera le squadre ordinate per girone e posizione
+    teams_by_position = {}
+    for group in ['A', 'B', 'C', 'D']:
+        # Ordina le squadre per group_order (posizione nel girone)
+        teams = Team.query.filter_by(group=group).order_by(Team.group_order, Team.name).all()
         
-        if len(teams) > 2:
-            last_match = (teams[-2], teams[-1])
-            if last_match in tutte_partite:
-                ordered_matches.append(last_match)
-                tutte_partite.remove(last_match)
+        if len(teams) != 4:
+            print(f"ERRORE: Girone {group} ha {len(teams)} squadre invece di 4!")
+            return False
         
-        def match_key(match):
-            idx1 = teams.index(match[0])
-            idx2 = teams.index(match[1])
-            return (idx1, idx2)
-        remaining = sorted(tutte_partite, key=match_key)
-        ordered_matches.extend(remaining)
-        group_matches[group] = ordered_matches
+        # Mappa le posizioni (1=primo, 2=secondo, 3=terzo, 4=quarto)
+        for i, team in enumerate(teams):
+            position_key = f"{group}{i+1}"  # A1, A2, A3, A4, ecc.
+            teams_by_position[position_key] = team
+            print(f"Posizione {position_key}: {team.name}")
     
-    # Intercala le partite dei gironi
-    interleaved_matches = []
-    max_rounds = max(len(matches) for matches in group_matches.values())
-    for round_index in range(max_rounds):
-        for group in groups:
-            if round_index < len(group_matches[group]):
-                interleaved_matches.append((group_matches[group][round_index], group))
+    # Elimina le partite di qualificazione esistenti
+    Match.query.filter_by(phase='group').delete()
     
-    # Assegna le partite agli orari
-    scheduled_matches = []
-    total_slots = len(qualification_dates) * len(match_times)
-    slot_index = 0
-    
-    for (team1, team2), group in interleaved_matches:
-        if slot_index >= total_slots:
-            break
-        day_index = slot_index // len(match_times)
-        time_index = slot_index % len(match_times)
+    # Genera le partite seguendo la sequenza esatta
+    for i, (pos1, pos2) in enumerate(QUALIFICATION_SEQUENCE):
+        # Calcola data e orario
+        day_index = i // 12  # 0 per sabato (partite 0-11), 1 per domenica (partite 12-23)
+        time_index = i % 12  # Indice dell'orario nel giorno
+        
         match_date = qualification_dates[day_index]
         match_time = match_times[time_index]
-        scheduled_matches.append((team1, team2, match_date, match_time, group))
-        slot_index += 1
-    
-    # Salva le partite nel database
-    for team1, team2, match_date, match_time, group in scheduled_matches:
+        
+        # Ottieni le squadre dalle posizioni
+        team1 = teams_by_position.get(pos1)
+        team2 = teams_by_position.get(pos2)
+        
+        if not team1 or not team2:
+            print(f"ERRORE: Non trovate squadre per posizioni {pos1} vs {pos2}")
+            continue
+        
+        # Crea la partita
         match = Match(
             team1=team1,
             team2=team2,
@@ -524,6 +613,13 @@ def generate_qualification_matches_simple():
             phase='group'
         )
         db.session.add(match)
+        
+        print(f"Partita {i+1}: {team1.name} vs {team2.name} - {match_date} {match_time}")
+    
+    db.session.commit()
+    print("Qualificazioni generate con successo seguendo la logica del torneo!")
+    return True
+
 
 # 3. MODIFICA la funzione generate_all_playoff_matches_simple per usare ID placeholder diversi
 def generate_all_playoff_matches_simple():
@@ -605,9 +701,6 @@ def generate_all_playoff_matches_simple():
         db.session.add(match)
 
 
-# 3. AGGIUNGI la funzione mancante
-
-
 
 
 
@@ -655,6 +748,25 @@ def update_semifinals_route():
     
     return redirect(url_for('schedule'))
 
+@app.route('/debug_playoff_teams_current')
+def debug_playoff_teams_current():
+    """Debug: mostra i team attuali dei playoff."""
+    
+    quarterfinals = Match.query.filter_by(phase='quarterfinal').order_by(Match.league, Match.time).all()
+    
+    info = []
+    for match in quarterfinals:
+        info.append({
+            'match_number': match.get_match_number(),
+            'league': match.league,
+            'team1': match.team1.name if match.team1 else 'NULL',
+            'team2': match.team2.name if match.team2 else 'NULL',
+            'expected': match.get_playoff_description()
+        })
+    
+    print(f'Debug quarti attuali: {info}', 'info')
+    return redirect(url_for('schedule'))
+
 
 @app.route('/update_finals', methods=['POST'])
 def update_finals_route():
@@ -687,7 +799,7 @@ def generate_complete_tournament_simple():
     generate_all_playoff_matches_simple()
     
     db.session.commit()
-    flash('Calendario completo del torneo generato!')
+    print('Calendario completo del torneo generato!')
 
 # Aggiungi questa nuova route per generare il calendario corretto
 @app.route('/generate_complete_tournament_fixed', methods=['POST'])
@@ -861,11 +973,11 @@ def get_tournament_times():
     """
     return {
         'qualification_times': [
-            time(10, 0), time(10, 50), time(11, 40), time(12, 30), time(13, 20),
-            time(14, 10), time(15, 0), time(15, 50), time(16, 40), time(17, 30),
-            time(18, 20), time(19, 10)
+            time(10, 0), time(10, 45), time(11, 30), time(12, 15), time(13, 00),
+            time(13, 45), time(14, 30), time(15, 15), time(16, 00), time(16, 45),
+            time(17, 30), time(18, 15)
         ],
-        'playoff_times': [time(19, 30), time(20, 15), time(21, 0), time(21, 45)],
+        'playoff_times': [time(19, 00), time(19, 45), time(20, 30), time(21, 15)],
         'final_times_ml': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)],
         'final_times_bl': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)]
     }
@@ -1116,21 +1228,21 @@ def validate_groups_for_tournament():
     
     return True, "Tutti i gironi sono completi"
 
-def generate_complete_tournament_with_descriptions():
-    """Genera l'intero calendario del torneo con descrizioni corrette."""
+# def generate_complete_tournament_with_descriptions():
+#     """Genera l'intero calendario del torneo con descrizioni corrette."""
     
-    # Elimina tutte le partite esistenti
-    Match.query.delete()
-    db.session.commit()
+#     # Elimina tutte le partite esistenti
+#     Match.query.delete()
+#     db.session.commit()
     
-    # Genera le qualificazioni
-    generate_qualification_matches_simple()
+#     # Genera le qualificazioni
+#     generate_qualification_matches_simple()
     
-    # Genera tutti i playoff con placeholder, le descrizioni verranno mostrate automaticamente
-    generate_all_playoff_matches_with_placeholder()
+#     # Genera tutti i playoff con placeholder, le descrizioni verranno mostrate automaticamente
+#     generate_all_playoff_matches_with_placeholder()
     
-    db.session.commit()
-    flash('Calendario completo del torneo generato con descrizioni!')
+#     db.session.commit()
+#     flash('Calendario completo del torneo generato con descrizioni!')
 
 def generate_all_playoff_matches_with_placeholder():
     """Genera tutte le partite playoff con placeholder minimi."""
@@ -2572,10 +2684,10 @@ def update_playoff_brackets():
     if len(major_quarterfinals) >= 4:
         # Accoppiamenti Major League (primi 2 di ogni girone)
         matchups = [
-            (standings['C'][0], standings['D'][1]),  # 1°C vs 2°D
-            (standings['B'][0], standings['C'][1]),  # 1°B vs 2°C
-            (standings['D'][0], standings['A'][1]),  # 1°D vs 2°A
-            (standings['A'][0], standings['B'][1])   # 1°A vs 2°B
+            (standings['D'][0], standings['C'][1]),  # 1°D vs 2°C
+            (standings['A'][0], standings['B'][1]),  # 1°A vs 2°B
+            (standings['C'][0], standings['A'][1]),  # 1°C vs 2°A
+            (standings['B'][0], standings['D'][1])   # 1°B vs 2°D
         ]
         
         for i, (team1, team2) in enumerate(matchups):
@@ -2599,10 +2711,10 @@ def update_playoff_brackets():
     if len(beer_quarterfinals) >= 4:
         # Accoppiamenti Beer League (3° e 4° di ogni girone)
         matchups = [
-            (standings['B'][2], standings['C'][3]),  # 3°B vs 4°C
-            (standings['D'][2], standings['A'][3]),  # 3°D vs 4°A
-            (standings['A'][2], standings['B'][3]),  # 3°A vs 4°B
-            (standings['C'][2], standings['D'][3])   # 3°C vs 4°D
+            (standings['B'][2], standings['A'][3]),  # 3°B vs 4°A
+            (standings['D'][2], standings['C'][3]),  # 3°D vs 4°C
+            (standings['A'][2], standings['D'][3]),  # 3°A vs 4°D
+            (standings['C'][2], standings['B'][3])   # 3°C vs 4°B
         ]
         
         for i, (team1, team2) in enumerate(matchups):
@@ -3729,10 +3841,10 @@ def populate_step_by_step():
         elif step == '1':
             # Solo assegnazione gironi
             team_assignments = {
-                'A': ['DRUNK JUNIORS', 'LE PADELLE', 'ANIMALS TEAM', 'BARRHOCK'],
-                'B': ['AROSIO CAPITALS', 'TRE SEJDLAR', 'FLORY MOTOS', 'GIUGADUU DALA LIPPA'],
-                'C': ['YELLOWSTONE', 'BARDOLINO TEAM DOC', 'TIRABUSCION', 'HOCKTAIL'],
-                'D': ['CATERPILLARS', 'I GAMB ROTT', 'PEPPA BEER', 'ORIGINAL TWINS']
+                'A': ['Barrhock', 'Yellowstone Team', 'Flory Motos', 'Hocktail'],
+                'B': ['Original Twins', 'Arosio Capital', 'I Gamb Rott', 'Animal\'s Team'],
+                'C': ['Peppa Beer', 'Tirabiscion', 'Bardolino', 'Le Padelle'],
+                'D': ['Drunk Junior', 'Tre Sejdlàr', 'HC Caterpillars', 'Giugaduu Dala Lippa']
             }
             
             for group, team_names in team_assignments.items():
@@ -3773,251 +3885,251 @@ def populate_step_by_step():
     return redirect(url_for('index'))
 
 
-def populate_players():
-    """Aggiunge giocatori casuali a ogni squadra."""
+# def populate_players():
+#     """Aggiunge giocatori casuali a ogni squadra."""
     
-    teams = Team.query.all()
-    nome_index = 0
+#     teams = Team.query.all()
+#     nome_index = 0
     
-    for team in teams:
-        # Elimina giocatori esistenti per questa squadra
-        Player.query.filter_by(team_id=team.id).delete()
+#     for team in teams:
+#         # Elimina giocatori esistenti per questa squadra
+#         Player.query.filter_by(team_id=team.id).delete()
         
-        # Aggiungi 8-12 giocatori per squadra
-        num_players = random.randint(8, 12)
-        team_points = 0
+#         # Aggiungi 8-12 giocatori per squadra
+#         num_players = random.randint(8, 12)
+#         team_points = 0
         
-        for i in range(num_players):
-            if nome_index >= len(NOMI_GIOCATORI):
-                nome_index = 0  # Ricomincia se finiscono i nomi
+#         for i in range(num_players):
+#             if nome_index >= len(NOMI_GIOCATORI):
+#                 nome_index = 0  # Ricomincia se finiscono i nomi
             
-            player_name = NOMI_GIOCATORI[nome_index]
-            nome_index += 1
+#             player_name = NOMI_GIOCATORI[nome_index]
+#             nome_index += 1
             
-            # Determina se è tesserato (70% probabilità)
-            is_registered = random.random() < 0.7
+#             # Determina se è tesserato (70% probabilità)
+#             is_registered = random.random() < 0.7
             
-            if is_registered:
-                # Assegna categoria casuale ma bilanciata
-                if team_points < 10:  # Se abbiamo ancora spazio per giocatori forti
-                    category_choice = random.choices(
-                        ['LNA/LNB', '1a Lega', '2a Lega'],
-                        weights=[0.1, 0.3, 0.6]  # Più giocatori di categoria bassa
-                    )[0]
-                else:  # Se siamo vicini al limite
-                    category_choice = random.choices(
-                        ['1a Lega', '2a Lega'],
-                        weights=[0.2, 0.8]  # Solo categorie più basse
-                    )[0]
+#             if is_registered:
+#                 # Assegna categoria casuale ma bilanciata
+#                 if team_points < 10:  # Se abbiamo ancora spazio per giocatori forti
+#                     category_choice = random.choices(
+#                         ['LNA/LNB', '1a Lega', '2a Lega'],
+#                         weights=[0.1, 0.3, 0.6]  # Più giocatori di categoria bassa
+#                     )[0]
+#                 else:  # Se siamo vicini al limite
+#                     category_choice = random.choices(
+#                         ['1a Lega', '2a Lega'],
+#                         weights=[0.2, 0.8]  # Solo categorie più basse
+#                     )[0]
                 
-                category = category_choice
-            else:
-                category = None
+#                 category = category_choice
+#             else:
+#                 category = None
             
-            # Crea il giocatore
-            player = Player(
-                name=player_name,
-                team=team,
-                is_registered=is_registered,
-                category=category
-            )
+#             # Crea il giocatore
+#             player = Player(
+#                 name=player_name,
+#                 team=team,
+#                 is_registered=is_registered,
+#                 category=category
+#             )
             
-            # Calcola punti tesseramento
-            points = player.registration_points
+#             # Calcola punti tesseramento
+#             points = player.registration_points
             
-            # Se aggiungere questo giocatore supererebbe il limite, rendilo non tesserato
-            if team_points + points > 20:
-                player.is_registered = False
-                player.category = None
-                points = 2
+#             # Se aggiungere questo giocatore supererebbe il limite, rendilo non tesserato
+#             if team_points + points > 20:
+#                 player.is_registered = False
+#                 player.category = None
+#                 points = 2
             
-            team_points += points
-            db.session.add(player)
+#             team_points += points
+#             db.session.add(player)
             
-            # Se raggiungiamo esattamente 20 punti, smetti di aggiungere tesserati
-            if team_points >= 20:
-                # Aggiungi il resto come non tesserati
-                for j in range(i + 1, num_players):
-                    if nome_index >= len(NOMI_GIOCATORI):
-                        nome_index = 0
+#             # Se raggiungiamo esattamente 20 punti, smetti di aggiungere tesserati
+#             if team_points >= 20:
+#                 # Aggiungi il resto come non tesserati
+#                 for j in range(i + 1, num_players):
+#                     if nome_index >= len(NOMI_GIOCATORI):
+#                         nome_index = 0
                     
-                    remaining_player = Player(
-                        name=NOMI_GIOCATORI[nome_index],
-                        team=team,
-                        is_registered=False,
-                        category=None
-                    )
-                    nome_index += 1
-                    db.session.add(remaining_player)
-                break
+#                     remaining_player = Player(
+#                         name=NOMI_GIOCATORI[nome_index],
+#                         team=team,
+#                         is_registered=False,
+#                         category=None
+#                     )
+#                     nome_index += 1
+#                     db.session.add(remaining_player)
+#                 break
     
-    db.session.commit()
+#     db.session.commit()
 
-def populate_qualification_results():
-    """Popola i risultati delle partite di qualificazione con dati casuali."""
+# def populate_qualification_results():
+#     """Popola i risultati delle partite di qualificazione con dati casuali."""
     
-    # Ottieni tutte le partite di qualificazione
-    qualification_matches = Match.query.filter_by(phase='group').all()
+#     # Ottieni tutte le partite di qualificazione
+#     qualification_matches = Match.query.filter_by(phase='group').all()
     
-    for match in qualification_matches:
-        # Genera punteggi casuali (0-6 gol per squadra)
-        team1_score = random.randint(0, 6)
-        team2_score = random.randint(0, 6)
+#     for match in qualification_matches:
+#         # Genera punteggi casuali (0-6 gol per squadra)
+#         team1_score = random.randint(0, 6)
+#         team2_score = random.randint(0, 6)
         
-        # Salva i punteggi
-        match.team1_score = team1_score
-        match.team2_score = team2_score
+#         # Salva i punteggi
+#         match.team1_score = team1_score
+#         match.team2_score = team2_score
         
-        # Aggiorna le statistiche delle squadre
-        update_team_stats(match, None, None)
+#         # Aggiorna le statistiche delle squadre
+#         update_team_stats(match, None, None)
         
-        # Popola statistiche realistiche dei giocatori per questa partita
-        populate_realistic_player_stats_for_match(match)
+#         # Popola statistiche realistiche dei giocatori per questa partita
+#         populate_realistic_player_stats_for_match(match)
     
-    db.session.commit()
+#     db.session.commit()
 
-def populate_realistic_player_stats_for_match(match):
-    """Popola le statistiche dei giocatori per una partita specifica in modo realistico."""
+# def populate_realistic_player_stats_for_match(match):
+#     """Popola le statistiche dei giocatori per una partita specifica in modo realistico."""
     
-    if not match.team1 or not match.team2:
-        return
+#     if not match.team1 or not match.team2:
+#         return
     
-    team1_players = list(match.team1.players)
-    team2_players = list(match.team2.players)
+#     team1_players = list(match.team1.players)
+#     team2_players = list(match.team2.players)
     
-    if not team1_players or not team2_players:
-        return
+#     if not team1_players or not team2_players:
+#         return
     
-    # Distribuisci i gol in modo realistico per la squadra 1
-    distribute_goals_realistically(team1_players, match.team1_score, match.id)
+#     # Distribuisci i gol in modo realistico per la squadra 1
+#     distribute_goals_realistically(team1_players, match.team1_score, match.id)
     
-    # Distribuisci i gol in modo realistico per la squadra 2
-    distribute_goals_realistically(team2_players, match.team2_score, match.id)
+#     # Distribuisci i gol in modo realistico per la squadra 2
+#     distribute_goals_realistically(team2_players, match.team2_score, match.id)
     
-    # Aggiungi assist e penalità per entrambe le squadre
-    add_assists_and_penalties(team1_players, match.id)
-    add_assists_and_penalties(team2_players, match.id)
+#     # Aggiungi assist e penalità per entrambe le squadre
+#     add_assists_and_penalties(team1_players, match.id)
+#     add_assists_and_penalties(team2_players, match.id)
 
-def distribute_goals_realistically(players, total_goals, match_id):
-    """Distribuisce i gol in modo realistico tra i giocatori di una squadra."""
+# def distribute_goals_realistically(players, total_goals, match_id):
+#     """Distribuisce i gol in modo realistico tra i giocatori di una squadra."""
     
-    if total_goals == 0 or not players:
-        # Anche se non ci sono gol, crea record vuoti per tutti i giocatori
-        for player in players:
-            create_or_update_player_match_stats(player.id, match_id, 0, 0, 0)
-        return
+#     if total_goals == 0 or not players:
+#         # Anche se non ci sono gol, crea record vuoti per tutti i giocatori
+#         for player in players:
+#             create_or_update_player_match_stats(player.id, match_id, 0, 0, 0)
+#         return
     
-    goals_distributed = 0
-    goals_per_player = {}
+#     goals_distributed = 0
+#     goals_per_player = {}
     
-    # Inizializza tutti i giocatori con 0 gol
-    for player in players:
-        goals_per_player[player.id] = 0
+#     # Inizializza tutti i giocatori con 0 gol
+#     for player in players:
+#         goals_per_player[player.id] = 0
     
-    # Distribuisci i gol uno per uno
-    available_players = players.copy()
+#     # Distribuisci i gol uno per uno
+#     available_players = players.copy()
     
-    while goals_distributed < total_goals and available_players:
-        # Scegli un giocatore casuale
-        scorer = random.choice(available_players)
-        goals_per_player[scorer.id] += 1
-        goals_distributed += 1
+#     while goals_distributed < total_goals and available_players:
+#         # Scegli un giocatore casuale
+#         scorer = random.choice(available_players)
+#         goals_per_player[scorer.id] += 1
+#         goals_distributed += 1
         
-        # Un giocatore può segnare al massimo 3 gol per partita
-        if goals_per_player[scorer.id] >= 3:
-            available_players.remove(scorer)
+#         # Un giocatore può segnare al massimo 3 gol per partita
+#         if goals_per_player[scorer.id] >= 3:
+#             available_players.remove(scorer)
     
-    # Crea i record delle statistiche per tutti i giocatori
-    for player in players:
-        goals = goals_per_player[player.id]
-        create_or_update_player_match_stats(player.id, match_id, goals, 0, 0)
+#     # Crea i record delle statistiche per tutti i giocatori
+#     for player in players:
+#         goals = goals_per_player[player.id]
+#         create_or_update_player_match_stats(player.id, match_id, goals, 0, 0)
         
-        # Aggiorna anche le statistiche cumulative (vecchio sistema)
-        player.goals += goals
+#         # Aggiorna anche le statistiche cumulative (vecchio sistema)
+#         player.goals += goals
 
-def add_assists_and_penalties(players, match_id):
-    """Aggiunge assist e penalità casuali ai giocatori."""
+# def add_assists_and_penalties(players, match_id):
+#     """Aggiunge assist e penalità casuali ai giocatori."""
     
-    for player in players:
-        # Ottieni le statistiche esistenti per questo giocatore in questa partita
-        existing_stats = get_player_match_stats(player.id, match_id)
-        goals = existing_stats['goals'] if existing_stats else 0
+#     for player in players:
+#         # Ottieni le statistiche esistenti per questo giocatore in questa partita
+#         existing_stats = get_player_match_stats(player.id, match_id)
+#         goals = existing_stats['goals'] if existing_stats else 0
         
-        # Calcola assist (ogni gol può avere 0-2 assist, più probabili se il giocatore non ha segnato)
-        assists = 0
-        if goals == 0:
-            # I giocatori che non hanno segnato hanno più probabilità di fare assist
-            if random.random() < 0.25:  # 25% probabilità
-                assists = random.randint(1, 2)
-        else:
-            # I giocatori che hanno segnato hanno meno probabilità di fare anche assist
-            if random.random() < 0.15:  # 15% probabilità
-                assists = 1
+#         # Calcola assist (ogni gol può avere 0-2 assist, più probabili se il giocatore non ha segnato)
+#         assists = 0
+#         if goals == 0:
+#             # I giocatori che non hanno segnato hanno più probabilità di fare assist
+#             if random.random() < 0.25:  # 25% probabilità
+#                 assists = random.randint(1, 2)
+#         else:
+#             # I giocatori che hanno segnato hanno meno probabilità di fare anche assist
+#             if random.random() < 0.15:  # 15% probabilità
+#                 assists = 1
         
-        # Calcola penalità (rare, 5% probabilità)
-        penalties = 0
-        if random.random() < 0.05:
-            penalties = random.choices([1, 2], weights=[0.8, 0.2])[0]  # Più spesso 1 penalità
+#         # Calcola penalità (rare, 5% probabilità)
+#         penalties = 0
+#         if random.random() < 0.05:
+#             penalties = random.choices([1, 2], weights=[0.8, 0.2])[0]  # Più spesso 1 penalità
         
-        # Aggiorna le statistiche
-        create_or_update_player_match_stats(player.id, match_id, goals, assists, penalties)
+#         # Aggiorna le statistiche
+#         create_or_update_player_match_stats(player.id, match_id, goals, assists, penalties)
         
-        # Aggiorna anche le statistiche cumulative (vecchio sistema)
-        player.assists += assists
-        player.penalties += penalties
+#         # Aggiorna anche le statistiche cumulative (vecchio sistema)
+#         player.assists += assists
+#         player.penalties += penalties
 
-def create_or_update_player_match_stats(player_id, match_id, goals, assists, penalties):
-    """Crea o aggiorna le statistiche di un giocatore per una partita specifica."""
+# def create_or_update_player_match_stats(player_id, match_id, goals, assists, penalties):
+#     """Crea o aggiorna le statistiche di un giocatore per una partita specifica."""
     
-    try:
-        # Prova a usare il nuovo sistema (PlayerMatchStats)
-        if db.inspect(db.engine).has_table('player_match_stats'):
-            # Cerca statistiche esistenti
-            existing_stats = PlayerMatchStats.query.filter_by(
-                player_id=player_id,
-                match_id=match_id
-            ).first()
+#     try:
+#         # Prova a usare il nuovo sistema (PlayerMatchStats)
+#         if db.inspect(db.engine).has_table('player_match_stats'):
+#             # Cerca statistiche esistenti
+#             existing_stats = PlayerMatchStats.query.filter_by(
+#                 player_id=player_id,
+#                 match_id=match_id
+#             ).first()
             
-            if existing_stats:
-                # Aggiorna statistiche esistenti
-                existing_stats.goals = goals
-                existing_stats.assists = assists
-                existing_stats.penalties = penalties
-            else:
-                # Crea nuove statistiche
-                new_stats = PlayerMatchStats(
-                    player_id=player_id,
-                    match_id=match_id,
-                    goals=goals,
-                    assists=assists,
-                    penalties=penalties
-                )
-                db.session.add(new_stats)
+#             if existing_stats:
+#                 # Aggiorna statistiche esistenti
+#                 existing_stats.goals = goals
+#                 existing_stats.assists = assists
+#                 existing_stats.penalties = penalties
+#             else:
+#                 # Crea nuove statistiche
+#                 new_stats = PlayerMatchStats(
+#                     player_id=player_id,
+#                     match_id=match_id,
+#                     goals=goals,
+#                     assists=assists,
+#                     penalties=penalties
+#                 )
+#                 db.session.add(new_stats)
         
-    except Exception as e:
-        print(f"Errore nella gestione PlayerMatchStats: {e}")
-        # Se il nuovo sistema non funziona, le statistiche cumulative sono già gestite sopra
+#     except Exception as e:
+#         print(f"Errore nella gestione PlayerMatchStats: {e}")
+#         # Se il nuovo sistema non funziona, le statistiche cumulative sono già gestite sopra
 
-def get_player_match_stats(player_id, match_id):
-    """Ottiene le statistiche di un giocatore per una partita specifica."""
+# def get_player_match_stats(player_id, match_id):
+#     """Ottiene le statistiche di un giocatore per una partita specifica."""
     
-    try:
-        if db.inspect(db.engine).has_table('player_match_stats'):
-            stats = PlayerMatchStats.query.filter_by(
-                player_id=player_id,
-                match_id=match_id
-            ).first()
+#     try:
+#         if db.inspect(db.engine).has_table('player_match_stats'):
+#             stats = PlayerMatchStats.query.filter_by(
+#                 player_id=player_id,
+#                 match_id=match_id
+#             ).first()
             
-            if stats:
-                return {
-                    'goals': stats.goals,
-                    'assists': stats.assists,
-                    'penalties': stats.penalties
-                }
-    except Exception as e:
-        print(f"Errore nel recupero PlayerMatchStats: {e}")
+#             if stats:
+#                 return {
+#                     'goals': stats.goals,
+#                     'assists': stats.assists,
+#                     'penalties': stats.penalties
+#                 }
+#     except Exception as e:
+#         print(f"Errore nel recupero PlayerMatchStats: {e}")
     
-    return None
+#     return None
 
 # Route per attivare la popolazione completa
 @app.route('/populate_sample_data', methods=['POST'])
@@ -4079,6 +4191,24 @@ def verify_data():
     flash(f'Verifica completata. Squadre totali: {len(teams)}. Dati: {verification}', 'info')
     return redirect(url_for('teams'))
 
+@app.route('/debug_teams')
+def debug_teams():
+    """Debug: mostra informazioni sulle squadre."""
+    teams = Team.query.all()
+    info = []
+    
+    for team in teams:
+        info.append({
+            'id': team.id,
+            'name': team.name,
+            'group': team.group,
+            'players': len(team.players) if team.players else 0
+        })
+    
+    flash(f'Debug teams: {info}', 'info')
+    return redirect(url_for('teams'))
+
+
 @app.route('/verify_player_stats')
 def verify_player_stats():
     """Verifica le statistiche dei giocatori per debugging."""
@@ -4116,43 +4246,27 @@ def verify_player_stats():
     flash(f'Statistiche giocatori: {stats_info}', 'info')
     return redirect(url_for('standings'))
 
-@app.route('/debug_teams')
-def debug_teams():
-    """Debug: mostra informazioni sulle squadre."""
-    teams = Team.query.all()
-    info = []
-    
-    for team in teams:
-        info.append({
-            'id': team.id,
-            'name': team.name,
-            'group': team.group,
-            'players': len(team.players) if team.players else 0
-        })
-    
-    flash(f'Debug teams: {info}', 'info')
-    return redirect(url_for('teams'))
 
-@app.route('/debug_matches')
-def debug_matches_route():
-    """Debug: mostra informazioni sulle partite."""
-    matches = Match.query.all()
-    info = []
+# @app.route('/debug_matches')
+# def debug_matches_route():
+#     """Debug: mostra informazioni sulle partite."""
+#     matches = Match.query.all()
+#     info = []
     
-    for match in matches[:10]:  # Solo prime 10
-        info.append({
-            'id': match.id,
-            'phase': match.phase,
-            'league': match.league,
-            'team1_id': match.team1_id,
-            'team2_id': match.team2_id,
-            'team1_name': match.team1.name if match.team1 else 'None',
-            'team2_name': match.team2.name if match.team2 else 'None',
-            'score': f"{match.team1_score}-{match.team2_score}" if match.is_completed else "Non giocata"
-        })
+#     for match in matches[:10]:  # Solo prime 10
+#         info.append({
+#             'id': match.id,
+#             'phase': match.phase,
+#             'league': match.league,
+#             'team1_id': match.team1_id,
+#             'team2_id': match.team2_id,
+#             'team1_name': match.team1.name if match.team1 else 'None',
+#             'team2_name': match.team2.name if match.team2 else 'None',
+#             'score': f"{match.team1_score}-{match.team2_score}" if match.is_completed else "Non giocata"
+#         })
     
-    flash(f'Debug matches (prime 10): {info}', 'info')
-    return redirect(url_for('schedule'))
+#     flash(f'Debug matches (prime 10): {info}', 'info')
+#     return redirect(url_for('schedule'))
 
 if __name__ == '__main__':
-    app.run(debug=True)
+     app.run(debug=True)

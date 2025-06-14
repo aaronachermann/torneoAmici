@@ -73,4 +73,69 @@ footer {
 }
 
 
+/* Allineamento tabelle playoff */
+.playoff-table {
+    margin-bottom: 2rem;
+}
+
+.playoff-table .table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.playoff-table .table th,
+.playoff-table .table td {
+    vertical-align: middle;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+/* Larghezze colonne fisse per consistenza */
+.playoff-table .table th:nth-child(1),
+.playoff-table .table td:nth-child(1) { width: 80px; }   /* Partita N° */
+
+.playoff-table .table th:nth-child(2),
+.playoff-table .table td:nth-child(2) { width: 70px; }   /* Orario */
+
+.playoff-table .table th:nth-child(3),
+.playoff-table .table td:nth-child(3) { width: 200px; }  /* Squadra 1 */
+
+.playoff-table .table th:nth-child(4),
+.playoff-table .table td:nth-child(4) { width: 200px; }  /* Squadra 2 */
+
+.playoff-table .table th:nth-child(5),
+.playoff-table .table td:nth-child(5) { width: 120px; }  /* Risultato */
+
+.playoff-table .table th:nth-child(6),
+.playoff-table .table td:nth-child(6) { width: 90px; }   /* Azioni */
+
+/* Altezza minima uniforme per le righe */
+.playoff-table .table tbody tr {
+    height: 60px;
+}
+
+/* Sezioni semifinali con spacing uniforme */
+.semifinal-section {
+    margin-bottom: 1.5rem;
+}
+
+.semifinal-section h5 {
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+/* Header delle card uniformi */
+.playoff-card .card-header {
+    padding: 0.75rem 1.25rem;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+}
+
+.playoff-card .card-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+
 
