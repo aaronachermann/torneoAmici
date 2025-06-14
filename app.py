@@ -19,6 +19,7 @@ class Team(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False, unique=True)
     group = db.Column(db.String(1))  # A, B, C, or D
+    group_order = db.Column(db.Integer, default=0)  # NUOVO CAMPO per l'ordinamento nel girone
     
     players = db.relationship('Player', backref='team', lazy=True)
     
@@ -945,11 +946,11 @@ def reset_playoff_teams_to_null():
 
 @app.route('/teams')
 def teams():
-    teams = Team.query.all()
+    # Ordina le squadre per girone e poi per group_order
+    teams = Team.query.order_by(Team.group.nulls_last(), Team.group_order, Team.name).all()
     team_count = Team.query.count()
     max_teams = 16
     return render_template('teams.html', teams=teams, team_count=team_count, max_teams=max_teams)
-
 
 
 @app.route('/add_team', methods=['POST'])
@@ -977,8 +978,13 @@ def add_team():
     # Se il girone non è specificato, lascialo vuoto (None)
     if group == '':
         group = None
+        group_order = 0
+    else:
+        # Trova il prossimo numero d'ordine per il girone
+        max_order = db.session.query(db.func.max(Team.group_order)).filter_by(group=group).scalar()
+        group_order = (max_order or 0) + 1
     
-    team = Team(name=team_name, group=group)
+    team = Team(name=team_name, group=group, group_order=group_order)
     db.session.add(team)
     db.session.commit()
     
@@ -1008,6 +1014,15 @@ def update_team_group(team_id):
     
     old_group = team.group
     team.group = new_group
+    
+    # Aggiorna l'ordinamento
+    if new_group:
+        # Trova il prossimo numero d'ordine per il nuovo girone
+        max_order = db.session.query(db.func.max(Team.group_order)).filter_by(group=new_group).scalar()
+        team.group_order = (max_order or 0) + 1
+    else:
+        team.group_order = 0
+    
     db.session.commit()
     
     if old_group and new_group:
@@ -1020,6 +1035,8 @@ def update_team_group(team_id):
         flash(f'Girone della squadra {team.name} aggiornato')
     
     return redirect(url_for('teams'))
+
+
 
 @app.route('/team/<int:team_id>/edit', methods=['GET', 'POST'])
 def edit_team(team_id):
@@ -2150,16 +2167,100 @@ def get_player_statistics_for_standings():
         ).all()
 
 
-# Aggiorna la route standings per usare il nuovo sistema
+# # Aggiorna la route standings per usare il nuovo sistema
+# @app.route('/standings')
+# def standings():
+#     # Group stage standings
+#     group_standings = {}
+#     for group in ['A', 'B', 'C', 'D']:
+#         teams = Team.query.filter_by(group=group).order_by(
+#             Team.points.desc(), 
+#             (Team.goals_for - Team.goals_against).desc(),
+#             Team.goals_for.desc()
+#         ).all()
+#         group_standings[group] = teams
+    
+#     # Player statistics - usa il nuovo sistema
+#     try:
+#         if db.inspect(db.engine).has_table('player_match_stats'):
+#             # Nuovo sistema: calcola totali dalle partite
+#             from sqlalchemy import func
+            
+#             # Query per i migliori marcatori
+#             top_scorers_query = db.session.query(
+#                 Player,
+#                 func.sum(PlayerMatchStats.goals).label('total_goals')
+#             ).join(PlayerMatchStats).group_by(Player.id).having(
+#                 func.sum(PlayerMatchStats.goals) > 0
+#             ).order_by(func.sum(PlayerMatchStats.goals).desc()).limit(10)
+            
+#             top_scorers = []
+#             for player, total_goals in top_scorers_query:
+#                 player.display_goals = total_goals
+#                 top_scorers.append(player)
+            
+#             # Query per i migliori assistman
+#             top_assists_query = db.session.query(
+#                 Player,
+#                 func.sum(PlayerMatchStats.assists).label('total_assists')
+#             ).join(PlayerMatchStats).group_by(Player.id).having(
+#                 func.sum(PlayerMatchStats.assists) > 0
+#             ).order_by(func.sum(PlayerMatchStats.assists).desc()).limit(10)
+            
+#             top_assists = []
+#             for player, total_assists in top_assists_query:
+#                 player.display_assists = total_assists
+#                 top_assists.append(player)
+            
+#             # Query per le penalità
+#             most_penalties_query = db.session.query(
+#                 Player,
+#                 func.sum(PlayerMatchStats.penalties).label('total_penalties')
+#             ).join(PlayerMatchStats).group_by(Player.id).having(
+#                 func.sum(PlayerMatchStats.penalties) > 0
+#             ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(10)
+            
+#             most_penalties = []
+#             for player, total_penalties in most_penalties_query:
+#                 player.display_penalties = total_penalties
+#                 most_penalties.append(player)
+                
+#         else:
+#             # Fallback al sistema vecchio
+#             top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
+#             top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
+#             most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
+            
+#             for player in top_scorers:
+#                 player.display_goals = player.goals
+#             for player in top_assists:
+#                 player.display_assists = player.assists
+#             for player in most_penalties:
+#                 player.display_penalties = player.penalties
+    
+#     except Exception as e:
+#         print(f"Errore nelle statistiche: {e}")
+#         # Fallback completo
+#         top_scorers = []
+#         top_assists = []
+#         most_penalties = []
+    
+#     return render_template('standings.html', 
+#                           group_standings=group_standings,
+#                           top_scorers=top_scorers,
+#                           top_assists=top_assists,
+#                           most_penalties=most_penalties)
+
 @app.route('/standings')
 def standings():
-    # Group stage standings
+    # Group stage standings - usa l'ordinamento per gironi
     group_standings = {}
     for group in ['A', 'B', 'C', 'D']:
         teams = Team.query.filter_by(group=group).order_by(
             Team.points.desc(), 
             (Team.goals_for - Team.goals_against).desc(),
-            Team.goals_for.desc()
+            Team.goals_for.desc(),
+            Team.group_order  # Aggiungi ordinamento come tiebreaker finale
         ).all()
         group_standings[group] = teams
     
@@ -2233,7 +2334,6 @@ def standings():
                           top_scorers=top_scorers,
                           top_assists=top_assists,
                           most_penalties=most_penalties)
-
 
 # Funzione helper per verificare le statistiche di un giocatore
 def get_player_match_stats_summary(player_id):
@@ -2849,7 +2949,8 @@ def groups():
     all_teams = Team.query.all()
     
     for group in ['A', 'B', 'C', 'D']:
-        teams = Team.query.filter_by(group=group).order_by(Team.name).all()
+        # Ordina le squadre per group_order all'interno del girone
+        teams = Team.query.filter_by(group=group).order_by(Team.group_order, Team.name).all()
         groups[group] = teams
     
     # Calcola statistiche dei gironi
@@ -2861,6 +2962,89 @@ def groups():
     }
     
     return render_template('groups.html', groups=groups, all_teams=all_teams, groups_stats=groups_stats)
+
+
+@app.route('/update_team_order', methods=['POST'])
+def update_team_order():
+    """Aggiorna l'ordine delle squadre all'interno di un girone."""
+    data = request.json
+    group = data.get('group')
+    team_ids = data.get('team_ids', [])
+    
+    try:
+        # Aggiorna l'ordinamento per ogni squadra
+        for index, team_id in enumerate(team_ids):
+            team = Team.query.get(team_id)
+            if team and team.group == group:
+                team.group_order = index + 1
+        
+        db.session.commit()
+        return {'success': True, 'message': f'Ordine squadre del Girone {group} aggiornato con successo'}
+    
+    except Exception as e:
+        db.session.rollback()
+        return {'success': False, 'message': f'Errore durante l\'aggiornamento: {str(e)}'}, 500
+
+@app.route('/migrate_team_order', methods=['POST'])
+def migrate_team_order():
+    """Migra i dati esistenti aggiungendo il campo group_order."""
+    try:
+        # Per ogni girone, assegna un ordine basato sull'ID o nome
+        for group in ['A', 'B', 'C', 'D']:
+            teams = Team.query.filter_by(group=group).order_by(Team.id).all()
+            for index, team in enumerate(teams):
+                team.group_order = index + 1
+        
+        # Squadre senza girone
+        unassigned_teams = Team.query.filter_by(group=None).all()
+        for team in unassigned_teams:
+            team.group_order = 0
+        
+        db.session.commit()
+        flash('Migrazione dell\'ordinamento completata con successo!', 'success')
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante la migrazione: {str(e)}', 'danger')
+    
+    return redirect(url_for('groups'))
+
+
+@app.route('/migrate_database', methods=['POST'])
+def migrate_database():
+    """Migra il database aggiungendo il campo group_order se non esiste."""
+    try:
+        # Controlla se la colonna group_order esiste già
+        inspector = db.inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('team')]
+        
+        if 'group_order' not in columns:
+            # Aggiungi la colonna group_order
+            with db.engine.connect() as conn:
+                conn.execute(db.text('ALTER TABLE team ADD COLUMN group_order INTEGER DEFAULT 0'))
+                conn.commit()
+            
+            # Assegna ordini esistenti
+            for group in ['A', 'B', 'C', 'D']:
+                teams = Team.query.filter_by(group=group).order_by(Team.id).all()
+                for index, team in enumerate(teams):
+                    team.group_order = index + 1
+            
+            # Squadre senza girone
+            unassigned_teams = Team.query.filter_by(group=None).all()
+            for team in unassigned_teams:
+                team.group_order = 0
+            
+            db.session.commit()
+            flash('Database migrato con successo! Campo group_order aggiunto.', 'success')
+        else:
+            flash('Il campo group_order esiste già nel database.', 'info')
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante la migrazione del database: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
 
 
 

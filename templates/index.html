@@ -95,11 +95,14 @@
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{{ url_for('init_db') }}" class="btn btn-warning">Inizializza Database</a>
                     <button type="button" class="btn btn-danger" onclick="confirmResetDB()">Azzera Database</button>
-                    <form method="post" action="{{ url_for('fix_complete_playoff_system') }}" class="d-inline">
+                    <!-- <form method="post" action="{{ url_for('fix_complete_playoff_system') }}" class="d-inline">
                         <button type="submit" class="btn btn-success">🔧 Fix Completo Sistema Playoff</button>
-                    </form>
+                    </form> -->
                 </div>
                 </div>
+                <!-- <small class="text-muted d-block mt-2">
+                    <strong>Migra Database:</strong> Usa questo se hai aggiornato il codice e devi aggiungere il campo per l'ordinamento squadre.
+                </small> -->
             </div>
 
             <div class="mt-4">
