@@ -6,6 +6,7 @@
     <title>Calendario - Gestione Torneo Hockey</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    
 </head>
 <body class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -59,7 +60,7 @@
 
         <!-- Pulsanti di aggiornamento playoff -->
         {% if matches_by_date %}
-            <div class="row mt-3">
+            <!-- <div class="row mt-3">
                 <div class="col-12">
                     <div class="card">
                         <div class="card-header bg-secondary text-white">
@@ -84,17 +85,25 @@
                         </div>
                     </div>
                 </div>
-            </div>
+            </div> -->
         {% endif %}
 
         <!-- Sezione Qualificazioni -->
-        <h2 class="mt-4">Qualificazioni ({{ tournament_dates.qualification_day1.day_name_it }} e {{ tournament_dates.qualification_day2.day_name_it }}, {{ tournament_dates.qualification_day1.date.day }} e {{ tournament_dates.qualification_day2.date.day }} {{ tournament_dates.qualification_day1.date.strftime('%B')|title }} {{ tournament_dates.qualification_day1.date.year }})</h2>
+        <h2 class="mt-4" id="qualificazioni">Qualificazioni ({{ tournament_dates.qualification_day1.day_name_it }} e {{ tournament_dates.qualification_day2.day_name_it }}, {{ tournament_dates.qualification_day1.date.day }} e {{ tournament_dates.qualification_day2.date.day }} {{ tournament_dates.qualification_day1.month_name_it }} {{ tournament_dates.qualification_day1.date.year }})</h2>
         {% for date, matches in matches_by_date.items() %}
             {% set qual_matches = matches | selectattr("phase", "equalto", "group") | list %}
             {% if qual_matches|length > 0 %}
-                <div class="card mt-4">
+                <div class="card mt-4" id="qual-{{ date }}">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">{{ date }}</h4>
+                    <h4 class="mb-0">
+                        {% if date == tournament_dates.qualification_day1.date.strftime('%Y-%m-%d') %}
+                            {{ tournament_dates.qualification_day1.day_name_it }}, {{ date }}
+                        {% elif date == tournament_dates.qualification_day2.date.strftime('%Y-%m-%d') %}
+                            {{ tournament_dates.qualification_day2.day_name_it }}, {{ date }}
+                        {% else %}
+                            {{ date }}
+                        {% endif %}
+                    </h4>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive">
@@ -111,7 +120,7 @@
                                 </thead>
                                 <tbody>
                                     {% for match in qual_matches %}
-                                        <tr>
+                                        <tr id="match-{{ match.id }}">
                                             <td><strong>{{ match.get_match_number() }}</strong></td>
                                             <td>{{ match.time.strftime('%H:%M') }}</td>
                                             <td>{{ match.get_team1_display_name() }}</td>
@@ -124,7 +133,7 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -138,11 +147,11 @@
         
 
         <!-- Sezione Playoff - Major League -->
-        <h2 class="mt-4">Playoff - Major League</h2>
+        <h2 class="mt-4" id="playoff-major">Playoff - Major League</h2>
         {% for date, matches in matches_by_date.items() %}
             {% set major_matches = matches | selectattr("league", "equalto", "Major League") | selectattr("phase", "ne", "group") | selectattr("phase", "ne", "final") | list %}
             {% if major_matches|length > 0 %}
-                <div class="card mt-4">
+                <div class="card mt-4" id="major-{{ date }}">
                     <div class="card-header bg-success text-white">
                         <h4 class="mb-0">
                             {{ date }}
@@ -165,17 +174,17 @@
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
+                                            <th style="width: 80px;">Partita N°</th>
+                                            <th style="width: 70px;">Orario</th>
+                                            <th style="width: 200px;">Squadra 1</th>
+                                            <th style="width: 200px;">Squadra 2</th>
+                                            <th style="width: 100px;">Risultato</th>
+                                            <th style="width: 90px;">Azioni</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for match in consolation_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -188,30 +197,31 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
-                            
+
+                            <!-- SEMIFINALI MAJOR LEAGUE - Sezione 1°-4° posto -->
                             <h5 class="text-primary mb-3">🏆 Semifinali 1°-4° posto</h5>
                             <div class="table-responsive">
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
+                                            <th style="width: 80px;">Partita N°</th>
+                                            <th style="width: 70px;">Orario</th>
+                                            <th style="width: 200px;">Squadra 1</th>
+                                            <th style="width: 200px;">Squadra 2</th>
+                                            <th style="width: 100px;">Risultato</th>
+                                            <th style="width: 90px;">Azioni</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for match in title_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -224,7 +234,7 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -247,7 +257,7 @@
                                     </thead>
                                     <tbody>
                                         {% for match in major_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -260,7 +270,7 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -274,11 +284,11 @@
         {% endfor %}
 
         <!-- Sezione Playoff - Beer League -->
-        <h2 class="mt-4">Playoff - Beer League</h2>
+        <h2 class="mt-4" id="playoff-beer">Playoff - Beer League</h2>
         {% for date, matches in matches_by_date.items() %}
             {% set beer_matches = matches | selectattr("league", "equalto", "Beer League") | selectattr("phase", "ne", "group") | selectattr("phase", "ne", "final") | list %}
             {% if beer_matches|length > 0 %}
-                <div class="card mt-4">
+                <div class="card mt-4" id="beer-{{ date }}">
                     <div class="card-header bg-warning text-dark">
                         <h4 class="mb-0">
                             {{ date }}
@@ -301,17 +311,17 @@
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
+                                            <th style="width: 80px;">Partita N°</th>
+                                            <th style="width: 70px;">Orario</th>
+                                            <th style="width: 200px;">Squadra 1</th>
+                                            <th style="width: 200px;">Squadra 2</th>
+                                            <th style="width: 100px;">Risultato</th>
+                                            <th style="width: 90px;">Azioni</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for match in consolation_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -324,30 +334,31 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
                                     </tbody>
                                 </table>
                             </div>
-                            
+
+                            <!-- SEMIFINALI BEER LEAGUE - Sezione 1°-4° posto -->
                             <h5 class="text-primary mb-3">🏆 Semifinali 1°-4° posto</h5>
                             <div class="table-responsive">
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Partita N°</th>
-                                            <th>Orario</th>
-                                            <th>Squadra 1</th>
-                                            <th>Squadra 2</th>
-                                            <th>Risultato</th>
-                                            <th>Azioni</th>
+                                            <th style="width: 80px;">Partita N°</th>
+                                            <th style="width: 70px;">Orario</th>
+                                            <th style="width: 200px;">Squadra 1</th>
+                                            <th style="width: 200px;">Squadra 2</th>
+                                            <th style="width: 100px;">Risultato</th>
+                                            <th style="width: 90px;">Azioni</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for match in title_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -360,7 +371,7 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -383,7 +394,7 @@
                                     </thead>
                                     <tbody>
                                         {% for match in beer_matches %}
-                                            <tr>
+                                            <tr id="match-{{ match.id }}">
                                                 <td><strong>{{ match.get_match_number() }}</strong></td>
                                                 <td>{{ match.time.strftime('%H:%M') }}</td>
                                                 <td>{{ match.get_team1_display_name() }}</td>
@@ -396,7 +407,7 @@
                                                     {% endif %}
                                                 </td>
                                                 <td>
-                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                    <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -410,11 +421,11 @@
         {% endfor %}
 
         <!-- Sezione Finali Unificate -->
-        <h2 class="mt-4">Finali - Sabato {{ tournament_dates.finals.date.day }} {{ tournament_dates.finals.date.strftime('%B')|title }}</h2>
+        <h2 class="mt-4" id="finali">Finali - {{ tournament_dates.finals.day_name_it }} {{ tournament_dates.finals.date.day }} {{ tournament_dates.finals.month_name_it }}</h2>
         {% for date, matches in matches_by_date.items() %}
             {% set final_matches = matches | selectattr("phase", "equalto", "final") | list %}
             {% if final_matches|length > 0 %}
-                <div class="card mt-4">
+                <div class="card mt-4" id="finali-{{ date }}">
                     <div class="card-header bg-dark text-white">
                         <h4 class="mb-0">
                             🏆 Finali {{ date }} - Piazzamenti
@@ -442,7 +453,7 @@
                                 </thead>
                                 <tbody>
                                     {% for match in final_matches | sort(attribute='time') %}
-                                        <tr {% if match.league == 'Major League' %}class="table-success"{% else %}class="table-warning"{% endif %}>
+                                        <tr {% if match.league == 'Major League' %}class="table-success"{% else %}class="table-warning"{% endif %} id="match-{{ match.id }}">
                                             <td><strong>{{ match.get_match_number() }}</strong></td>
                                             <td>{{ match.time.strftime('%H:%M') }}</td>
                                             <td>
@@ -474,7 +485,7 @@
                                                 {% endif %}
                                             </td>
                                             <td>
-                                                <a href="{{ url_for('match_detail', match_id=match.id) }}" class="btn btn-sm btn-info">Dettagli</a>
+                                                <a href="{{ url_for('match_detail', match_id=match.id) }}?return_anchor=match-{{ match.id }}" class="btn btn-sm btn-info">Dettagli</a>
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -561,5 +572,29 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Script per smooth scroll agli anchor -->
+    <script>
+        // Smooth scroll quando si torna da una pagina di dettaglio
+        document.addEventListener('DOMContentLoaded', function() {
+            // Se c'è un hash nell'URL, scrolla verso quell'elemento
+            if (window.location.hash) {
+                const element = document.querySelector(window.location.hash);
+                if (element) {
+                    setTimeout(() => {
+                        element.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                        // Evidenzia brevemente la riga
+                        element.style.backgroundColor = '#ffeb3b';
+                        setTimeout(() => {
+                            element.style.backgroundColor = '';
+                        }, 2000);
+                    }, 100);
+                }
+            }
+        });
+    </script>
 </body>
 </html>

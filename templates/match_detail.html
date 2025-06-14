@@ -47,7 +47,11 @@
 
         <div class="d-flex justify-content-between align-items-center">
             <h1>Dettagli Partita</h1>
-            <a href="{{ url_for('schedule') }}" class="btn btn-secondary">Torna al Calendario</a>
+            {% if return_anchor %}
+                <a href="{{ url_for('schedule') }}#{{ return_anchor }}" class="btn btn-secondary">Torna al Calendario</a>
+            {% else %}
+                <a href="{{ url_for('schedule') }}" class="btn btn-secondary">Torna al Calendario</a>
+            {% endif %}
         </div>
 
         <!-- Informazioni Partita -->
@@ -118,6 +122,9 @@
                         </div>
                         <div class="card-body">
                             <form method="post">
+                                {% if return_anchor %}
+                                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+                                {% endif %}
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -148,6 +155,9 @@
                         </div>
                         <div class="card-body">
                             <form method="post">
+                                {% if return_anchor %}
+                                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+                                {% endif %}
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -179,6 +189,9 @@
                         <div class="card-body">
                             <!-- FORM UNICO PER ENTRAMBE LE SQUADRE -->
                             <form method="post" action="{{ url_for('update_player_stats', match_id=match.id) }}">
+                                {% if return_anchor %}
+                                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+                                {% endif %}
                                 <div class="row">
                                     <!-- Squadra 1 -->
                                     <div class="col-md-6">

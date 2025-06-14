@@ -1979,6 +1979,9 @@ def days_until_tournament():
 def match_detail(match_id):
     match = Match.query.get_or_404(match_id)
     
+    # Ottieni il parametro di riferimento per tornare alla posizione corretta
+    return_anchor = request.args.get('return_anchor', '')
+    
     if request.method == 'POST':
         team1_score_str = request.form.get('team1_score')
         team2_score_str = request.form.get('team2_score')
@@ -1995,7 +1998,11 @@ def match_detail(match_id):
             db.session.commit()
             flash('Risultato della partita registrato')
             
-            return redirect(url_for('match_detail', match_id=match_id))
+            # Dopo aver salvato, torna alla posizione corretta
+            if return_anchor:
+                return redirect(url_for('schedule') + f'#{return_anchor}')
+            else:
+                return redirect(url_for('match_detail', match_id=match_id))
     
     # Ottieni le statistiche per questa partita specifica
     team1_players = match.team1.players if match.team1 else []
@@ -2037,13 +2044,14 @@ def match_detail(match_id):
                            match=match, 
                            team1_players=team1_players, 
                            team2_players=team2_players, 
-                           match_stats=match_stats)
-
+                           match_stats=match_stats,
+                           return_anchor=return_anchor)
 
 @app.route('/match/<int:match_id>/update_player_stats', methods=['POST'])
 def update_player_stats(match_id):
     """Aggiorna le statistiche dei giocatori SOLO per questa partita specifica."""
     match = Match.query.get_or_404(match_id)
+    return_anchor = request.form.get('return_anchor', '')
     
     try:
         # Assicurati che la tabella PlayerMatchStats esista
@@ -2094,8 +2102,11 @@ def update_player_stats(match_id):
         db.session.rollback()
         flash(f'Errore nell\'aggiornamento delle statistiche: {str(e)}', 'danger')
     
-    return redirect(url_for('match_detail', match_id=match_id))
-
+    # Torna alla pagina match_detail con l'anchor
+    if return_anchor:
+        return redirect(url_for('match_detail', match_id=match_id) + f'?return_anchor={return_anchor}')
+    else:
+        return redirect(url_for('match_detail', match_id=match_id))
 
 # Aggiorna anche la funzione per il calcolo dei totali nelle classifiche
 def get_player_statistics_for_standings():
@@ -3310,7 +3321,50 @@ def generate_finals():
     db.session.commit()
     return True
 
-
+def format_tournament_dates():
+    """
+    Restituisce le date del torneo formattate per la visualizzazione.
+    """
+    dates = get_tournament_dates()
+    formatted = {}
+    
+    # Mappatura mesi italiano
+    mesi_italiani = {
+        'January': 'Gennaio',
+        'February': 'Febbraio', 
+        'March': 'Marzo',
+        'April': 'Aprile',
+        'May': 'Maggio',
+        'June': 'Giugno',
+        'July': 'Luglio',
+        'August': 'Agosto',
+        'September': 'Settembre',
+        'October': 'Ottobre',
+        'November': 'Novembre',
+        'December': 'Dicembre'
+    }
+    
+    for key, date_obj in dates.items():
+        month_english = date_obj.strftime('%B')
+        month_italian = mesi_italiani.get(month_english, month_english)
+        
+        formatted[key] = {
+            'date': date_obj,
+            'formatted': date_obj.strftime('%d/%m/%Y'),
+            'day_name': date_obj.strftime('%A'),
+            'day_name_it': {
+                'Monday': 'Lunedì',
+                'Tuesday': 'Martedì', 
+                'Wednesday': 'Mercoledì',
+                'Thursday': 'Giovedì',
+                'Friday': 'Venerdì',
+                'Saturday': 'Sabato',
+                'Sunday': 'Domenica'
+            }.get(date_obj.strftime('%A'), date_obj.strftime('%A')),
+            'month_name_it': month_italian  # AGGIUNTO: nome mese in italiano
+        }
+    
+    return formatted
 
 # Aggiungi queste funzioni al tuo app.py per popolare il database con dati di esempio
 
