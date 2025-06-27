@@ -430,7 +430,7 @@ class PlayerMatchStats(db.Model):
     __tablename__ = 'player_match_stats'
     __table_args__ = (
         db.UniqueConstraint('player_id', 'match_id', name='_player_match_uc'),
-        {'extend_existing': True}  # Questo risolve l'errore
+        {'extend_existing': True}
     )
     
     id = db.Column(db.Integer, primary_key=True)
@@ -439,11 +439,393 @@ class PlayerMatchStats(db.Model):
     goals = db.Column(db.Integer, default=0)
     assists = db.Column(db.Integer, default=0)
     penalties = db.Column(db.Integer, default=0)
+    is_best_player_team1 = db.Column(db.Boolean, default=False)  # NUOVO CAMPO
+    is_best_player_team2 = db.Column(db.Boolean, default=False)  # NUOVO CAMPO
     
     # Relazioni
     player = db.relationship('Player', backref='match_stats')
     match = db.relationship('Match', backref='player_stats')
 
+class TournamentSettings(db.Model):
+    """Configurazioni del torneo."""
+    __tablename__ = 'tournament_settings'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Date del torneo
+    tournament_start_date = db.Column(db.Date)
+    qualification_day1 = db.Column(db.Date)
+    qualification_day2 = db.Column(db.Date)
+    quarterfinals_ml_date = db.Column(db.Date)
+    quarterfinals_bl_date = db.Column(db.Date)
+    semifinals_ml_date = db.Column(db.Date)
+    semifinals_bl_date = db.Column(db.Date)
+    finals_date = db.Column(db.Date)
+    
+    # Orari (salvati come JSON string)
+    qualification_times = db.Column(db.Text)  # JSON array
+    playoff_times = db.Column(db.Text)       # JSON array
+    final_times_ml = db.Column(db.Text)      # JSON array
+    final_times_bl = db.Column(db.Text)      # JSON array
+    
+    # Configurazioni squadre
+    max_teams = db.Column(db.Integer, default=16)
+    teams_per_group = db.Column(db.Integer, default=4)
+    max_registration_points = db.Column(db.Integer, default=20)
+    min_players_per_team = db.Column(db.Integer, default=8)
+    max_players_per_team = db.Column(db.Integer, default=15)
+    
+    # Sistema punti
+    points_win = db.Column(db.Integer, default=3)
+    points_draw = db.Column(db.Integer, default=1)
+    points_loss = db.Column(db.Integer, default=0)
+    
+    # Categorie tesseramento (JSON)
+    registration_categories = db.Column(db.Text)  # JSON object
+    
+    # Sistema playoff
+    playoff_system = db.Column(db.String(50), default='standard')  # standard, custom
+    quarterfinal_matchups = db.Column(db.Text)  # JSON array
+    
+    # Configurazioni generali
+    tournament_name = db.Column(db.String(200), default='Torneo degli Amici dello Skater')
+    auto_update_playoffs = db.Column(db.Boolean, default=True)
+    maintenance_mode = db.Column(db.Boolean, default=False)
+    
+    # Timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    @staticmethod
+    def get_settings():
+        """Ottieni le configurazioni correnti o crea quelle di default."""
+        try:
+            # Controlla se la tabella esiste
+            if not db.inspect(db.engine).has_table('tournament_settings'):
+                print("⚠️ Tabella tournament_settings non trovata, ritorno None")
+                return None
+            
+            settings = TournamentSettings.query.first()
+            if not settings:
+                print("📝 Nessuna configurazione trovata, creando default...")
+                settings = TournamentSettings.create_default()
+            return settings
+        except Exception as e:
+            print(f"❌ Errore nel recupero settings: {e}")
+            return None
+    
+    @staticmethod
+    def create_default():
+        """Crea configurazioni di default."""
+        import json
+        from datetime import time
+        
+        # Date di default (secondo sabato di luglio)
+        tournament_dates = get_tournament_dates()
+        tournament_times = get_tournament_times()
+        
+        # Converti i time objects in stringhe per JSON
+        qual_times = [t.strftime('%H:%M') for t in tournament_times['qualification_times']]
+        playoff_times_str = [t.strftime('%H:%M') for t in tournament_times['playoff_times']]
+        final_ml_times = [t.strftime('%H:%M') for t in tournament_times['final_times_ml']]
+        final_bl_times = [t.strftime('%H:%M') for t in tournament_times['final_times_bl']]
+        
+        # Accoppiamenti quarti di finale di default
+        default_quarterfinals = [
+            {"position": 1, "team1": "1° gruppo D", "team2": "2° gruppo C"},
+            {"position": 2, "team1": "1° gruppo A", "team2": "2° gruppo B"},
+            {"position": 3, "team1": "1° gruppo C", "team2": "2° gruppo A"},
+            {"position": 4, "team1": "1° gruppo B", "team2": "2° gruppo D"}
+        ]
+        
+        # Categorie tesseramento di default
+        default_categories = {
+            "LNA/LNB": 5,
+            "1a Lega": 3,
+            "2a Lega": 2,
+            "Non tesserato": 2
+        }
+        
+        settings = TournamentSettings(
+            tournament_start_date=tournament_dates['qualification_day1'],
+            qualification_day1=tournament_dates['qualification_day1'],
+            qualification_day2=tournament_dates['qualification_day2'],
+            quarterfinals_ml_date=tournament_dates['quarterfinals_ml'],
+            quarterfinals_bl_date=tournament_dates['quarterfinals_bl'],
+            semifinals_ml_date=tournament_dates['semifinals_ml'],
+            semifinals_bl_date=tournament_dates['semifinals_bl'],
+            finals_date=tournament_dates['finals'],
+            
+            qualification_times=json.dumps(qual_times),
+            playoff_times=json.dumps(playoff_times_str),
+            final_times_ml=json.dumps(final_ml_times),
+            final_times_bl=json.dumps(final_bl_times),
+            
+            quarterfinal_matchups=json.dumps(default_quarterfinals),
+            registration_categories=json.dumps(default_categories)
+        )
+        
+        db.session.add(settings)
+        db.session.commit()
+        return settings
+    
+    def get_qualification_times_list(self):
+        """Ottieni gli orari delle qualificazioni come lista di time objects."""
+        import json
+        from datetime import time
+        if self.qualification_times:
+            times_str = json.loads(self.qualification_times)
+            return [datetime.strptime(t, '%H:%M').time() for t in times_str]
+        return []
+    
+    def get_playoff_times_list(self):
+        """Ottieni gli orari dei playoff come lista di time objects."""
+        import json
+        from datetime import time
+        if self.playoff_times:
+            times_str = json.loads(self.playoff_times)
+            return [datetime.strptime(t, '%H:%M').time() for t in times_str]
+        return []
+    
+    def get_quarterfinal_matchups_list(self):
+        """Ottieni gli accoppiamenti dei quarti come lista."""
+        import json
+        if self.quarterfinal_matchups:
+            return json.loads(self.quarterfinal_matchups)
+        return []
+    
+    def get_registration_categories_dict(self):
+        """Ottieni le categorie di tesseramento come dizionario."""
+        import json
+        if self.registration_categories:
+            return json.loads(self.registration_categories)
+        return {}
+
+@app.route('/settings')
+def settings():
+    """Pagina delle configurazioni del torneo."""
+    try:
+        settings = TournamentSettings.get_settings()
+        if not settings:
+            # Se non ci sono settings, mostra una pagina di inizializzazione
+            return render_template('settings_init.html')
+        return render_template('settings.html', settings=settings)
+    except Exception as e:
+        flash(f'❌ Errore nel caricamento delle configurazioni: {str(e)}', 'danger')
+        return render_template('settings_init.html')
+
+
+@app.route('/settings/dates', methods=['POST'])
+def update_dates():
+    """Aggiorna le date del torneo."""
+    try:
+        settings = TournamentSettings.get_settings()
+        
+        # Aggiorna le date
+        settings.qualification_day1 = datetime.strptime(request.form.get('qualification_day1'), '%Y-%m-%d').date()
+        settings.qualification_day2 = datetime.strptime(request.form.get('qualification_day2'), '%Y-%m-%d').date()
+        settings.quarterfinals_ml_date = datetime.strptime(request.form.get('quarterfinals_ml_date'), '%Y-%m-%d').date()
+        settings.quarterfinals_bl_date = datetime.strptime(request.form.get('quarterfinals_bl_date'), '%Y-%m-%d').date()
+        settings.semifinals_ml_date = datetime.strptime(request.form.get('semifinals_ml_date'), '%Y-%m-%d').date()
+        settings.semifinals_bl_date = datetime.strptime(request.form.get('semifinals_bl_date'), '%Y-%m-%d').date()
+        settings.finals_date = datetime.strptime(request.form.get('finals_date'), '%Y-%m-%d').date()
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('📅 Date del torneo aggiornate con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento delle date: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/times', methods=['POST'])
+def update_times():
+    """Aggiorna gli orari del torneo."""
+    try:
+        import json
+        settings = TournamentSettings.get_settings()
+        
+        # Qualificazioni - ottieni gli orari dal form
+        qual_times = []
+        i = 0
+        while f'qual_time_{i}' in request.form:
+            time_str = request.form.get(f'qual_time_{i}')
+            if time_str:
+                qual_times.append(time_str)
+            i += 1
+        
+        # Playoff
+        playoff_times = []
+        i = 0
+        while f'playoff_time_{i}' in request.form:
+            time_str = request.form.get(f'playoff_time_{i}')
+            if time_str:
+                playoff_times.append(time_str)
+            i += 1
+        
+        # Finali ML
+        final_ml_times = []
+        i = 0
+        while f'final_ml_time_{i}' in request.form:
+            time_str = request.form.get(f'final_ml_time_{i}')
+            if time_str:
+                final_ml_times.append(time_str)
+            i += 1
+        
+        # Finali BL
+        final_bl_times = []
+        i = 0
+        while f'final_bl_time_{i}' in request.form:
+            time_str = request.form.get(f'final_bl_time_{i}')
+            if time_str:
+                final_bl_times.append(time_str)
+            i += 1
+        
+        # Salva nel database
+        settings.qualification_times = json.dumps(qual_times)
+        settings.playoff_times = json.dumps(playoff_times)
+        settings.final_times_ml = json.dumps(final_ml_times)
+        settings.final_times_bl = json.dumps(final_bl_times)
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('⏰ Orari del torneo aggiornati con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento degli orari: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/teams', methods=['POST'])
+def update_team_settings():
+    """Aggiorna le configurazioni delle squadre."""
+    try:
+        settings = TournamentSettings.get_settings()
+        
+        settings.max_teams = int(request.form.get('max_teams', 16))
+        settings.teams_per_group = int(request.form.get('teams_per_group', 4))
+        settings.max_registration_points = int(request.form.get('max_registration_points', 20))
+        settings.min_players_per_team = int(request.form.get('min_players_per_team', 8))
+        settings.max_players_per_team = int(request.form.get('max_players_per_team', 15))
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('👥 Configurazioni squadre aggiornate con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento configurazioni squadre: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/points', methods=['POST'])
+def update_points_system():
+    """Aggiorna il sistema punti."""
+    try:
+        settings = TournamentSettings.get_settings()
+        
+        settings.points_win = int(request.form.get('points_win', 3))
+        settings.points_draw = int(request.form.get('points_draw', 1))
+        settings.points_loss = int(request.form.get('points_loss', 0))
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('📊 Sistema punti aggiornato con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento sistema punti: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/playoff', methods=['POST'])
+def update_playoff_system():
+    """Aggiorna il sistema playoff."""
+    try:
+        import json
+        settings = TournamentSettings.get_settings()
+        
+        # Aggiorna accoppiamenti quarti di finale
+        matchups = []
+        for i in range(4):
+            team1 = request.form.get(f'qf_team1_{i}')
+            team2 = request.form.get(f'qf_team2_{i}')
+            if team1 and team2:
+                matchups.append({
+                    "position": i + 1,
+                    "team1": team1,
+                    "team2": team2
+                })
+        
+        settings.quarterfinal_matchups = json.dumps(matchups)
+        settings.auto_update_playoffs = 'auto_update_playoffs' in request.form
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('🏆 Sistema playoff aggiornato con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento sistema playoff: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/general', methods=['POST'])
+def update_general_settings():
+    """Aggiorna le configurazioni generali."""
+    try:
+        settings = TournamentSettings.get_settings()
+        
+        settings.tournament_name = request.form.get('tournament_name', settings.tournament_name)
+        settings.maintenance_mode = 'maintenance_mode' in request.form
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash('⚙️ Configurazioni generali aggiornate con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento configurazioni generali: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/reset', methods=['POST'])
+def reset_settings():
+    """Reset delle configurazioni ai valori di default."""
+    try:
+        # Elimina configurazioni esistenti
+        TournamentSettings.query.delete()
+        db.session.commit()
+        
+        # Crea nuove configurazioni di default
+        TournamentSettings.create_default()
+        
+        flash('🔄 Configurazioni ripristinate ai valori di default!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nel reset delle configurazioni: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
+
+@app.route('/settings/migrate', methods=['POST'])
+def migrate_settings():
+    """Migra il database per aggiungere la tabella settings."""
+    try:
+        # Crea la tabella se non esiste
+        db.create_all()
+        
+        # Assicurati che esistano configurazioni di default
+        settings = TournamentSettings.get_settings()
+        
+        flash('🔧 Migrazione settings completata con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante la migrazione: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
 
 
 #round robin
@@ -933,44 +1315,116 @@ def debug_semifinal_numbers():
     return redirect(url_for('schedule'))
 
 
+# def get_tournament_dates():
+#     """
+#     Calcola le date del torneo per l'anno corrente.
+#     Il torneo inizia sempre il sabato della seconda settimana di luglio.
+#     """
+#     current_year = datetime.now().year
+    
+#     # Trova il primo sabato di luglio
+#     july_first = datetime(current_year, 7, 1)
+    
+#     # Calcola quanti giorni mancano al primo sabato
+#     # calendar.SATURDAY = 5 (0=lunedì, 1=martedì, ..., 6=domenica)
+#     days_until_saturday = (calendar.SATURDAY - july_first.weekday()) % 7
+    
+#     # Se il primo luglio è già sabato, days_until_saturday sarà 0
+#     # Se il primo luglio è domenica, days_until_saturday sarà 6
+#     first_saturday = july_first + timedelta(days=days_until_saturday)
+    
+#     # Il torneo inizia il sabato della SECONDA settimana (aggiungi 7 giorni)
+#     tournament_start = first_saturday + timedelta(days=7)
+    
+#     # Calcola tutte le date del torneo
+#     dates = {
+#         'qualification_day1': tournament_start.date(),                    # Sabato (qualificazioni)
+#         'qualification_day2': (tournament_start + timedelta(days=1)).date(),  # Domenica (qualificazioni)
+#         'quarterfinals_ml': (tournament_start + timedelta(days=2)).date(),     # Lunedì (quarti ML)
+#         'quarterfinals_bl': (tournament_start + timedelta(days=3)).date(),     # Martedì (quarti BL)
+#         'semifinals_ml': (tournament_start + timedelta(days=5)).date(),        # Giovedì (semi ML)
+#         'semifinals_bl': (tournament_start + timedelta(days=6)).date(),        # Venerdì (semi BL)
+#         'finals': (tournament_start + timedelta(days=7)).date()               # Sabato (finali)
+#     }
+    
+#     return dates
+
+
+
+# def get_tournament_times():
+#     """
+#     Restituisce gli orari standardizzati per ogni fase del torneo.
+#     """
+#     return {
+#         'qualification_times': [
+#             time(10, 0), time(10, 45), time(11, 30), time(12, 15), time(13, 00),
+#             time(13, 45), time(14, 30), time(15, 15), time(16, 00), time(16, 45),
+#             time(17, 30), time(18, 15)
+#         ],
+#         'playoff_times': [time(19, 00), time(19, 45), time(20, 30), time(21, 15)],
+#         'final_times_ml': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)],
+#         'final_times_bl': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)]
+#     }
+
+
 def get_tournament_dates():
     """
-    Calcola le date del torneo per l'anno corrente.
-    Il torneo inizia sempre il sabato della seconda settimana di luglio.
+    Ottieni le date del torneo dalle configurazioni o calcola quelle di default.
     """
+    try:
+        # Solo se la tabella esiste e ci sono settings
+        if db.inspect(db.engine).has_table('tournament_settings'):
+            settings = TournamentSettings.query.first()
+            if settings and settings.qualification_day1:
+                return {
+                    'qualification_day1': settings.qualification_day1,
+                    'qualification_day2': settings.qualification_day2,
+                    'quarterfinals_ml': settings.quarterfinals_ml_date,
+                    'quarterfinals_bl': settings.quarterfinals_bl_date,
+                    'semifinals_ml': settings.semifinals_ml_date,
+                    'semifinals_bl': settings.semifinals_bl_date,
+                    'finals': settings.finals_date
+                }
+    except Exception as e:
+        print(f"Errore nel recupero date da settings: {e}")
+    
+    # Fallback alle date calcolate automaticamente
     current_year = datetime.now().year
-    
-    # Trova il primo sabato di luglio
     july_first = datetime(current_year, 7, 1)
-    
-    # Calcola quanti giorni mancano al primo sabato
-    # calendar.SATURDAY = 5 (0=lunedì, 1=martedì, ..., 6=domenica)
     days_until_saturday = (calendar.SATURDAY - july_first.weekday()) % 7
-    
-    # Se il primo luglio è già sabato, days_until_saturday sarà 0
-    # Se il primo luglio è domenica, days_until_saturday sarà 6
     first_saturday = july_first + timedelta(days=days_until_saturday)
-    
-    # Il torneo inizia il sabato della SECONDA settimana (aggiungi 7 giorni)
     tournament_start = first_saturday + timedelta(days=7)
     
-    # Calcola tutte le date del torneo
-    dates = {
-        'qualification_day1': tournament_start.date(),                    # Sabato (qualificazioni)
-        'qualification_day2': (tournament_start + timedelta(days=1)).date(),  # Domenica (qualificazioni)
-        'quarterfinals_ml': (tournament_start + timedelta(days=2)).date(),     # Lunedì (quarti ML)
-        'quarterfinals_bl': (tournament_start + timedelta(days=3)).date(),     # Martedì (quarti BL)
-        'semifinals_ml': (tournament_start + timedelta(days=5)).date(),        # Giovedì (semi ML)
-        'semifinals_bl': (tournament_start + timedelta(days=6)).date(),        # Venerdì (semi BL)
-        'finals': (tournament_start + timedelta(days=7)).date()               # Sabato (finali)
+    return {
+        'qualification_day1': tournament_start.date(),
+        'qualification_day2': (tournament_start + timedelta(days=1)).date(),
+        'quarterfinals_ml': (tournament_start + timedelta(days=2)).date(),
+        'quarterfinals_bl': (tournament_start + timedelta(days=3)).date(),
+        'semifinals_ml': (tournament_start + timedelta(days=5)).date(),
+        'semifinals_bl': (tournament_start + timedelta(days=6)).date(),
+        'finals': (tournament_start + timedelta(days=7)).date()
     }
-    
-    return dates
 
 def get_tournament_times():
     """
-    Restituisce gli orari standardizzati per ogni fase del torneo.
+    Ottieni gli orari del torneo dalle configurazioni o usa quelli di default.
     """
+    try:
+        # Solo se la tabella esiste e ci sono settings
+        if db.inspect(db.engine).has_table('tournament_settings'):
+            settings = TournamentSettings.query.first()
+            if settings and settings.qualification_times:
+                import json
+                return {
+                    'qualification_times': settings.get_qualification_times_list(),
+                    'playoff_times': settings.get_playoff_times_list(),
+                    'final_times_ml': [datetime.strptime(t, '%H:%M').time() for t in json.loads(settings.final_times_ml)] if settings.final_times_ml else [],
+                    'final_times_bl': [datetime.strptime(t, '%H:%M').time() for t in json.loads(settings.final_times_bl)] if settings.final_times_bl else []
+                }
+    except Exception as e:
+        print(f"Errore nel recupero orari da settings: {e}")
+    
+    # Fallback agli orari di default
     return {
         'qualification_times': [
             time(10, 0), time(10, 45), time(11, 30), time(12, 15), time(13, 00),
@@ -1012,6 +1466,16 @@ def format_tournament_dates():
 def index():
     return render_template('index.html')
 
+@app.template_filter('from_json')
+def from_json_filter(value):
+    """Converte una stringa JSON in oggetto Python."""
+    import json
+    try:
+        if value:
+            return json.loads(value)
+    except:
+        pass
+    return []
 
 
 # Aggiungi questa route di debug in app.py
@@ -2139,6 +2603,8 @@ def match_detail(match_id):
     
     # Crea un dizionario per le statistiche di questa partita
     match_stats = {}
+    best_player_team1 = None
+    best_player_team2 = None
     
     # Se esiste la tabella PlayerMatchStats, usala
     try:
@@ -2154,6 +2620,12 @@ def match_detail(match_id):
                     'assists': stats.assists,
                     'penalties': stats.penalties
                 }
+                
+                # Trova i migliori giocatori
+                if stats.is_best_player_team1:
+                    best_player_team1 = player
+                elif stats.is_best_player_team2:
+                    best_player_team2 = player
             else:
                 match_stats[player.id] = {
                     'goals': 0,
@@ -2174,7 +2646,124 @@ def match_detail(match_id):
                            team1_players=team1_players, 
                            team2_players=team2_players, 
                            match_stats=match_stats,
+                           best_player_team1=best_player_team1,
+                           best_player_team2=best_player_team2,
                            return_anchor=return_anchor)
+
+
+
+def get_best_players_by_match():
+    """Ottiene tutti i migliori giocatori per ogni partita."""
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            best_players = []
+            
+            # Query per tutti i migliori giocatori squadra 1
+            team1_best = db.session.query(
+                PlayerMatchStats, Player, Match
+            ).join(Player).join(Match).filter(
+                PlayerMatchStats.is_best_player_team1 == True
+            ).all()
+            
+            # Query per tutti i migliori giocatori squadra 2
+            team2_best = db.session.query(
+                PlayerMatchStats, Player, Match
+            ).join(Player).join(Match).filter(
+                PlayerMatchStats.is_best_player_team2 == True
+            ).all()
+            
+            for stats, player, match in team1_best + team2_best:
+                best_players.append({
+                    'player': player,
+                    'match': match,
+                    'team': 1 if stats.is_best_player_team1 else 2,
+                    'goals': stats.goals,
+                    'assists': stats.assists,
+                    'total_points': stats.goals + stats.assists
+                })
+            
+            return best_players
+    except Exception as e:
+        print(f"Errore nel recupero migliori giocatori: {e}")
+    
+    return []
+
+
+def get_best_player_awards():
+    """Conta quante volte ogni giocatore è stato nominato miglior giocatore."""
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            # Approccio più semplice: ottieni tutti i record MVP e conta manualmente
+            
+            # Query per tutti i MVP team1
+            team1_mvps = db.session.query(PlayerMatchStats, Player).join(Player).filter(
+                PlayerMatchStats.is_best_player_team1 == True
+            ).all()
+            
+            # Query per tutti i MVP team2  
+            team2_mvps = db.session.query(PlayerMatchStats, Player).join(Player).filter(
+                PlayerMatchStats.is_best_player_team2 == True
+            ).all()
+            
+            # Conta manualmente
+            player_counts = {}
+            
+            # Conta MVP team1
+            for stats, player in team1_mvps:
+                if player.id not in player_counts:
+                    player_counts[player.id] = {'player': player, 'count': 0}
+                player_counts[player.id]['count'] += 1
+            
+            # Conta MVP team2
+            for stats, player in team2_mvps:
+                if player.id not in player_counts:
+                    player_counts[player.id] = {'player': player, 'count': 0}
+                player_counts[player.id]['count'] += 1
+            
+            # Converti in lista ordinata
+            awards = []
+            for player_id, data in player_counts.items():
+                awards.append((data['player'], data['count']))
+            
+            # Ordina per numero di award (decrescente)
+            awards.sort(key=lambda x: x[1], reverse=True)
+            
+            return awards
+            
+    except Exception as e:
+        print(f"Errore nel conteggio awards: {e}")
+        import traceback
+        traceback.print_exc()
+    
+    return []
+
+
+@app.route('/test_mvp_simple')
+def test_mvp_simple():
+    """Test semplice per contare MVP."""
+    try:
+        # Test diretto sui dati
+        team1_mvps = PlayerMatchStats.query.filter(
+            PlayerMatchStats.is_best_player_team1 == True
+        ).all()
+        
+        team2_mvps = PlayerMatchStats.query.filter(
+            PlayerMatchStats.is_best_player_team2 == True
+        ).all()
+        
+        flash(f'🔍 MVP Team1: {len(team1_mvps)}, MVP Team2: {len(team2_mvps)}', 'info')
+        
+        # Test della funzione corretta
+        awards = get_best_player_awards()
+        flash(f'🏆 Awards trovati: {len(awards)}', 'success')
+        
+        for player, count in awards:
+            flash(f'⭐ {player.name} ({player.team.name}): {count} MVP', 'success')
+            
+    except Exception as e:
+        flash(f'❌ Errore: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
 
 @app.route('/match/<int:match_id>/update_player_stats', methods=['POST'])
 def update_player_stats(match_id):
@@ -2190,17 +2779,30 @@ def update_player_stats(match_id):
         
         # Ottieni tutti i giocatori di entrambe le squadre
         all_players = []
-        if match.team1:
-            all_players.extend(match.team1.players)
-        if match.team2:
-            all_players.extend(match.team2.players)
+        team1_players = []
+        team2_players = []
         
-        # Aggiorna le statistiche SOLO per questa partita
+        if match.team1:
+            team1_players = list(match.team1.players)
+            all_players.extend(team1_players)
+        if match.team2:
+            team2_players = list(match.team2.players)
+            all_players.extend(team2_players)
+        
+        # Ottieni i migliori giocatori selezionati
+        best_player_team1_id = request.form.get('best_player_team1')
+        best_player_team2_id = request.form.get('best_player_team2')
+        
+        # Aggiorna le statistiche per tutti i giocatori
         for player in all_players:
             # Leggi i valori dal form
             goals = int(request.form.get(f'player_{player.id}_goals', 0))
             assists = int(request.form.get(f'player_{player.id}_assists', 0))
             penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
+            
+            # Determina se è il miglior giocatore della sua squadra
+            is_best_team1 = (str(player.id) == best_player_team1_id and player in team1_players)
+            is_best_team2 = (str(player.id) == best_player_team2_id and player in team2_players)
             
             # Trova o crea le statistiche per questo giocatore in questa partita
             stats = PlayerMatchStats.query.filter_by(
@@ -2215,7 +2817,9 @@ def update_player_stats(match_id):
                     match_id=match_id,
                     goals=goals,
                     assists=assists,
-                    penalties=penalties
+                    penalties=penalties,
+                    is_best_player_team1=is_best_team1,
+                    is_best_player_team2=is_best_team2
                 )
                 db.session.add(stats)
             else:
@@ -2223,6 +2827,8 @@ def update_player_stats(match_id):
                 stats.goals = goals
                 stats.assists = assists
                 stats.penalties = penalties
+                stats.is_best_player_team1 = is_best_team1
+                stats.is_best_player_team2 = is_best_team2
         
         db.session.commit()
         flash('Statistiche della partita aggiornate con successo!', 'success')
@@ -2236,7 +2842,6 @@ def update_player_stats(match_id):
         return redirect(url_for('match_detail', match_id=match_id) + f'?return_anchor={return_anchor}')
     else:
         return redirect(url_for('match_detail', match_id=match_id))
-
 # Aggiorna anche la funzione per il calcolo dei totali nelle classifiche
 def get_player_statistics_for_standings():
     """Calcola le statistiche totali dei giocatori sommando tutte le partite."""
@@ -2280,89 +2885,6 @@ def get_player_statistics_for_standings():
 
 
 # # Aggiorna la route standings per usare il nuovo sistema
-# @app.route('/standings')
-# def standings():
-#     # Group stage standings
-#     group_standings = {}
-#     for group in ['A', 'B', 'C', 'D']:
-#         teams = Team.query.filter_by(group=group).order_by(
-#             Team.points.desc(), 
-#             (Team.goals_for - Team.goals_against).desc(),
-#             Team.goals_for.desc()
-#         ).all()
-#         group_standings[group] = teams
-    
-#     # Player statistics - usa il nuovo sistema
-#     try:
-#         if db.inspect(db.engine).has_table('player_match_stats'):
-#             # Nuovo sistema: calcola totali dalle partite
-#             from sqlalchemy import func
-            
-#             # Query per i migliori marcatori
-#             top_scorers_query = db.session.query(
-#                 Player,
-#                 func.sum(PlayerMatchStats.goals).label('total_goals')
-#             ).join(PlayerMatchStats).group_by(Player.id).having(
-#                 func.sum(PlayerMatchStats.goals) > 0
-#             ).order_by(func.sum(PlayerMatchStats.goals).desc()).limit(10)
-            
-#             top_scorers = []
-#             for player, total_goals in top_scorers_query:
-#                 player.display_goals = total_goals
-#                 top_scorers.append(player)
-            
-#             # Query per i migliori assistman
-#             top_assists_query = db.session.query(
-#                 Player,
-#                 func.sum(PlayerMatchStats.assists).label('total_assists')
-#             ).join(PlayerMatchStats).group_by(Player.id).having(
-#                 func.sum(PlayerMatchStats.assists) > 0
-#             ).order_by(func.sum(PlayerMatchStats.assists).desc()).limit(10)
-            
-#             top_assists = []
-#             for player, total_assists in top_assists_query:
-#                 player.display_assists = total_assists
-#                 top_assists.append(player)
-            
-#             # Query per le penalità
-#             most_penalties_query = db.session.query(
-#                 Player,
-#                 func.sum(PlayerMatchStats.penalties).label('total_penalties')
-#             ).join(PlayerMatchStats).group_by(Player.id).having(
-#                 func.sum(PlayerMatchStats.penalties) > 0
-#             ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(10)
-            
-#             most_penalties = []
-#             for player, total_penalties in most_penalties_query:
-#                 player.display_penalties = total_penalties
-#                 most_penalties.append(player)
-                
-#         else:
-#             # Fallback al sistema vecchio
-#             top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
-#             top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
-#             most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
-            
-#             for player in top_scorers:
-#                 player.display_goals = player.goals
-#             for player in top_assists:
-#                 player.display_assists = player.assists
-#             for player in most_penalties:
-#                 player.display_penalties = player.penalties
-    
-#     except Exception as e:
-#         print(f"Errore nelle statistiche: {e}")
-#         # Fallback completo
-#         top_scorers = []
-#         top_assists = []
-#         most_penalties = []
-    
-#     return render_template('standings.html', 
-#                           group_standings=group_standings,
-#                           top_scorers=top_scorers,
-#                           top_assists=top_assists,
-#                           most_penalties=most_penalties)
-
 @app.route('/standings')
 def standings():
     # Group stage standings - usa l'ordinamento per gironi
@@ -2372,7 +2894,7 @@ def standings():
             Team.points.desc(), 
             (Team.goals_for - Team.goals_against).desc(),
             Team.goals_for.desc(),
-            Team.group_order  # Aggiungi ordinamento come tiebreaker finale
+            Team.group_order
         ).all()
         group_standings[group] = teams
     
@@ -2420,12 +2942,16 @@ def standings():
             for player, total_penalties in most_penalties_query:
                 player.display_penalties = total_penalties
                 most_penalties.append(player)
+            
+            # NUOVO: Migliori giocatori (più nomination)
+            best_player_awards = get_best_player_awards()
                 
         else:
             # Fallback al sistema vecchio
             top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
             top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
             most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
+            best_player_awards = []
             
             for player in top_scorers:
                 player.display_goals = player.goals
@@ -2440,12 +2966,109 @@ def standings():
         top_scorers = []
         top_assists = []
         most_penalties = []
+        best_player_awards = []
     
     return render_template('standings.html', 
                           group_standings=group_standings,
                           top_scorers=top_scorers,
                           top_assists=top_assists,
-                          most_penalties=most_penalties)
+                          most_penalties=most_penalties,
+                          best_player_awards=best_player_awards)
+
+
+
+@app.route('/migrate_best_player_fields', methods=['POST'])
+def migrate_best_player_fields():
+    """Migra il database aggiungendo i campi per il miglior giocatore."""
+    try:
+        # Controlla se le colonne esistono già
+        inspector = db.inspect(db.engine)
+        
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+            
+            if 'is_best_player_team1' not in columns:
+                # Aggiungi le colonne per miglior giocatore
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN is_best_player_team1 BOOLEAN DEFAULT 0'))
+                    conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN is_best_player_team2 BOOLEAN DEFAULT 0'))
+                    conn.commit()
+                
+                flash('Database migrato con successo! Campi miglior giocatore aggiunti.', 'success')
+            else:
+                flash('I campi miglior giocatore esistono già nel database.', 'info')
+        else:
+            # Se la tabella non esiste, creala
+            db.create_all()
+            flash('Tabella PlayerMatchStats creata con successo!', 'success')
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore durante la migrazione del database: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
+
+
+@app.route('/debug_mvp')
+def debug_mvp():
+    """Debug: controlla i dati MVP nel database."""
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            # Controlla se ci sono record con MVP
+            mvp_records = PlayerMatchStats.query.filter(
+                (PlayerMatchStats.is_best_player_team1 == True) | 
+                (PlayerMatchStats.is_best_player_team2 == True)
+            ).all()
+            
+            debug_info = []
+            for record in mvp_records:
+                player = Player.query.get(record.player_id)
+                match = Match.query.get(record.match_id)
+                debug_info.append({
+                    'player_name': player.name if player else 'Sconosciuto',
+                    'team_name': player.team.name if player and player.team else 'Sconosciuto',
+                    'match_id': record.match_id,
+                    'is_team1_mvp': record.is_best_player_team1,
+                    'is_team2_mvp': record.is_best_player_team2,
+                    'match_teams': f"{match.get_team1_display_name()} vs {match.get_team2_display_name()}" if match else 'Match non trovato'
+                })
+            
+            flash(f'🔍 Debug MVP - Record trovati: {len(mvp_records)}. Dettagli: {debug_info}', 'info')
+        else:
+            flash('❌ Tabella player_match_stats non trovata! Esegui la migrazione.', 'danger')
+    except Exception as e:
+        flash(f'❌ Errore debug MVP: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
+
+
+@app.route('/debug_mvp_awards')
+def debug_mvp_awards():
+    """Debug: controlla la funzione get_best_player_awards."""
+    try:
+        awards = get_best_player_awards()
+        
+        debug_info = {
+            'awards_count': len(awards),
+            'awards_details': []
+        }
+        
+        for player, count in awards:
+            debug_info['awards_details'].append({
+                'player_name': player.name,
+                'team_name': player.team.name,
+                'awards_count': count
+            })
+        
+        flash(f'🏆 Debug Awards Function: {debug_info}', 'info')
+        
+    except Exception as e:
+        flash(f'❌ Errore nella funzione get_best_player_awards: {str(e)}', 'danger')
+        import traceback
+        flash(f'Traceback: {traceback.format_exc()}', 'danger')
+    
+    return redirect(url_for('standings'))
+
 
 # Funzione helper per verificare le statistiche di un giocatore
 def get_player_match_stats_summary(player_id):
@@ -2542,8 +3165,97 @@ def get_player_total_stats():
 
 
 
+# def update_team_stats(match, old_team1_score=None, old_team2_score=None):
+#     """Aggiorna le statistiche delle squadre e controlla aggiornamenti playoff automatici."""
+#     team1 = match.team1
+#     team2 = match.team2
+
+#     # Se esistono vecchi punteggi, sottraiamo quei valori dalle statistiche delle squadre
+#     if old_team1_score is not None and old_team2_score is not None:
+#         team1.goals_for -= old_team1_score
+#         team1.goals_against -= old_team2_score
+#         team2.goals_for -= old_team2_score
+#         team2.goals_against -= old_team1_score
+
+#         if old_team1_score > old_team2_score:
+#             team1.wins -= 1
+#             team2.losses -= 1
+#             team1.points -= 3
+#         elif old_team2_score > old_team1_score:
+#             team2.wins -= 1
+#             team1.losses -= 1
+#             team2.points -= 3
+#         else:
+#             team1.draws -= 1
+#             team2.draws -= 1
+#             team1.points -= 1
+#             team2.points -= 1
+
+#     # Aggiungiamo i nuovi valori alle statistiche
+#     team1.goals_for += match.team1_score
+#     team1.goals_against += match.team2_score
+#     team2.goals_for += match.team2_score
+#     team2.goals_against += match.team1_score
+
+#     if match.team1_score > match.team2_score:
+#         team1.wins += 1
+#         team2.losses += 1
+#         team1.points += 3
+#     elif match.team2_score > match.team1_score:
+#         team2.wins += 1
+#         team1.losses += 1
+#         team2.points += 3
+#     else:
+#         team1.draws += 1
+#         team2.draws += 1
+#         team1.points += 1
+#         team2.points += 1
+
+#     # *** AGGIORNAMENTI AUTOMATICI PLAYOFF ***
+    
+#     # 1. QUALIFICAZIONI COMPLETATE → AGGIORNA QUARTI
+#     if match.phase == 'group' and all_group_matches_completed():
+#         print("🎯 Tutte le qualificazioni completate! Aggiornamento quarti automatico...")
+#         try:
+#             update_playoff_brackets()
+#             print("✅ Quarti aggiornati automaticamente!")
+#         except Exception as e:
+#             print(f"❌ Errore aggiornamento quarti: {e}")
+    
+#     # 2. QUARTI COMPLETATI PER UNA LEGA → AGGIORNA SEMIFINALI DI QUELLA LEGA
+#     if match.phase == 'quarterfinal':
+#         league = match.league
+#         if league and all_phase_matches_completed('quarterfinal', league):
+#             print(f"🎯 Quarti {league} completati! Aggiornamento semifinali automatico...")
+#             try:
+#                 update_semifinals(league)
+#                 print(f"✅ Semifinali {league} aggiornate automaticamente!")
+#             except Exception as e:
+#                 print(f"❌ Errore aggiornamento semifinali {league}: {e}")
+    
+#     # 3. SEMIFINALI COMPLETATE PER UNA LEGA → AGGIORNA FINALI DI QUELLA LEGA
+#     if match.phase == 'semifinal':
+#         league = match.league
+#         if league and all_phase_matches_completed('semifinal', league):
+#             print(f"🎯 Semifinali {league} completate! Aggiornamento finali automatico...")
+#             try:
+#                 update_finals(league)
+#                 print(f"✅ Finali {league} aggiornate automaticamente!")
+#             except Exception as e:
+#                 print(f"❌ Errore aggiornamento finali {league}: {e}")
+
 def update_team_stats(match, old_team1_score=None, old_team2_score=None):
-    """Aggiorna le statistiche delle squadre e controlla aggiornamenti playoff automatici."""
+    """Aggiorna le statistiche delle squadre usando i punti dalle configurazioni."""
+    
+    # Ottieni i punti dalle settings
+    try:
+        settings = TournamentSettings.get_settings()
+        points_win = settings.points_win if settings else 3
+        points_draw = settings.points_draw if settings else 1
+        points_loss = settings.points_loss if settings else 0
+    except:
+        points_win, points_draw, points_loss = 3, 1, 0
+    
     team1 = match.team1
     team2 = match.team2
 
@@ -2557,16 +3269,16 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
         if old_team1_score > old_team2_score:
             team1.wins -= 1
             team2.losses -= 1
-            team1.points -= 3
+            team1.points -= points_win
         elif old_team2_score > old_team1_score:
             team2.wins -= 1
             team1.losses -= 1
-            team2.points -= 3
+            team2.points -= points_win
         else:
             team1.draws -= 1
             team2.draws -= 1
-            team1.points -= 1
-            team2.points -= 1
+            team1.points -= points_draw
+            team2.points -= points_draw
 
     # Aggiungiamo i nuovi valori alle statistiche
     team1.goals_for += match.team1_score
@@ -2577,18 +3289,20 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
     if match.team1_score > match.team2_score:
         team1.wins += 1
         team2.losses += 1
-        team1.points += 3
+        team1.points += points_win
+        team2.points += points_loss
     elif match.team2_score > match.team1_score:
         team2.wins += 1
         team1.losses += 1
-        team2.points += 3
+        team2.points += points_win
+        team1.points += points_loss
     else:
         team1.draws += 1
         team2.draws += 1
-        team1.points += 1
-        team2.points += 1
+        team1.points += points_draw
+        team2.points += points_draw
 
-    # *** AGGIORNAMENTI AUTOMATICI PLAYOFF ***
+    # *** AGGIORNAMENTI AUTOMATICI PLAYOFF (come prima) ***
     
     # 1. QUALIFICAZIONI COMPLETATE → AGGIORNA QUARTI
     if match.phase == 'group' and all_group_matches_completed():
@@ -2620,8 +3334,6 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None):
                 print(f"✅ Finali {league} aggiornate automaticamente!")
             except Exception as e:
                 print(f"❌ Errore aggiornamento finali {league}: {e}")
-
-
 
 
 def all_group_matches_completed():
@@ -3661,6 +4373,7 @@ def format_tournament_dates():
         }
     
     return formatted
+
 
 # Aggiungi queste funzioni al tuo app.py per popolare il database con dati di esempio
 

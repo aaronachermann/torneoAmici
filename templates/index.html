@@ -28,6 +28,10 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
+                    </li>
+
                 </ul>
             </div>
         </div>
@@ -98,13 +102,24 @@
                     <!-- <form method="post" action="{{ url_for('fix_complete_playoff_system') }}" class="d-inline">
                         <button type="submit" class="btn btn-success">🔧 Fix Completo Sistema Playoff</button>
                     </form> -->
-                    
+                    <form method="post" action="{{ url_for('migrate_best_player_fields') }}" class="d-inline">
+                    <button type="submit" class="btn btn-info" onclick="return confirm('Aggiornare il database per supportare i migliori giocatori? Questo è sicuro e non eliminerà dati esistenti.')">
+                        🏆 Abilita Migliori Giocatori
+                    </button>
+                </form>
+                <a href="{{ url_for('settings') }}" class="btn btn-primary">Configurazioni</a>
+
                 </div>
+                <small class="text-muted d-block mt-2">
+                    <strong>Abilita Migliori Giocatori:</strong> Aggiunge i campi necessari per selezionare i migliori giocatori di ogni partita. Esegui questa migrazione una sola volta.
+                </small>
+                <small class="text-muted d-block mt-2">
+                    <strong>⚙️ Configurazioni:</strong> Personalizza date, orari, sistema playoff e altre impostazioni del torneo.
+                </small>
                 </div>
-                <!-- <small class="text-muted d-block mt-2">
-                    <strong>Migra Database:</strong> Usa questo se hai aggiornato il codice e devi aggiungere il campo per l'ordinamento squadre.
-                </small> -->
+
             </div>
+            
 
             <div class="mt-4">
                 <h3>Dati di Esempio</h3>

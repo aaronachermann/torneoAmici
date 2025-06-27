@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inizializzazione Settings - Gestione Torneo degli Amici</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo degli Amici</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('teams') }}">Squadre</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('groups') }}">Gironi</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('schedule') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('settings') }}">⚙️ Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card border-primary">
+                    <div class="card-header bg-primary text-white text-center">
+                        <h1 class="mb-0">⚙️ Inizializzazione Settings</h1>
+                    </div>
+                    <div class="card-body text-center p-5">
+                        <div class="mb-4">
+                            <i class="fas fa-cog fa-5x text-primary mb-3"></i>
+                            <h3>Sistema Configurazioni Non Inizializzato</h3>
+                            <p class="lead text-muted">
+                                Il sistema di configurazioni del torneo non è ancora stato inizializzato. 
+                                Clicca il pulsante qui sotto per creare le configurazioni di default.
+                            </p>
+                        </div>
+
+                        <div class="alert alert-info text-start">
+                            <h5><i class="fas fa-info-circle"></i> Cosa Verrà Creato:</h5>
+                            <ul class="mb-0">
+                                <li><strong>📅 Date del Torneo:</strong> Calcolate automaticamente (secondo sabato di luglio)</li>
+                                <li><strong>⏰ Orari Standard:</strong> Qualificazioni, playoff e finali</li>
+                                <li><strong>🏆 Sistema Playoff:</strong> Accoppiamenti standard dei quarti di finale</li>
+                                <li><strong>👥 Limiti Squadre:</strong> 16 squadre, 4 per girone, max 20 punti tesseramento</li>
+                                <li><strong>📊 Sistema Punti:</strong> 3 vittoria, 1 pareggio, 0 sconfitta</li>
+                                <li><strong>⚙️ Configurazioni:</strong> Nome torneo e impostazioni generali</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-flex justify-content-center gap-3">
+                            <form method="post" action="{{ url_for('migrate_settings') }}">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-magic"></i> Inizializza Settings
+                                </button>
+                            </form>
+                            <a href="{{ url_for('index') }}" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-arrow-left"></i> Torna alla Home
+                            </a>
+                        </div>
+
+                        <div class="mt-4">
+                            <small class="text-muted">
+                                <i class="fas fa-shield-alt"></i> 
+                                <strong>Sicuro:</strong> Questa operazione non eliminerà nessun dato esistente. 
+                                Creerà solo le tabelle e configurazioni necessarie per il sistema settings.
+                            </small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Informazioni Aggiuntive -->
+                <div class="row mt-4">
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-calendar-alt fa-2x text-success mb-2"></i>
+                                <h5>Date Flessibili</h5>
+                                <p class="small text-muted">Modifica facilmente tutte le date del torneo</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+                                <h5>Orari Personalizzabili</h5>
+                                <p class="small text-muted">Aggiungi/rimuovi orari per ogni fase del torneo</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card h-100">
+                            <div class="card-body text-center">
+                                <i class="fas fa-trophy fa-2x text-danger mb-2"></i>
+                                <h5>Playoff Configurabili</h5>
+                                <p class="small text-muted">Personalizza chi gioca contro chi nei playoff</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-3 mt-auto">
+        <div class="container text-center">
+            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

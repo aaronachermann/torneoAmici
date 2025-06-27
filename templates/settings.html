@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurazioni - Gestione Torneo degli Amici</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .settings-section {
+            margin-bottom: 2rem;
+        }
+        .time-input-group {
+            margin-bottom: 0.5rem;
+        }
+        .add-time-btn {
+            margin-top: 0.5rem;
+        }
+        .settings-card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .danger-zone {
+            border: 2px solid #dc3545;
+            border-radius: 8px;
+            padding: 1rem;
+            background-color: #f8d7da;
+        }
+    </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo degli Amici</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('teams') }}">Squadre</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('groups') }}">Gironi</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('schedule') }}">Calendario</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="{{ url_for('settings') }}">Settings</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>⚙️ Configurazioni Torneo</h1>
+            <div>
+                <form method="post" action="{{ url_for('migrate_settings') }}" class="d-inline">
+                    <button type="submit" class="btn btn-info">🔧 Inizializza Settings</button>
+                </form>
+                <a href="{{ url_for('index') }}" class="btn btn-secondary">Torna alla Home</a>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <ul class="nav nav-tabs" id="settingsTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="dates-tab" data-bs-toggle="tab" data-bs-target="#dates" type="button" role="tab">📅 Date</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="times-tab" data-bs-toggle="tab" data-bs-target="#times" type="button" role="tab">⏰ Orari</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">👥 Squadre</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="points-tab" data-bs-toggle="tab" data-bs-target="#points" type="button" role="tab">📊 Punti</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="playoff-tab" data-bs-toggle="tab" data-bs-target="#playoff" type="button" role="tab">🏆 Playoff</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">⚙️ Generale</button>
+            </li>
+        </ul>
+
+        <div class="tab-content mt-4" id="settingsTabContent">
+            
+            <!-- TAB DATE -->
+            <div class="tab-pane fade show active" id="dates" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">📅 Date del Torneo</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_dates') }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="qualification_day1" class="form-label">Qualificazioni - Giorno 1</label>
+                                    <input type="date" class="form-control" id="qualification_day1" name="qualification_day1" 
+                                           value="{{ settings.qualification_day1.strftime('%Y-%m-%d') if settings.qualification_day1 else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="qualification_day2" class="form-label">Qualificazioni - Giorno 2</label>
+                                    <input type="date" class="form-control" id="qualification_day2" name="qualification_day2" 
+                                           value="{{ settings.qualification_day2.strftime('%Y-%m-%d') if settings.qualification_day2 else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="quarterfinals_ml_date" class="form-label">Quarti Major League</label>
+                                    <input type="date" class="form-control" id="quarterfinals_ml_date" name="quarterfinals_ml_date" 
+                                           value="{{ settings.quarterfinals_ml_date.strftime('%Y-%m-%d') if settings.quarterfinals_ml_date else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="quarterfinals_bl_date" class="form-label">Quarti Beer League</label>
+                                    <input type="date" class="form-control" id="quarterfinals_bl_date" name="quarterfinals_bl_date" 
+                                           value="{{ settings.quarterfinals_bl_date.strftime('%Y-%m-%d') if settings.quarterfinals_bl_date else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="semifinals_ml_date" class="form-label">Semifinali Major League</label>
+                                    <input type="date" class="form-control" id="semifinals_ml_date" name="semifinals_ml_date" 
+                                           value="{{ settings.semifinals_ml_date.strftime('%Y-%m-%d') if settings.semifinals_ml_date else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="semifinals_bl_date" class="form-label">Semifinali Beer League</label>
+                                    <input type="date" class="form-control" id="semifinals_bl_date" name="semifinals_bl_date" 
+                                           value="{{ settings.semifinals_bl_date.strftime('%Y-%m-%d') if settings.semifinals_bl_date else '' }}">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="finals_date" class="form-label">Finali</label>
+                                    <input type="date" class="form-control" id="finals_date" name="finals_date" 
+                                           value="{{ settings.finals_date.strftime('%Y-%m-%d') if settings.finals_date else '' }}">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">💾 Salva Date</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB ORARI -->
+            <div class="tab-pane fade" id="times" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">⏰ Orari del Torneo</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_times') }}">
+                            <div class="row">
+                                <!-- Orari Qualificazioni -->
+                                <div class="col-md-6 mb-4">
+                                    <h5>Qualificazioni</h5>
+                                    <div id="qualification-times">
+                                        {% set qual_times = settings.get_qualification_times_list() %}
+                                        {% if qual_times %}
+                                            {% for time_obj in qual_times %}
+                                                <div class="time-input-group">
+                                                    <input type="time" class="form-control" name="qual_time_{{ loop.index0 }}" value="{{ time_obj.strftime('%H:%M') }}">
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="time-input-group">
+                                                <input type="time" class="form-control" name="qual_time_0" value="10:00">
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success add-time-btn" onclick="addTimeInput('qualification-times', 'qual_time')">+ Aggiungi Orario</button>
+                                </div>
+
+                                <!-- Orari Playoff -->
+                                <div class="col-md-6 mb-4">
+                                    <h5>Playoff</h5>
+                                    <div id="playoff-times">
+                                        {% set playoff_times = settings.get_playoff_times_list() %}
+                                        {% if playoff_times %}
+                                            {% for time_obj in playoff_times %}
+                                                <div class="time-input-group">
+                                                    <input type="time" class="form-control" name="playoff_time_{{ loop.index0 }}" value="{{ time_obj.strftime('%H:%M') }}">
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="time-input-group">
+                                                <input type="time" class="form-control" name="playoff_time_0" value="19:00">
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success add-time-btn" onclick="addTimeInput('playoff-times', 'playoff_time')">+ Aggiungi Orario</button>
+                                </div>
+
+                                <!-- Orari Finali ML -->
+                                <div class="col-md-6 mb-4">
+                                    <h5>Finali Major League</h5>
+                                    <div id="final-ml-times">
+                                        {% if settings.final_times_ml %}
+                                            {% set final_ml_times = settings.final_times_ml | from_json %}
+                                            {% for time_str in final_ml_times %}
+                                                <div class="time-input-group">
+                                                    <input type="time" class="form-control" name="final_ml_time_{{ loop.index0 }}" value="{{ time_str }}">
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="time-input-group">
+                                                <input type="time" class="form-control" name="final_ml_time_0" value="12:00">
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success add-time-btn" onclick="addTimeInput('final-ml-times', 'final_ml_time')">+ Aggiungi Orario</button>
+                                </div>
+
+                                <!-- Orari Finali BL -->
+                                <div class="col-md-6 mb-4">
+                                    <h5>Finali Beer League</h5>
+                                    <div id="final-bl-times">
+                                        {% if settings.final_times_bl %}
+                                            {% set final_bl_times = settings.final_times_bl | from_json %}
+                                            {% for time_str in final_bl_times %}
+                                                <div class="time-input-group">
+                                                    <input type="time" class="form-control" name="final_bl_time_{{ loop.index0 }}" value="{{ time_str }}">
+                                                </div>
+                                            {% endfor %}
+                                        {% else %}
+                                            <div class="time-input-group">
+                                                <input type="time" class="form-control" name="final_bl_time_0" value="11:00">
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-success add-time-btn" onclick="addTimeInput('final-bl-times', 'final_bl_time')">+ Aggiungi Orario</button>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-success">💾 Salva Orari</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB SQUADRE -->
+            <div class="tab-pane fade" id="teams" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">👥 Configurazioni Squadre</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_team_settings') }}">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="max_teams" class="form-label">Numero Massimo Squadre</label>
+                                    <input type="number" class="form-control" id="max_teams" name="max_teams" value="{{ settings.max_teams or 16 }}" min="4" max="32">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="teams_per_group" class="form-label">Squadre per Girone</label>
+                                    <input type="number" class="form-control" id="teams_per_group" name="teams_per_group" value="{{ settings.teams_per_group or 4 }}" min="2" max="8">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="max_registration_points" class="form-label">Punti Tesseramento Massimi</label>
+                                    <input type="number" class="form-control" id="max_registration_points" name="max_registration_points" value="{{ settings.max_registration_points or 20 }}" min="10" max="50">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="min_players_per_team" class="form-label">Giocatori Minimi per Squadra</label>
+                                    <input type="number" class="form-control" id="min_players_per_team" name="min_players_per_team" value="{{ settings.min_players_per_team or 8 }}" min="5" max="15">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="max_players_per_team" class="form-label">Giocatori Massimi per Squadra</label>
+                                    <input type="number" class="form-control" id="max_players_per_team" name="max_players_per_team" value="{{ settings.max_players_per_team or 15 }}" min="10" max="25">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-info">💾 Salva Configurazioni Squadre</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB PUNTI -->
+            <div class="tab-pane fade" id="points" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-warning text-dark">
+                        <h4 class="mb-0">📊 Sistema Punti</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_points_system') }}">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="points_win" class="form-label">Punti per Vittoria</label>
+                                    <input type="number" class="form-control" id="points_win" name="points_win" value="{{ settings.points_win or 3 }}" min="0" max="10">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="points_draw" class="form-label">Punti per Pareggio</label>
+                                    <input type="number" class="form-control" id="points_draw" name="points_draw" value="{{ settings.points_draw or 1 }}" min="0" max="5">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="points_loss" class="form-label">Punti per Sconfitta</label>
+                                    <input type="number" class="form-control" id="points_loss" name="points_loss" value="{{ settings.points_loss or 0 }}" min="0" max="3">
+                                </div>
+                            </div>
+                            <div class="alert alert-info">
+                                <strong>💡 Sistema Attuale:</strong> 
+                                Vittoria = {{ settings.points_win or 3 }} punti, 
+                                Pareggio = {{ settings.points_draw or 1 }} punto, 
+                                Sconfitta = {{ settings.points_loss or 0 }} punti
+                            </div>
+                            <button type="submit" class="btn btn-warning">💾 Salva Sistema Punti</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB PLAYOFF -->
+            <div class="tab-pane fade" id="playoff" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-danger text-white">
+                        <h4 class="mb-0">🏆 Sistema Playoff</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_playoff_system') }}">
+                            <h5>Accoppiamenti Quarti di Finale</h5>
+                            <div class="row">
+                                {% set quarterfinal_matchups = settings.get_quarterfinal_matchups_list() %}
+                                {% for i in range(4) %}
+                                    {% set matchup = quarterfinal_matchups[i] if i < quarterfinal_matchups|length else {} %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <strong>Quarto {{ i + 1 }}</strong>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-2">
+                                                    <label class="form-label">Squadra 1</label>
+                                                    <select class="form-select" name="qf_team1_{{ i }}">
+                                                        <option value="1° gruppo A" {% if matchup.team1 == "1° gruppo A" %}selected{% endif %}>1° gruppo A</option>
+                                                        <option value="1° gruppo B" {% if matchup.team1 == "1° gruppo B" %}selected{% endif %}>1° gruppo B</option>
+                                                        <option value="1° gruppo C" {% if matchup.team1 == "1° gruppo C" %}selected{% endif %}>1° gruppo C</option>
+                                                        <option value="1° gruppo D" {% if matchup.team1 == "1° gruppo D" %}selected{% endif %}>1° gruppo D</option>
+                                                        <option value="2° gruppo A" {% if matchup.team1 == "2° gruppo A" %}selected{% endif %}>2° gruppo A</option>
+                                                        <option value="2° gruppo B" {% if matchup.team1 == "2° gruppo B" %}selected{% endif %}>2° gruppo B</option>
+                                                        <option value="2° gruppo C" {% if matchup.team1 == "2° gruppo C" %}selected{% endif %}>2° gruppo C</option>
+                                                        <option value="2° gruppo D" {% if matchup.team1 == "2° gruppo D" %}selected{% endif %}>2° gruppo D</option>
+                                                    </select>
+                                                </div>
+                                                <div class="text-center mb-2"><strong>VS</strong></div>
+                                                <div class="mb-2">
+                                                    <label class="form-label">Squadra 2</label>
+                                                    <select class="form-select" name="qf_team2_{{ i }}">
+                                                        <option value="1° gruppo A" {% if matchup.team2 == "1° gruppo A" %}selected{% endif %}>1° gruppo A</option>
+                                                        <option value="1° gruppo B" {% if matchup.team2 == "1° gruppo B" %}selected{% endif %}>1° gruppo B</option>
+                                                        <option value="1° gruppo C" {% if matchup.team2 == "1° gruppo C" %}selected{% endif %}>1° gruppo C</option>
+                                                        <option value="1° gruppo D" {% if matchup.team2 == "1° gruppo D" %}selected{% endif %}>1° gruppo D</option>
+                                                        <option value="2° gruppo A" {% if matchup.team2 == "2° gruppo A" %}selected{% endif %}>2° gruppo A</option>
+                                                        <option value="2° gruppo B" {% if matchup.team2 == "2° gruppo B" %}selected{% endif %}>2° gruppo B</option>
+                                                        <option value="2° gruppo C" {% if matchup.team2 == "2° gruppo C" %}selected{% endif %}>2° gruppo C</option>
+                                                        <option value="2° gruppo D" {% if matchup.team2 == "2° gruppo D" %}selected{% endif %}>2° gruppo D</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="auto_update_playoffs" name="auto_update_playoffs" 
+                                           {% if settings.auto_update_playoffs %}checked{% endif %}>
+                                    <label class="form-check-label" for="auto_update_playoffs">
+                                        Aggiornamento Automatico Playoff
+                                    </label>
+                                </div>
+                                <small class="text-muted">Se abilitato, i playoff si aggiornano automaticamente quando le fasi precedenti sono completate.</small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-danger">💾 Salva Sistema Playoff</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB GENERALE -->
+            <div class="tab-pane fade" id="general" role="tabpanel">
+                <div class="card settings-card">
+                    <div class="card-header bg-dark text-white">
+                        <h4 class="mb-0">⚙️ Configurazioni Generali</h4>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{{ url_for('update_general_settings') }}">
+                            <div class="mb-3">
+                                <label for="tournament_name" class="form-label">Nome Torneo</label>
+                                <input type="text" class="form-control" id="tournament_name" name="tournament_name" 
+                                       value="{{ settings.tournament_name or 'Torneo degli Amici dello Skater' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="maintenance_mode" name="maintenance_mode" 
+                                           {% if settings.maintenance_mode %}checked{% endif %}>
+                                    <label class="form-check-label" for="maintenance_mode">
+                                        Modalità Manutenzione
+                                    </label>
+                                </div>
+                                <small class="text-muted">Se abilitata, blocca le modifiche ai dati del torneo.</small>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-dark">💾 Salva Configurazioni Generali</button>
+                        </form>
+                        
+                        <!-- Informazioni Sistema -->
+                        <hr class="my-4">
+                        <h5>📊 Informazioni Sistema</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p><strong>Ultima Modifica:</strong> {{ settings.updated_at.strftime('%d/%m/%Y %H:%M') if settings.updated_at else 'Mai' }}</p>
+                                <p><strong>Creazione Settings:</strong> {{ settings.created_at.strftime('%d/%m/%Y %H:%M') if settings.created_at else 'Mai' }}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p><strong>Squadre Totali:</strong> {{ (settings.max_teams or 16) }}</p>
+                                <p><strong>Gironi:</strong> {{ ((settings.max_teams or 16) // (settings.teams_per_group or 4)) }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Zona Pericolosa -->
+                <div class="danger-zone mt-4">
+                    <h5 class="text-danger">⚠️ Zona Pericolosa</h5>
+                    <p>Le azioni seguenti sono irreversibili e possono cancellare dati importanti.</p>
+                    <div class="d-flex gap-2">
+                        <form method="post" action="{{ url_for('reset_settings') }}" class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger" 
+                                    onclick="return confirm('Sei sicuro di voler ripristinare tutte le configurazioni ai valori di default? Questa azione non può essere annullata.')">
+                                🔄 Reset Settings
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-3 mt-auto">
+        <div class="container text-center">
+            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Funzione per aggiungere campi orario dinamicamente
+        function addTimeInput(containerId, inputName) {
+            const container = document.getElementById(containerId);
+            const inputGroups = container.querySelectorAll('.time-input-group');
+            const newIndex = inputGroups.length;
+            
+            const newGroup = document.createElement('div');
+            newGroup.className = 'time-input-group';
+            newGroup.innerHTML = `
+                <div class="input-group">
+                    <input type="time" class="form-control" name="${inputName}_${newIndex}" value="10:00">
+                    <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeTimeInput(this)">×</button>
+                </div>
+            `;
+            
+            container.appendChild(newGroup);
+        }
+        
+        // Funzione per rimuovere campi orario
+        function removeTimeInput(button) {
+            const timeGroup = button.closest('.time-input-group');
+            timeGroup.remove();
+        }
+        
+        // Aggiorna numerazione dei campi quando si rimuove un elemento
+        function updateInputNames(containerId, inputName) {
+            const container = document.getElementById(containerId);
+            const inputs = container.querySelectorAll('input[type="time"]');
+            
+            inputs.forEach((input, index) => {
+                input.name = `${inputName}_${index}`;
+            });
+        }
+    </script>
+</body>
+</html>
