@@ -18,6 +18,10 @@
             background: linear-gradient(135deg, #fff3cd, #ffeaa7);
             border: 2px solid #ffc107;
         }
+        .fair-play-card {
+            background: linear-gradient(135deg, #d1ecf1, #b3e5fc);
+            border: 2px solid #17a2b8;
+        }
         .podium-1st {
             background: linear-gradient(135deg, #ffd700, #ffed4e);
             color: #333;
@@ -29,6 +33,22 @@
         .podium-3rd {
             background: linear-gradient(135deg, #cd7f32, #deb887);
             color: #333;
+        }
+        .fair-play-winner {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+        .major-league-team {
+            background-color: rgba(40, 167, 69, 0.1);
+            border-left: 4px solid #28a745;
+        }
+        .beer-league-team {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+        }
+        .estimated-position {
+            font-style: italic;
+            color: #6c757d;
         }
     </style>
 </head>
@@ -54,7 +74,7 @@
                         <a class="nav-link active" href="{{ url_for('standings') }}">Classifiche</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
+                        <a class="nav-link" href="{{ url_for('settings') }}">⚙️ Settings</a>
                     </li>
                 </ul>
             </div>
@@ -73,7 +93,19 @@
             {% endif %}
         {% endwith %}
 
-        <h1>Classifiche</h1>
+        <div class="d-flex justify-content-between align-items-center">
+            <h1>Classifiche</h1>
+            <div>
+                <form method="post" action="{{ url_for('migrate_fair_play') }}" class="d-inline">
+                    <button type="submit" class="btn btn-info btn-sm">🔧 Abilita Fair Play</button>
+                </form>
+                {% if not has_final_rankings %}
+                    <form method="post" action="{{ url_for('update_final_rankings') }}" class="d-inline">
+                        <button type="submit" class="btn btn-success btn-sm">🏆 Calcola Classifiche Finali</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
         
         <ul class="nav nav-tabs mt-4" id="myTab" role="tablist">
             <li class="nav-item" role="presentation">
@@ -84,6 +116,9 @@
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="awards-tab" data-bs-toggle="tab" data-bs-target="#awards" type="button" role="tab">🏆 MVP</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fairplay-tab" data-bs-toggle="tab" data-bs-target="#fairplay" type="button" role="tab">🤝 Fair Play</button>
             </li>
         </ul>
         
@@ -318,24 +353,142 @@
                                             </tbody>
                                         </table>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="col-12">
+                            <div class="alert alert-warning text-center">
+                                <h4><i class="fas fa-trophy"></i> Nessun MVP ancora assegnato</h4>
+                                <p>I premi MVP della partita appariranno qui quando inizierai ad assegnare i migliori giocatori nelle partite.</p>
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- TAB FAIR PLAY -->
+            <div class="tab-pane fade" id="fairplay" role="tabpanel">
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="alert alert-info">
+                            <h4><i class="fas fa-handshake"></i> Classifica Fair Play</h4>
+                            <p>La classifica Fair Play premia le squadre con minor numero di penalità e migliori risultati finali.</p>
+                            <p><strong>Criteri di ordinamento:</strong> 1) Minuti di penalità (meno = meglio), 2) Posizione finale nel torneo (Major League 1°-8°, Beer League 9°-16°)</p>
+                        </div>
+                    </div>
+
+                    {% if fair_play_ranking %}
+                        <div class="col-lg-10 mx-auto">
+                            <div class="card fair-play-card">
+                                <div class="card-header text-center">
+                                    <h4 class="mb-0">🤝 Classifica Fair Play</h4>
+                                    <small class="text-muted">Squadre ordinate per comportamento sportivo</small>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th width="80">Posizione</th>
+                                                    <th>Squadra</th>
+                                                    <th>Girone</th>
+                                                    <th width="120" class="text-center">Minuti Penalità</th>
+                                                    <th width="120" class="text-center">Posizione Finale</th>
+                                                    <th width="100" class="text-center">Premio</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for entry in fair_play_ranking %}
+                                                    {% set team = entry.team %}
+                                                    <tr {% if loop.index == 1 %}class="fair-play-winner"{% elif entry.final_position <= 8 %}class="major-league-team"{% else %}class="beer-league-team"{% endif %}>
+                                                        <td class="text-center">
+                                                            {% if loop.index == 1 %}
+                                                                <span class="fs-4">🏆</span>
+                                                            {% elif loop.index == 2 %}
+                                                                <span class="fs-5">🥈</span>
+                                                            {% elif loop.index == 3 %}
+                                                                <span class="fs-5">🥉</span>
+                                                            {% else %}
+                                                                {{ loop.index }}°
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <strong>{{ team.name }}</strong>
+                                                            {% if loop.index == 1 %}
+                                                                <span class="badge bg-success ms-2">🤝 Fair Play Winner</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td>
+                                                            <span class="badge bg-primary">Girone {{ team.group or 'N/A' }}</span>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <span class="badge {% if entry.penalty_minutes == 0 %}bg-success{% elif entry.penalty_minutes <= 4 %}bg-warning{% else %}bg-danger{% endif %}">
+                                                                {{ entry.penalty_minutes }}'
+                                                            </span>
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if entry.has_final_ranking %}
+                                                                {% if entry.final_position <= 8 %}
+                                                                    <span class="badge bg-success">{{ entry.final_position }}° (ML)</span>
+                                                                {% else %}
+                                                                    <span class="badge bg-warning text-dark">{{ entry.final_position }}° (BL)</span>
+                                                                {% endif %}
+                                                            {% else %}
+                                                                <span class="badge bg-secondary estimated-position">~{{ entry.final_position }}°*</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if loop.index == 1 %}
+                                                                <span class="badge bg-success">🏆 Fair Play</span>
+                                                            {% elif loop.index <= 3 %}
+                                                                <span class="badge bg-info">🤝 Menzione</span>
+                                                            {% else %}
+                                                                <span class="badge bg-light text-dark">-</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                     
-                                    {% if best_player_awards|length > 0 %}
-                                        <div class="text-center mt-3">
-                                            <small class="text-muted">
-                                                Totale partite con MVP assegnato: {{ best_player_awards|sum(attribute='1') }}
-                                            </small>
+                                    <!-- Legenda -->
+                                    <div class="row mt-4">
+                                        <div class="col-md-6">
+                                            <h6>📊 Legenda Posizioni:</h6>
+                                            <ul class="small">
+                                                <li><span class="badge bg-success">ML</span> = Major League (1°-8° posto finale)</li>
+                                                <li><span class="badge bg-warning text-dark">BL</span> = Beer League (9°-16° posto finale)</li>
+                                                <li><span class="text-muted">*</span> = Posizione stimata (finali non completate)</li>
+                                            </ul>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <h6>⚖️ Criteri Fair Play:</h6>
+                                            <ul class="small">
+                                                <li><strong>Primo criterio:</strong> Minuti di penalità (meno = meglio)</li>
+                                                <li><strong>Secondo criterio:</strong> Posizione finale nel torneo</li>
+                                                <li><strong>Calcolo:</strong> 2 minuti per ogni penalità ricevuta</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    
+                                    {% if not has_final_rankings %}
+                                        <div class="alert alert-warning mt-3">
+                                            <strong>📢 Nota:</strong> Le posizioni finali sono stimate. 
+                                            Completa tutte le finali e clicca "🏆 Calcola Classifiche Finali" per dati definitivi.
                                         </div>
                                     {% endif %}
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Podio visuale per i primi 3 -->
-                        {% if best_player_awards|length >= 3 %}
+                        <!-- Podio Fair Play -->
+                        {% if fair_play_ranking|length >= 3 %}
                             <div class="col-12 mt-4">
                                 <div class="card">
-                                    <div class="card-header bg-dark text-white text-center">
-                                        <h4 class="mb-0">🏆 Podio MVP</h4>
+                                    <div class="card-header bg-success text-white text-center">
+                                        <h4 class="mb-0">🤝 Podio Fair Play</h4>
                                     </div>
                                     <div class="card-body">
                                         <div class="row text-center">
@@ -344,21 +497,21 @@
                                                 <div class="card podium-2nd h-100" style="margin-top: 20px;">
                                                     <div class="card-body">
                                                         <div class="display-1">🥈</div>
-                                                        <h5>{{ best_player_awards[1][0].name }}</h5>
-                                                        <p class="mb-1"><small>{{ best_player_awards[1][0].team.name }}</small></p>
-                                                        <span class="badge bg-secondary">{{ best_player_awards[1][1] }} MVP</span>
+                                                        <h5>{{ fair_play_ranking[1].team.name }}</h5>
+                                                        <p class="mb-1"><small>{{ fair_play_ranking[1].penalty_minutes }}' penalità</small></p>
+                                                        <span class="badge bg-secondary">2° Fair Play</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             
                                             <!-- 1° Posto -->
                                             <div class="col-md-4">
-                                                <div class="card podium-1st h-100">
+                                                <div class="card fair-play-winner h-100">
                                                     <div class="card-body">
-                                                        <div class="display-1">🥇</div>
-                                                        <h4><strong>{{ best_player_awards[0][0].name }}</strong></h4>
-                                                        <p class="mb-1">{{ best_player_awards[0][0].team.name }}</p>
-                                                        <span class="badge bg-warning text-dark">👑 {{ best_player_awards[0][1] }} MVP</span>
+                                                        <div class="display-1">🏆</div>
+                                                        <h4><strong>{{ fair_play_ranking[0].team.name }}</strong></h4>
+                                                        <p class="mb-1">{{ fair_play_ranking[0].penalty_minutes }}' penalità</p>
+                                                        <span class="badge bg-light text-success">🤝 Fair Play Winner</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -368,9 +521,9 @@
                                                 <div class="card podium-3rd h-100" style="margin-top: 40px;">
                                                     <div class="card-body">
                                                         <div class="display-1">🥉</div>
-                                                        <h5>{{ best_player_awards[2][0].name }}</h5>
-                                                        <p class="mb-1"><small>{{ best_player_awards[2][0].team.name }}</small></p>
-                                                        <span class="badge" style="background-color: #cd7f32; color: white;">{{ best_player_awards[2][1] }} MVP</span>
+                                                        <h5>{{ fair_play_ranking[2].team.name }}</h5>
+                                                        <p class="mb-1"><small>{{ fair_play_ranking[2].penalty_minutes }}' penalità</small></p>
+                                                        <span class="badge" style="background-color: #cd7f32; color: white;">3° Fair Play</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -383,14 +536,14 @@
                     {% else %}
                         <div class="col-12">
                             <div class="alert alert-warning text-center">
-                                <h4><i class="fas fa-trophy"></i> Nessun MVP ancora assegnato</h4>
-                                <p>I premi MVP della partita appariranno qui quando inizierai ad assegnare i migliori giocatori nelle partite.</p>
+                                <h4><i class="fas fa-handshake"></i> Classifica Fair Play Non Disponibile</h4>
+                                <p>La classifica Fair Play apparirà qui quando ci saranno dati sulle penalità delle squadre.</p>
                                 <p><strong>Come funziona:</strong></p>
                                 <ol class="text-start">
-                                    <li>Vai alla pagina di dettaglio di una partita</li>
-                                    <li>Nella sezione "Statistiche Giocatori", seleziona il miglior giocatore per ogni squadra</li>
-                                    <li>Salva le statistiche</li>
-                                    <li>I premi MVP appariranno automaticamente in questa sezione</li>
+                                    <li>Inserisci le penalità dei giocatori nelle partite</li>
+                                    <li>Il sistema calcola automaticamente i minuti totali per squadra</li>
+                                    <li>Completa le finali per le posizioni definitive</li>
+                                    <li>La classifica Fair Play apparirà automaticamente</li>
                                 </ol>
                             </div>
                         </div>

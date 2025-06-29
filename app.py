@@ -264,6 +264,255 @@ class Match(db.Model):
 
 
 
+class FinalRanking(db.Model):
+    """Classifica finale del torneo (posizioni 1-16)."""
+    __tablename__ = 'final_ranking'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
+    final_position = db.Column(db.Integer, nullable=False)  # 1-16
+    league = db.Column(db.String(20), nullable=False)  # Major League o Beer League
+    league_position = db.Column(db.Integer, nullable=False)  # 1-8 dentro la lega
+    
+    # Timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relazioni
+    team = db.relationship('Team', backref='final_ranking_entry')
+    
+    @staticmethod
+    def calculate_final_rankings():
+        """Calcola e salva le classifiche finali basate sui risultati delle finali."""
+        try:
+            # Elimina ranking esistenti
+            FinalRanking.query.delete()
+            
+            # Ottieni tutti i risultati delle finali
+            final_matches = Match.query.filter_by(phase='final').order_by(Match.time).all()
+            
+            if not final_matches:
+                print("⚠️ Nessuna finale trovata per calcolare la classifica")
+                return False
+            
+            # Separa le finali per lega
+            ml_finals = [m for m in final_matches if m.league == 'Major League']
+            bl_finals = [m for m in final_matches if m.league == 'Beer League']
+            
+            rankings = []
+            
+            # MAJOR LEAGUE - Posizioni 1-8
+            if len(ml_finals) >= 4:
+                ml_rankings = FinalRanking._process_league_finals(ml_finals, 'Major League', 0)
+                rankings.extend(ml_rankings)
+            
+            # BEER LEAGUE - Posizioni 9-16  
+            if len(bl_finals) >= 4:
+                bl_rankings = FinalRanking._process_league_finals(bl_finals, 'Beer League', 8)
+                rankings.extend(bl_rankings)
+            
+            # Salva nel database
+            for ranking in rankings:
+                db.session.add(ranking)
+            
+            db.session.commit()
+            print(f"✅ Classifiche finali calcolate: {len(rankings)} posizioni")
+            return True
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Errore nel calcolo classifiche finali: {e}")
+            return False
+    
+    @staticmethod
+    def _process_league_finals(finals, league_name, position_offset):
+        """Processa le finali di una lega e restituisce le classifiche."""
+        rankings = []
+        
+        # Ordina le finali per piazzamento (1°/2°, 3°/4°, 5°/6°, 7°/8°)
+        # Assumendo che siano ordinate per orario: 7°/8°, 5°/6°, 3°/4°, 1°/2°
+        finals_by_placement = {}
+        
+        for i, match in enumerate(finals):
+            if i == 0:  # Prima finale = 7°/8° posto
+                placement = "7-8"
+            elif i == 1:  # Seconda finale = 5°/6° posto
+                placement = "5-6"
+            elif i == 2:  # Terza finale = 3°/4° posto
+                placement = "3-4"
+            elif i == 3:  # Quarta finale = 1°/2° posto
+                placement = "1-2"
+            
+            finals_by_placement[placement] = match
+        
+        # Calcola le posizioni finali
+        positions = {}
+        
+        # 1°/2° posto
+        if "1-2" in finals_by_placement:
+            match = finals_by_placement["1-2"]
+            if match.is_completed and match.winner:
+                winner = match.winner
+                loser = match.team1 if match.team2 == winner else match.team2
+                positions[1] = winner
+                positions[2] = loser
+        
+        # 3°/4° posto
+        if "3-4" in finals_by_placement:
+            match = finals_by_placement["3-4"]
+            if match.is_completed and match.winner:
+                winner = match.winner
+                loser = match.team1 if match.team2 == winner else match.team2
+                positions[3] = winner
+                positions[4] = loser
+        
+        # 5°/6° posto
+        if "5-6" in finals_by_placement:
+            match = finals_by_placement["5-6"]
+            if match.is_completed and match.winner:
+                winner = match.winner
+                loser = match.team1 if match.team2 == winner else match.team2
+                positions[5] = winner
+                positions[6] = loser
+        
+        # 7°/8° posto
+        if "7-8" in finals_by_placement:
+            match = finals_by_placement["7-8"]
+            if match.is_completed and match.winner:
+                winner = match.winner
+                loser = match.team1 if match.team2 == winner else match.team2
+                positions[7] = winner
+                positions[8] = loser
+        
+        # Crea gli oggetti FinalRanking
+        for league_pos in range(1, 9):
+            if league_pos in positions:
+                team = positions[league_pos]
+                final_position = position_offset + league_pos
+                
+                ranking = FinalRanking(
+                    team_id=team.id,
+                    final_position=final_position,
+                    league=league_name,
+                    league_position=league_pos
+                )
+                rankings.append(ranking)
+        
+        return rankings
+    
+    @staticmethod
+    def get_team_final_position(team_id):
+        """Ottieni la posizione finale di una squadra."""
+        ranking = FinalRanking.query.filter_by(team_id=team_id).first()
+        return ranking.final_position if ranking else None
+
+
+def calculate_team_penalty_minutes(team):
+    """Calcola i minuti totali di penalità per una squadra."""
+    try:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            # Nuovo sistema: usa PlayerMatchStats
+            from sqlalchemy import func
+            
+            total_penalties = db.session.query(
+                func.sum(PlayerMatchStats.penalties)
+            ).join(Player).filter(
+                Player.team_id == team.id
+            ).scalar()
+            
+            # Converti penalità in minuti (assumendo 2 minuti per penalità)
+            penalty_minutes = (total_penalties or 0) * 2
+            
+        else:
+            # Fallback al sistema vecchio
+            total_penalties = sum(player.penalties for player in team.players)
+            penalty_minutes = total_penalties * 2
+        
+        return penalty_minutes
+        
+    except Exception as e:
+        print(f"Errore calcolo penalità per {team.name}: {e}")
+        return 0
+
+def get_fair_play_ranking():
+    """Calcola la classifica Fair Play."""
+    try:
+        teams = Team.query.all()
+        fair_play_data = []
+        
+        for team in teams:
+            # Calcola minuti di penalità
+            penalty_minutes = calculate_team_penalty_minutes(team)
+            
+            # Ottieni posizione finale (se disponibile)
+            final_position = FinalRanking.get_team_final_position(team.id)
+            
+            # Se non c'è posizione finale, usa la posizione nei gironi come stima
+            if final_position is None:
+                # Calcola posizione stimata basata sui punti nei gironi
+                group_teams = Team.query.filter_by(group=team.group).order_by(
+                    Team.points.desc(),
+                    (Team.goals_for - Team.goals_against).desc(),
+                    Team.goals_for.desc()
+                ).all()
+                
+                group_position = next((i + 1 for i, t in enumerate(group_teams) if t.id == team.id), 5)
+                
+                # Stima posizione finale (molto approssimativa)
+                if group_position <= 2:
+                    estimated_final_position = group_position  # Top 2 vanno in Major
+                else:
+                    estimated_final_position = group_position + 8  # Bottom 2 vanno in Beer
+                
+                final_position = estimated_final_position
+            
+            fair_play_data.append({
+                'team': team,
+                'penalty_minutes': penalty_minutes,
+                'final_position': final_position,
+                'has_final_ranking': FinalRanking.get_team_final_position(team.id) is not None
+            })
+        
+        # Ordina per Fair Play:
+        # 1. Meno minuti di penalità (meglio)
+        # 2. Migliore posizione finale (numero più basso = meglio)
+        fair_play_data.sort(key=lambda x: (x['penalty_minutes'], x['final_position']))
+        
+        return fair_play_data
+        
+    except Exception as e:
+        print(f"Errore calcolo fair play: {e}")
+        return []
+
+
+
+@app.route('/update_final_rankings', methods=['POST'])
+def update_final_rankings():
+    """Calcola e aggiorna le classifiche finali."""
+    try:
+        success = FinalRanking.calculate_final_rankings()
+        if success:
+            flash('🏆 Classifiche finali calcolate con successo!', 'success')
+        else:
+            flash('⚠️ Non è possibile calcolare le classifiche finali. Completa prima tutte le finali.', 'warning')
+    except Exception as e:
+        flash(f'❌ Errore nel calcolo delle classifiche finali: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
+
+@app.route('/migrate_fair_play', methods=['POST'])
+def migrate_fair_play():
+    """Migra il database per aggiungere la tabella fair play."""
+    try:
+        # Crea la tabella se non esiste
+        db.create_all()
+        flash('🔧 Migrazione Fair Play completata con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante la migrazione Fair Play: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
+
 
 
 def generate_all_playoff_matches_with_null_teams():
@@ -2884,7 +3133,7 @@ def get_player_statistics_for_standings():
         ).all()
 
 
-# # Aggiorna la route standings per usare il nuovo sistema
+
 @app.route('/standings')
 def standings():
     # Group stage standings - usa l'ordinamento per gironi
@@ -2968,13 +3217,20 @@ def standings():
         most_penalties = []
         best_player_awards = []
     
+    # NUOVO: Fair Play ranking
+    fair_play_ranking = get_fair_play_ranking()
+    
+    # Verifica se esistono classifiche finali
+    has_final_rankings = FinalRanking.query.count() > 0
+    
     return render_template('standings.html', 
                           group_standings=group_standings,
                           top_scorers=top_scorers,
                           top_assists=top_assists,
                           most_penalties=most_penalties,
-                          best_player_awards=best_player_awards)
-
+                          best_player_awards=best_player_awards,
+                          fair_play_ranking=fair_play_ranking,
+                          has_final_rankings=has_final_rankings)
 
 
 @app.route('/migrate_best_player_fields', methods=['POST'])
