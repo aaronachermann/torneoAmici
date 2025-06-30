@@ -26,23 +26,6 @@
                         <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
                     </li>
                 </ul>
-                <ul class="navbar-nav ms-auto">
-                    {% if current_user.is_authenticated %}
-                        <li class="nav-item">
-                            <span class="nav-link">Ciao, {{ current_user.username }}</span>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('logout') }}">Logout</a>
-                        </li>
-                    {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">Login</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">Registrati</a>
-                        </li>
-                    {% endif %}
-                </ul>
             </div>
         </div>
     </nav>
@@ -60,35 +43,80 @@
         {% endwith %}
 
         <div class="d-flex justify-content-between align-items-center">
-            <h1>Modifica Giocatore</h1>
-            <a href="{{ url_for('team_detail', team_id=player.team_id) }}" class="btn btn-secondary">Torna alla Squadra</a>
+            <h1>✏️ Modifica Giocatore</h1>
+            <a href="{{ url_for('team_detail', team_id=player.team_id) }}" class="btn btn-secondary">
+                ← Torna a {{ player.team.name }}
+            </a>
         </div>
         
         <div class="row mt-4">
-            <div class="col-md-6 mx-auto">
+            <div class="col-md-8 mx-auto">
                 <div class="card">
                     <div class="card-header bg-warning text-dark">
                         <h4 class="mb-0">Modifica {{ player.name }}</h4>
                     </div>
                     <div class="card-body">
+                        <!-- Riepilogo attuale -->
+                        <div class="alert alert-info">
+                            <strong>📊 Dati attuali:</strong><br>
+                            • Nome: {{ player.name }}<br>
+                            • Tesserato: {{ 'Sì' if player.is_registered else 'No' }}<br>
+                            • Categoria: {{ player.category or 'N/A' }}<br>
+                            • Punti tesseramento: <strong>{{ player.registration_points }}</strong>
+                        </div>
+                        
                         <form method="post">
                             <div class="mb-3">
                                 <label for="player_name" class="form-label">Nome Giocatore</label>
-                                <input type="text" class="form-control" id="player_name" name="player_name" value="{{ player.name }}" required>
+                                <input type="text" class="form-control" id="player_name" name="player_name" 
+                                       value="{{ player.name }}" required>
                             </div>
+                            
                             <div class="mb-3 form-check">
-                                <input type="checkbox" class="form-check-input" id="is_registered" name="is_registered" {% if player.is_registered %}checked{% endif %}>
-                                <label class="form-check-label" for="is_registered">Tesserato</label>
+                                <input type="checkbox" class="form-check-input" id="is_registered" name="is_registered" 
+                                       {% if player.is_registered %}checked{% endif %}>
+                                <label class="form-check-label" for="is_registered">
+                                    <strong>Tesserato</strong>
+                                </label>
                             </div>
+                            
                             <div class="mb-3" id="category_div" {% if not player.is_registered %}style="display: none;"{% endif %}>
                                 <label for="category" class="form-label">Categoria</label>
                                 <select class="form-select" id="category" name="category">
-                                    <option value="LNA/LNB" {% if player.category == 'LNA/LNB' %}selected{% endif %}>LNA/LNB (5 punti)</option>
-                                    <option value="1a Lega" {% if player.category == '1a Lega' %}selected{% endif %}>1a Lega (3 punti)</option>
-                                    <option value="2a Lega" {% if player.category == '2a Lega' %}selected{% endif %}>2a Lega (2 punti)</option>
+                                    <option value="LNA/LNB" {% if player.category == 'LNA/LNB' %}selected{% endif %}>
+                                        LNA/LNB (5 punti) 🔴
+                                    </option>
+                                    <option value="1a Lega" {% if player.category == '1a Lega' %}selected{% endif %}>
+                                        1° Lega (3 punti) 🟠
+                                    </option>
+                                    <option value="2a Lega" {% if player.category == '2a Lega' %}selected{% endif %}>
+                                        2° Lega (2 punti) 🔵
+                                    </option>
+                                    <option value="Femminile" {% if player.category == 'Femminile' %}selected{% endif %}>
+                                        Femminile (0 punti) 🟢
+                                    </option>
+                                    <option value="Veterani" {% if player.category == 'Veterani' %}selected{% endif %}>
+                                        Veterani (0 punti) 🟢
+                                    </option>
                                 </select>
+                                <div class="form-text">
+                                    <strong>Sistema punti:</strong> LNA/LNB=5pt, 1°Lega=3pt, 2°Lega=2pt, Femminile/Veterani=0pt
+                                </div>
                             </div>
-                            <button type="submit" class="btn btn-warning">Aggiorna</button>
+                            
+                            <!-- Anteprima punti -->
+                            <div class="alert alert-secondary" id="points_preview">
+                                <strong>📊 Anteprima punti:</strong> <span id="preview_points">{{ player.registration_points }}</span> punti
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="submit" class="btn btn-warning">
+                                    💾 Salva Modifiche
+                                </button>
+                                <a href="{{ url_for('team_detail', team_id=player.team_id) }}" class="btn btn-outline-secondary">
+                                    ❌ Annulla
+                                </a>
+                            </div>
                         </form>
                     </div>
                 </div>
@@ -107,12 +135,38 @@
         document.addEventListener('DOMContentLoaded', function() {
             const isRegisteredCheckbox = document.getElementById('is_registered');
             const categoryDiv = document.getElementById('category_div');
+            const categorySelect = document.getElementById('category');
+            const previewPoints = document.getElementById('preview_points');
             
+            // Mostra/nasconde categoria quando si cambia tesseramento
             isRegisteredCheckbox.addEventListener('change', function() {
                 categoryDiv.style.display = this.checked ? 'block' : 'none';
+                updatePreview();
             });
+            
+            // Aggiorna anteprima quando cambia categoria
+            categorySelect.addEventListener('change', updatePreview);
+            
+            function updatePreview() {
+                let points = 0;
+                
+                if (isRegisteredCheckbox.checked) {
+                    const category = categorySelect.value;
+                    switch(category) {
+                        case 'LNA/LNB': points = 5; break;
+                        case '1a Lega': points = 3; break;
+                        case '2a Lega': points = 2; break;
+                        case 'Femminile':
+                        case 'Veterani': points = 0; break;
+                        default: points = 0;
+                    }
+                } else {
+                    points = 0; // Non tesserato
+                }
+                
+                previewPoints.textContent = points;
+            }
         });
     </script>
 </body>
 </html>
-

@@ -66,15 +66,20 @@ class Player(db.Model):
     
     @property
     def registration_points(self):
+        """Calcola i punti tesseramento secondo le regole del torneo."""
         if not self.is_registered:
-            return 2  # Non tesserato
+            return 0  # Non tesserato = 0 punti
         
+        # Mappa punti per categoria
         points_map = {
-            'LNA/LNB': 5,
-            '1a Lega': 3,
-            '2a Lega': 2
+            'LNA/LNB': 5,     # LNA/LNB = 5 punti
+            '1a Lega': 3,     # 1° Lega = 3 punti  
+            '2a Lega': 2,     # 2° Lega = 2 punti
+            'Femminile': 0,   # Femminile = 0 punti
+            'Veterani': 0     # Veterani = 0 punti
         }
-        return points_map.get(self.category, 2)
+        return points_map.get(self.category, 0)  # Default 0 punti se categoria non riconosciuta
+
     
 
     @property
@@ -130,6 +135,9 @@ class Match(db.Model):
     
     team1_score = db.Column(db.Integer, default=None)
     team2_score = db.Column(db.Integer, default=None)
+
+    overtime = db.Column(db.Boolean, default=False)  # True se la partita è andata oltre i tempi regolamentari
+    shootout = db.Column(db.Boolean, default=False)  # True se decisa ai rigori
     
     phase = db.Column(db.String(20), nullable=False)
     league = db.Column(db.String(20))
@@ -139,6 +147,11 @@ class Match(db.Model):
         return self.team1_score is not None and self.team2_score is not None
     
     @property
+    def is_regulation_time(self):
+        """True se la partita è finita nei tempi regolamentari."""
+        return not self.overtime and not self.shootout
+    
+    @property
     def winner(self):
         if not self.is_completed:
             return None
@@ -146,7 +159,35 @@ class Match(db.Model):
             return self.team1
         elif self.team2_score > self.team1_score:
             return self.team2
-        return None  # Draw
+        return None  # Draw (solo per fasi che permettono pareggi)
+    
+    @property 
+    def is_overtime_shootout(self):
+        """True se la partita è finita overtime/rigori."""
+        return self.overtime or self.shootout
+
+
+    def get_points_for_team(self, team):
+        """Calcola i punti per una squadra specifica secondo il regolamento hockey."""
+        if not self.is_completed or not team:
+            return 0
+        
+        is_winner = (self.winner == team)
+        is_loser = not is_winner and self.winner is not None
+        
+        # Sistema punti hockey
+        if is_winner:
+            if self.is_regulation_time:
+                return 3  # Vittoria nei tempi regolamentari
+            else:
+                return 2  # Vittoria overtime/rigori
+        elif is_loser:
+            if self.is_overtime_shootout:
+                return 1  # Sconfitta overtime/rigori
+            else:
+                return 0  # Sconfitta nei tempi regolamentari
+        else:
+            return 1  # Pareggio (se permesso)
 
     def get_match_number(self):
         """Restituisce il numero progressivo della partita."""
@@ -673,7 +714,6 @@ class MatchDescription(db.Model):
     
     match = db.relationship('Match', backref='description', lazy=True)
 
-
 class PlayerMatchStats(db.Model):
     """Statistiche di un giocatore in una singola partita."""
     __tablename__ = 'player_match_stats'
@@ -683,17 +723,20 @@ class PlayerMatchStats(db.Model):
     )
     
     id = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
+    # AGGIUNTO: ondelete='CASCADE' per eliminazione automatica
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
+    match_id = db.Column(db.Integer, db.ForeignKey('match.id', ondelete='CASCADE'), nullable=False)
     goals = db.Column(db.Integer, default=0)
     assists = db.Column(db.Integer, default=0)
     penalties = db.Column(db.Integer, default=0)
-    is_best_player_team1 = db.Column(db.Boolean, default=False)  # NUOVO CAMPO
-    is_best_player_team2 = db.Column(db.Boolean, default=False)  # NUOVO CAMPO
+    is_best_player_team1 = db.Column(db.Boolean, default=False)
+    is_best_player_team2 = db.Column(db.Boolean, default=False)
     
-    # Relazioni
-    player = db.relationship('Player', backref='match_stats')
-    match = db.relationship('Match', backref='player_stats')
+    # Relazioni con cascade
+    player = db.relationship('Player', backref=db.backref('match_stats', cascade='all, delete-orphan'))
+    match = db.relationship('Match', backref=db.backref('player_stats', cascade='all, delete-orphan'))
+
+
 
 class TournamentSettings(db.Model):
     """Configurazioni del torneo."""
@@ -1915,15 +1958,87 @@ def team_detail(team_id):
     
     return render_template('team_detail.html', team=team)
 
+
+@app.route('/player/<int:player_id>/edit', methods=['GET', 'POST'])
+def edit_player(player_id):
+    """Modifica un giocatore esistente."""
+    player = Player.query.get_or_404(player_id)
+    
+    if request.method == 'POST':
+        # Ottieni i dati dal form
+        new_name = request.form.get('player_name')
+        is_registered = 'is_registered' in request.form
+        category = request.form.get('category') if is_registered else None
+        
+        # Valida che il nome non sia vuoto
+        if not new_name or not new_name.strip():
+            flash('Il nome del giocatore non può essere vuoto', 'danger')
+            return redirect(url_for('edit_player', player_id=player_id))
+        
+        # Salva i vecchi valori per debug
+        old_name = player.name
+        old_registered = player.is_registered
+        old_category = player.category
+        old_points = player.registration_points
+        
+        # Aggiorna i dati del giocatore
+        player.name = new_name.strip()
+        player.is_registered = is_registered
+        player.category = category
+        
+        # Calcola i nuovi punti
+        new_points = player.registration_points
+        
+        try:
+            db.session.commit()
+            
+            # Messaggio di successo con dettagli
+            if old_name != player.name or old_registered != is_registered or old_category != category:
+                flash(f'✅ Giocatore aggiornato: {old_name} → {player.name} '
+                      f'({old_points}pt → {new_points}pt)', 'success')
+            else:
+                flash(f'ℹ️ Nessuna modifica per {player.name}', 'info')
+            
+            # Controlla se la squadra supera il limite
+            team_total = player.team.player_points_total
+            if team_total > 20:
+                flash(f'⚠️ Attenzione: {player.team.name} ora ha {team_total} punti tesseramento (limite: 20)', 'warning')
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'❌ Errore durante l\'aggiornamento: {str(e)}', 'danger')
+        
+        return redirect(url_for('team_detail', team_id=player.team_id))
+    
+    # GET request: mostra il form di modifica
+    return render_template('edit_player.html', player=player)
+
+
+
 @app.route('/player/<int:player_id>/delete', methods=['POST'])
 def delete_player(player_id):
     player = Player.query.get_or_404(player_id)
     team_id = player.team_id
+    player_name = player.name
     
-    db.session.delete(player)
-    db.session.commit()
+    try:
+        # Prima elimina le statistiche del giocatore se esistono
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            stats_deleted = PlayerMatchStats.query.filter_by(player_id=player.id).count()
+            PlayerMatchStats.query.filter_by(player_id=player.id).delete()
+            if stats_deleted > 0:
+                print(f"Eliminate {stats_deleted} statistiche per {player_name}")
+        
+        # Poi elimina il giocatore
+        db.session.delete(player)
+        db.session.commit()
+        
+        flash(f'🗑️ Giocatore {player_name} rimosso con successo', 'success')
     
-    flash(f'Giocatore {player.name} rimosso')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante l\'eliminazione: {str(e)}', 'danger')
+    
     return redirect(url_for('team_detail', team_id=team_id))
 
 
@@ -2827,15 +2942,28 @@ def match_detail(match_id):
     if request.method == 'POST':
         team1_score_str = request.form.get('team1_score')
         team2_score_str = request.form.get('team2_score')
+        overtime = 'overtime' in request.form
+        shootout = 'shootout' in request.form
         
         if team1_score_str and team2_score_str:
             old_team1_score = match.team1_score
-            old_team2_score = match.team2_score
+            old_team2_score = match.team2_score            
+            old_overtime = match.overtime
+            old_shootout = match.shootout
             
             match.team1_score = int(team1_score_str)
             match.team2_score = int(team2_score_str)
+            match.overtime = overtime
+            match.shootout = shootout
             
-            update_team_stats(match, old_team1_score, old_team2_score)
+            if match.phase == 'group' and match.team1_score == match.team2_score:
+                if not overtime and not shootout:
+                    flash('⚠️ Nelle qualificazioni non sono ammessi pareggi! Seleziona Overtime o Rigori.', 'warning')
+                    return redirect(url_for('match_detail', match_id=match_id))
+            
+            # Aggiorna le statistiche delle squadre
+            update_team_stats(match, old_team1_score, old_team2_score, old_overtime, old_shootout)
+            
             
             db.session.commit()
             flash('Risultato della partita registrato')
@@ -2899,7 +3027,77 @@ def match_detail(match_id):
                            best_player_team2=best_player_team2,
                            return_anchor=return_anchor)
 
+@app.route('/migrate_overtime_system', methods=['POST'])
+def migrate_overtime_system():
+    """Migra il database per aggiungere i campi overtime e shootout."""
+    try:
+        # Controlla se le colonne esistono già
+        inspector = db.inspect(db.engine)
+        
+        if db.inspect(db.engine).has_table('match'):
+            columns = [col['name'] for col in inspector.get_columns('match')]
+            
+            migrations_needed = []
+            if 'overtime' not in columns:
+                migrations_needed.append('overtime')
+            if 'shootout' not in columns:
+                migrations_needed.append('shootout')
+            
+            if migrations_needed:
+                # Aggiungi le colonne mancanti
+                with db.engine.connect() as conn:
+                    for column in migrations_needed:
+                        conn.execute(db.text(f'ALTER TABLE match ADD COLUMN {column} BOOLEAN DEFAULT 0'))
+                    conn.commit()
+                
+                flash(f'🏒 Sistema Overtime/Rigori abilitato! Aggiunte colonne: {", ".join(migrations_needed)}', 'success')
+            else:
+                flash('ℹ️ Sistema Overtime/Rigori già abilitato.', 'info')
+        else:
+            # Se la tabella non esiste, creala
+            db.create_all()
+            flash('🏒 Tabella Match creata con sistema Overtime/Rigori!', 'success')
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante la migrazione Overtime: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
 
+
+
+@app.route('/recalculate_all_points', methods=['POST'])
+def recalculate_all_points():
+    """Ricalcola tutti i punti delle squadre usando il nuovo sistema."""
+    try:
+        # Reset di tutte le statistiche delle squadre
+        teams = Team.query.all()
+        for team in teams:
+            team.wins = 0
+            team.losses = 0
+            team.draws = 0
+            team.goals_for = 0
+            team.goals_against = 0
+            team.points = 0
+        
+        # Ricalcola da tutte le partite completate
+        completed_matches = Match.query.filter(
+            Match.team1_score.isnot(None),
+            Match.team2_score.isnot(None)
+        ).all()
+        
+        for match in completed_matches:
+            if match.team1 and match.team2:
+                update_team_stats(match, None, None, None, None)
+        
+        db.session.commit()
+        flash(f'🔢 Punti ricalcolati per {len(completed_matches)} partite usando il sistema hockey!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante il ricalcolo: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
 
 def get_best_players_by_match():
     """Ottiene tutti i migliori giocatori per ogni partita."""
@@ -3133,7 +3331,6 @@ def get_player_statistics_for_standings():
         ).all()
 
 
-
 @app.route('/standings')
 def standings():
     # Group stage standings - usa l'ordinamento per gironi
@@ -3217,11 +3414,20 @@ def standings():
         most_penalties = []
         best_player_awards = []
     
-    # NUOVO: Fair Play ranking
+    # Fair Play ranking
     fair_play_ranking = get_fair_play_ranking()
     
-    # Verifica se esistono classifiche finali
-    has_final_rankings = FinalRanking.query.count() > 0
+    # Verifica se esistono classifiche finali - CON GESTIONE ERRORE
+    has_final_rankings = False
+    try:
+        # Controlla se la tabella esiste prima di fare la query
+        if db.inspect(db.engine).has_table('final_ranking'):
+            has_final_rankings = FinalRanking.query.count() > 0
+        else:
+            print("⚠️ Tabella final_ranking non trovata")
+    except Exception as e:
+        print(f"❌ Errore nel controllo final_ranking: {e}")
+        has_final_rankings = False
     
     return render_template('standings.html', 
                           group_standings=group_standings,
@@ -3231,6 +3437,23 @@ def standings():
                           best_player_awards=best_player_awards,
                           fair_play_ranking=fair_play_ranking,
                           has_final_rankings=has_final_rankings)
+
+
+
+
+
+@app.route('/migrate_final_ranking', methods=['POST'])
+def migrate_final_ranking():
+    """Migra il database per aggiungere la tabella final_ranking."""
+    try:
+        # Crea tutte le tabelle (inclusa final_ranking se non esiste)
+        db.create_all()
+        flash('🏆 Tabella final_ranking creata con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante la migrazione final_ranking: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
 
 
 @app.route('/migrate_best_player_fields', methods=['POST'])
@@ -3499,97 +3722,76 @@ def get_player_total_stats():
 #                 print(f"✅ Finali {league} aggiornate automaticamente!")
 #             except Exception as e:
 #                 print(f"❌ Errore aggiornamento finali {league}: {e}")
-
-def update_team_stats(match, old_team1_score=None, old_team2_score=None):
-    """Aggiorna le statistiche delle squadre usando i punti dalle configurazioni."""
-    
-    # Ottieni i punti dalle settings
-    try:
-        settings = TournamentSettings.get_settings()
-        points_win = settings.points_win if settings else 3
-        points_draw = settings.points_draw if settings else 1
-        points_loss = settings.points_loss if settings else 0
-    except:
-        points_win, points_draw, points_loss = 3, 1, 0
+def update_team_stats(match, old_team1_score=None, old_team2_score=None, old_overtime=None, old_shootout=None):
+    """Aggiorna le statistiche delle squadre usando il sistema punti hockey."""
     
     team1 = match.team1
     team2 = match.team2
 
-    # Se esistono vecchi punteggi, sottraiamo quei valori dalle statistiche delle squadre
+    # Se esistono vecchi punteggi, sottrai quei valori dalle statistiche
     if old_team1_score is not None and old_team2_score is not None:
         team1.goals_for -= old_team1_score
         team1.goals_against -= old_team2_score
         team2.goals_for -= old_team2_score
         team2.goals_against -= old_team1_score
 
+        # Crea match temporaneo con i vecchi valori per calcolare i punti da sottrarre
+        old_match = type('OldMatch', (), {
+            'team1_score': old_team1_score,
+            'team2_score': old_team2_score,
+            'overtime': old_overtime or False,
+            'shootout': old_shootout or False,
+            'is_completed': True,
+            'winner': team1 if old_team1_score > old_team2_score else (team2 if old_team2_score > old_team1_score else None),
+            'is_regulation_time': not (old_overtime or old_shootout),
+            'is_overtime_shootout': old_overtime or old_shootout
+        })()
+        old_match.get_points_for_team = match.get_points_for_team.__func__
+        
+        # Sottrai i vecchi punti
+        old_team1_points = old_match.get_points_for_team(old_match, team1)
+        old_team2_points = old_match.get_points_for_team(old_match, team2)
+        team1.points -= old_team1_points
+        team2.points -= old_team2_points
+
+        # Aggiorna record vittorie/sconfitte/pareggi (sottrai vecchi)
         if old_team1_score > old_team2_score:
             team1.wins -= 1
             team2.losses -= 1
-            team1.points -= points_win
         elif old_team2_score > old_team1_score:
             team2.wins -= 1
             team1.losses -= 1
-            team2.points -= points_win
         else:
             team1.draws -= 1
             team2.draws -= 1
-            team1.points -= points_draw
-            team2.points -= points_draw
 
-    # Aggiungiamo i nuovi valori alle statistiche
+    # Aggiungi i nuovi valori alle statistiche
     team1.goals_for += match.team1_score
     team1.goals_against += match.team2_score
     team2.goals_for += match.team2_score
     team2.goals_against += match.team1_score
 
+    # Calcola i nuovi punti usando il sistema hockey
+    team1_points = match.get_points_for_team(team1)
+    team2_points = match.get_points_for_team(team2)
+    team1.points += team1_points
+    team2.points += team2_points
+
+    # Aggiorna record vittorie/sconfitte/pareggi (aggiungi nuovi)
     if match.team1_score > match.team2_score:
         team1.wins += 1
         team2.losses += 1
-        team1.points += points_win
-        team2.points += points_loss
     elif match.team2_score > match.team1_score:
         team2.wins += 1
         team1.losses += 1
-        team2.points += points_win
-        team1.points += points_loss
     else:
         team1.draws += 1
         team2.draws += 1
-        team1.points += points_draw
-        team2.points += points_draw
 
-    # *** AGGIORNAMENTI AUTOMATICI PLAYOFF (come prima) ***
-    
-    # 1. QUALIFICAZIONI COMPLETATE → AGGIORNA QUARTI
-    if match.phase == 'group' and all_group_matches_completed():
-        print("🎯 Tutte le qualificazioni completate! Aggiornamento quarti automatico...")
-        try:
-            update_playoff_brackets()
-            print("✅ Quarti aggiornati automaticamente!")
-        except Exception as e:
-            print(f"❌ Errore aggiornamento quarti: {e}")
-    
-    # 2. QUARTI COMPLETATI PER UNA LEGA → AGGIORNA SEMIFINALI DI QUELLA LEGA
-    if match.phase == 'quarterfinal':
-        league = match.league
-        if league and all_phase_matches_completed('quarterfinal', league):
-            print(f"🎯 Quarti {league} completati! Aggiornamento semifinali automatico...")
-            try:
-                update_semifinals(league)
-                print(f"✅ Semifinali {league} aggiornate automaticamente!")
-            except Exception as e:
-                print(f"❌ Errore aggiornamento semifinali {league}: {e}")
-    
-    # 3. SEMIFINALI COMPLETATE PER UNA LEGA → AGGIORNA FINALI DI QUELLA LEGA
-    if match.phase == 'semifinal':
-        league = match.league
-        if league and all_phase_matches_completed('semifinal', league):
-            print(f"🎯 Semifinali {league} completate! Aggiornamento finali automatico...")
-            try:
-                update_finals(league)
-                print(f"✅ Finali {league} aggiornate automaticamente!")
-            except Exception as e:
-                print(f"❌ Errore aggiornamento finali {league}: {e}")
+    # Debug info
+    print(f"🏒 {team1.name} {match.team1_score}-{match.team2_score} {team2.name}")
+    print(f"   Overtime: {match.overtime}, Rigori: {match.shootout}")
+    print(f"   Punti: {team1.name}={team1_points}, {team2.name}={team2_points}")
 
 
 def all_group_matches_completed():
@@ -4662,9 +4864,9 @@ def create_teams():
     # Lista delle squadre del torneo
     team_names = [
         'DRUNK JUNIORS', 'LE PADELLE', 'ANIMALS TEAM', 'BARRHOCK',
-        'AROSIO CAPITALS', 'TRE SEJDLAR', 'FLORY MOTOS', 'GIUGADUU DALA LIPPA',
-        'YELLOWSTONE', 'BARDOLINO TEAM DOC', 'TIRABUSCION', 'HOCKTAIL',
-        'CATERPILLARS', 'I GAMB ROTT', 'PEPPA BEER', 'ORIGINAL TWINS'
+        'AROSIO CAPITALS', 'DRUNK DUDES', 'FLORY MOTOS', 'GIÜGADUU DALA LIPPA',
+        'YELLOWSTONE', 'BARDOLINO TEAM DOC', 'TIRABÜSCION', 'HOCKTAIL',
+        'HC CATERPILLARS', 'I GAMB ROTT', 'PEPPA BEER', 'ORIGINAL TWINS'
     ]
     
     created_teams = 0
@@ -4704,10 +4906,10 @@ def populate_sample_data():
         
         # Step 1: Assegna le squadre ai gironi come da lista
         team_assignments = {
-            'A': ['DRUNK JUNIORS', 'LE PADELLE', 'ANIMALS TEAM', 'BARRHOCK'],
-            'B': ['AROSIO CAPITALS', 'TRE SEJDLAR', 'FLORY MOTOS', 'GIUGADUU DALA LIPPA'],
-            'C': ['YELLOWSTONE', 'BARDOLINO TEAM DOC', 'TIRABUSCION', 'HOCKTAIL'],
-            'D': ['CATERPILLARS', 'I GAMB ROTT', 'PEPPA BEER', 'ORIGINAL TWINS']
+            'A': ['BARRHOCK', 'YELLOWSTONE', 'FLORY MOTOS', 'HOCKTAIL'],
+            'B': ['ORIGINAL TWINS', 'AROSIO CAPITALS', 'ANIMALS TEAM', 'I GAMB ROTT'],
+            'C': ['PEPPA BEER', 'TIRABÜSCION', 'BARDOLINO TEAM DOC', 'LE PADELLE'],
+            'D': ['DRUNK JUNIORS', 'DRUNK DUDES', 'HC CATERPILLARS', 'GIÜGADUU DALA LIPPA']
         }
         
         print("Step 1: Assegnazione gironi...")
@@ -4716,6 +4918,7 @@ def populate_sample_data():
                 team = Team.query.filter_by(name=team_name).first()
                 if team:
                     team.group = group
+                   
                     # Reset statistiche squadra
                     team.wins = 0
                     team.losses = 0
@@ -4729,23 +4932,23 @@ def populate_sample_data():
         db.session.commit()
         
         # Step 2: Popola giocatori per ogni squadra
-        print("Step 2: Creazione giocatori...")
-        populate_players()
+        # print("Step 2: Creazione giocatori...")
+        # populate_players()
         
         # Step 3: Genera il calendario delle qualificazioni
-        print("Step 3: Generazione calendario...")
-        generate_complete_tournament_simple()
+        # print("Step 3: Generazione calendario...")
+        # generate_complete_tournament_simple()
         
-        # Step 4: Reset e popola risultati delle qualificazioni con statistiche realistiche
-        print("Step 4: Popolamento risultati qualificazioni...")
-        reset_all_player_match_stats()  # Reset statistiche esistenti
-        populate_qualification_results()
+        # # Step 4: Reset e popola risultati delle qualificazioni con statistiche realistiche
+        # print("Step 4: Popolamento risultati qualificazioni...")
+        # reset_all_player_match_stats()  # Reset statistiche esistenti
+        # populate_qualification_results()
         
         # Step 5: Aggiorna i playoff con le squadre qualificate
-        print("Step 5: Aggiornamento playoff...")
-        update_playoff_brackets()
+        # print("Step 5: Aggiornamento playoff...")
+        # update_playoff_brackets()
         
-        flash('Database popolato con successo con dati di esempio!', 'success')
+        # flash('Database popolato con successo con dati di esempio!', 'success')
         
     except Exception as e:
         db.session.rollback()
@@ -4827,7 +5030,7 @@ def populate_step_by_step():
             
         elif step == '2':
             # Solo giocatori
-            populate_players()
+            # populate_players()
             flash('Step 2 completato: Giocatori creati', 'success')
             
         elif step == '3':
@@ -4839,7 +5042,7 @@ def populate_step_by_step():
         elif step == '4':
             # Solo risultati qualificazioni
             reset_all_player_match_stats()
-            populate_qualification_results()
+            # populate_qualification_results()
             flash('Step 4 completato: Risultati qualificazioni', 'success')
             
         elif step == '5':
@@ -5236,6 +5439,327 @@ def verify_player_stats():
     
 #     flash(f'Debug matches (prime 10): {info}', 'info')
 #     return redirect(url_for('schedule'))
+
+@app.route('/insert_all_players', methods=['POST'])
+def insert_all_players():
+    """Inserisce tutti i giocatori con calcolo punti corretto."""
+    
+    players_data = {
+        'DRUNK JUNIORS': [
+            ('Gianluca Antoni', True, 'LNA/LNB'),
+            ('Lorenzo Manfrini', True, 'LNA/LNB'),
+            ('Eros Radaelli', True, '2a Lega'),
+            ('Milo Meierhofer', True, '2a Lega'),
+            ('Tommaso Mercolli', True, '2a Lega'),
+            ('David Barchi', True, '2a Lega'),
+            ('Giorgio Stefani', False, None),
+            ('Matteo Destefani', False, None),
+            ('Nicolò Mogliazzi', True, '2a Lega'),
+            ('Andrea Pedrolini', True, 'Veterani'),
+            ('Samuele Brusa', True, 'LNA/LNB'),
+            ('Alex Weber', False, None),
+            ('Jonas Fontana', False, None),
+            ('Yvan Zanoli', False, None),
+        ],
+        'HC CATERPILLARS': [
+            ('Gabriele Cicchinelli', True, '2a Lega'),
+            ('Marzio Luvini', True, 'LNA/LNB'),
+            ('Marco Ruspini', True, '2a Lega'),
+            ('Manuel Ceresa', True, 'LNA/LNB'),
+            ('Nuno Goncalves', False, None),
+            ('Nelson Romelli', False, None),
+            ('Marco Bortolotti', False, None),
+            ('Luca Lischetti', False, None),
+            ('Flavio Vella', True, 'LNA/LNB'),
+            ('Stefano Doninelli', False, None),
+            ('Riccardo Galfetti', False, None),
+            ('Gabriele Boiani', True, '2a Lega'),
+            ('Stepan Göcer', False, None),
+        ],
+        'I GAMB ROTT': [
+            ('Alessandro Müller', True, 'Veterani'),
+            ('Dewis Prior', True, '1a Lega'),
+            ('Flavio Ambrosetti', False, None),
+            ('Luca Lavizzari', True, 'Veterani'),
+            ('Alan Giovannini', False, None),
+            ('Nicole Pozzi', False, None),
+            ('Mirko Pozzi', False, None),
+            ('Emiliano Contini', False, None),
+            ('Jari Pestelacci', False, None),
+            ('Aaron Achermann', False, None),
+            ('Roby Muschi', False, None),
+            ('Sascha Quirici', False, None),
+            ('Gualty Cimasoni', False, None),
+            ('Julian Walker', False, None),
+        ],
+        'YELLOWSTONE': [
+            ('Daniele Ponti', False, None),
+            ('Daniele Bernasconi', False, None),
+            ('Omar Rubbi', False, None),
+            ('Colin Patchett', True, '2a Lega'),
+            ('Claudio Busacchi', False, None),
+            ('Luca Molone', False, None),
+            ('Christian Perni', True, 'LNA/LNB'),
+            ('Daniele Bernasconi', True, '1a Lega'),  # Secondo Daniele Bernasconi
+            ('Alex Sala', False, None),
+            ('Alessandro Motta', False, None),
+            ('Andreas Brantschen', False, None),
+            ('Jonny Casoni', False, None),
+            ('Gianluca Braga', False, None),
+        ],
+        'HOCKTAIL': [
+            ('Loris Griesenhofer', True, '2a Lega'),
+            ('Rubina Cerutti', True, 'Femminile'),
+            ('Davide Albert', True, '2a Lega'),
+            ('Francesco Wezel', True, '2a Lega'),
+            ('Gionata Nessi', True, '1a Lega'),
+            ('Sergio Bianchi', False, None),
+            ('Guillame Tagliabue', False, None),
+            ('Elia Parzani', False, None),
+            ('Christian Cugnetto', False, None),
+            ('Michele Baggi', False, None),
+            ('Aramis Rezzonico', True, '1a Lega'),
+            ('Noele Zanardi', False, None),
+            ('Tommaso Bernardoni', True, '1a Lega'),
+            ('Daniel Arcidiacono', False, None),
+        ],
+        'BARDOLINO TEAM DOC': [
+            ('Yannick Ruspini', True, 'LNA/LNB'),
+            ('Allan Bolis', True, 'Veterani'),
+            ('Carlo Briccola', True, 'LNA/LNB'),
+            ('Andrea Involti', True, 'LNA/LNB'),
+            ('Gianini Dennis', True, 'LNA/LNB'),
+            ('Marcel Raggi', True, 'LNA/LNB'),
+            ('Luca Raggi', False, None),
+            ('Demian Burri', True, 'LNA/LNB'),
+            ('Gabriele Curcio', True, '1a Lega'),
+            ('Marcello Arnoldi', False, None),
+        ],
+        'ORIGINAL TWINS': [
+            ('Paolo Leonardi', False, None),
+            ('Andrea Leonardi', False, None),
+            ('Graziano Sassi', False, None),
+            ('Gabriele Amadò', False, None),
+            ('Agostino Mini', False, None),
+            ('Giuliano Sassi', False, None),
+            ('Luca Bonfanti', False, None),
+            ('Daniele Costantini', False, None),
+            ('Marcel Müller', False, None),
+            ('Alan Giacomini', True, 'LNA/LNB'),
+            ('Michele Domeniconi', False, None),
+            ('Francesco Casari', False, None),
+            ('Alain Scheggia', False, None),
+            ('Daniele Demarta', False, None),
+            ('Nicolas Poncini', True, 'LNA/LNB'),
+        ],
+        'TIRABÜSCION': [
+            ('Daniele Bianchi', True, '2a Lega'),
+            ('Alliata Tito', False, None),
+            ('Emanuele Bralla', False, None),
+            ('Zdenek Jirava', False, None),
+            ('Maurizio Capponi', False, None),
+            ('Antonio Bianchi', False, None),
+            ('Alessandra Mion', False, None),
+            ('Luca Renze', False, None),
+            ('Tiziano Bonoli', False, None),
+            ('David Lucchini', False, None),
+            ('Stefano Teggi', False, None),
+            ('Alessio Demarchi', True, '2a Lega'),
+            ('Michele Gambarasi', False, None),
+            ('Filippo De Filippis', False, None),
+            ('Samuel Spinzi', False, None),
+        ],
+        'FLORY MOTOS': [
+            ('Adrian Schumacher', True, 'Veterani'),
+            ('Andrea Guarisco', True, 'Veterani'),
+            ('Patrick Ruspini', True, 'Veterani'),
+            ('Aaron Bonaiti', True, 'Veterani'),
+            ('Mirko Bottani', True, 'Veterani'),
+            ('Patrik Arigoni', True, 'Veterani'),
+            ('Eric Mercolli', False, None),
+            ('Pietro Bacciarini', False, None),
+            ('Giona Bacciarini', False, None),
+            ('Luca Giorla', False, None),
+            ('Christian Cetti', True, 'LNA/LNB'),
+            ('Thomas Felappi', True, 'LNA/LNB'),
+            ('Micha Tonini', False, None),
+        ],
+        'BARRHOCK': [
+            ('Laura Bariffi', True, 'Femminile'),
+            ('Serena D\'Egidio', True, 'Femminile'),
+            ('Laura Desboeufs', True, 'Femminile'),
+            ('Michela Sobrio', True, 'Femminile'),
+            ('Tina Di Sigismondo', True, 'Femminile'),
+            ('Sophie Perrenoud', True, 'Femminile'),
+            ('Vasile Santini', True, 'LNA/LNB'),
+            ('Simone Cavadini', False, None),
+            ('Jonathan Desboeufs', True, 'LNA/LNB'),
+            ('Marzio Teggi', True, 'Veterani'),
+            ('Davide Tedoldi', True, 'Veterani'),
+            ('Noah Triangeli', True, 'LNA/LNB'),
+            ('Nicola Robbiani', True, 'Veterani'),
+        ],
+        'GIÜGADUU DALA LIPPA': [
+            ('Elvis Ciccone', False, None),
+            ('Marc Leutwyler', False, None),
+            ('Teo Parini', False, None),
+            ('Andreas Weber', False, None),
+            ('Stefano Canepa', False, None),
+            ('Alessandro Gianinazzi', False, None),
+            ('Marco Franceschi', False, None),
+            ('Marco Burgi', False, None),
+            ('Aris Biaggi', False, None),
+            ('Fiona Bleeke', False, None),
+            ('Nick Frisberg', True, 'LNA/LNB'),
+            ('Matteo Kaufmann', True, 'LNA/LNB'),
+            ('Neno Casati', False, None),
+        ],
+        'LE PADELLE': [
+            ('Colombo Raffaele', False, None),
+            ('Lo Presti Christoph', False, None),
+            ('Milani Claudia', False, None),
+            ('Bosisio Sabina', False, None),
+            ('Menghetti Domizia', False, None),
+            ('Rossinelli Silvia', False, None),
+            ('Bullo Cristina', False, None),
+            ('Ruffieux Aurélie', False, None),
+            ('Rossetti Noè', True, None),  # "SI" senza categoria = 2 punti
+            ('Pozzi Giorgio', True, None),
+            ('Santoro Fabiano', True, None),
+            ('Rodriguez-Maceda Fernando', False, None),
+        ],
+        'PEPPA BEER': [
+            ('Noahm Demarta', False, None),
+            ('Kevin Schuler', False, None),
+            ('Marco Cloetta', False, None),
+            ('Nakia Alberti', True, 'LNA/LNB'),
+            ('Luca Ferrari', False, None),
+            ('Jay Regazzoni', True, 'LNA/LNB'),
+            ('Matteo Cassina', True, '1a Lega'),
+            ('Michele Crivelli', True, '1a Lega'),
+            ('Simon Majek', False, None),
+            ('Roland Majek', False, None),
+            ('Elia Mazzolini', False, None),
+            ('Aron Fassora', False, None),
+            ('Axel Leone', True, 'LNA/LNB'),  # LNA = LNA/LNB nel sistema
+        ],
+        'ANIMALS TEAM': [
+            ('Simone Belloni', False, None),
+            ('Davide Belloni', False, None),
+            ('Fabrizio Ferrazzini', False, None),
+            ('Dimitri Frapolli', False, None),
+            ('Enrico Strahm', False, None),
+            ('Oliver Korch', False, None),
+            ('Omar Bonardi', False, None),
+            ('Simone Wagner', False, None),
+            ('Marco Dongiovanni', False, None),
+            ('Luc Bielli', False, None),
+            ('Zeno Cazzoli', True, '2 lega/LNB'),
+            ('Lucio Notari', False, None),
+            ('Elia Ferrari', False, None),
+            ('Filo Botti', False, None),
+            ('Stefano Piccardo', False, None),
+        ],
+            'LE PADELLE': [
+            ('Raffaele Colombo', False, None),
+            ('Christoph Lo Presti', False, None),
+            ('Claudia Milani', False, None),
+            ('Sabina Bosisio', False, None),
+            ('Domizia Menghetti', False, None),
+            ('Silvia Rossinelli', False, None),
+            ('Cristina Bullo', False, None),
+            ('Aurélie Ruffieux', False, None),
+            ('Noè Rossetti', True, '1a lega'),
+            ('Giorgio Pozzi', True, 'LN'),
+            ('Fabiano Santoro', True, 'LN'),
+            ('Fernando Rodriguez-Maceda', False, None),
+        ]
+
+
+    }
+    
+    try:
+        total_added = 0
+        errors = []
+        
+        for team_name, players in players_data.items():
+            team = Team.query.filter_by(name=team_name).first()
+            
+            if not team:
+                errors.append(f"Squadra '{team_name}' non trovata")
+                continue
+            
+            print(f"\n🏒 Aggiungendo giocatori a {team_name}...")
+            
+            # Elimina giocatori esistenti
+            existing_count = Player.query.filter_by(team_id=team.id).count()
+            if existing_count > 0:
+                Player.query.filter_by(team_id=team.id).delete()
+                print(f"  ❌ Rimossi {existing_count} giocatori esistenti")
+            
+            for name, is_registered, category in players:
+                try:
+                    # Crea il giocatore - I PUNTI VERRANNO CALCOLATI AUTOMATICAMENTE dal modello
+                    player = Player(
+                        name=name,
+                        team=team,
+                        is_registered=is_registered,
+                        category=category
+                    )
+                    
+                    db.session.add(player)
+                    total_added += 1
+                    
+                    # I punti vengono calcolati automaticamente dalla proprietà registration_points
+                    print(f"  ✅ {name} ({'Tesserato' if is_registered else 'Non tesserato'}, {category or 'N/A'})")
+                    
+                except Exception as e:
+                    errors.append(f"Errore giocatore {name} in {team_name}: {str(e)}")
+        
+        # Salva tutto
+        db.session.commit()
+        
+        # Ora calcola i totali usando la proprietà del modello
+        teams_stats = []
+        for team_name in players_data.keys():
+            team = Team.query.filter_by(name=team_name).first()
+            if team:
+                total_points = team.player_points_total  # Questo usa la proprietà registration_points
+                teams_stats.append(f"{team.name}: {len(team.players)} giocatori, {total_points} pt")
+                print(f"  📊 {team.name}: {total_points} punti tesseramento")
+                
+                if total_points > 20:
+                    errors.append(f"⚠️ {team.name} supera il limite di 20 punti ({total_points})")
+        
+        flash(f'🎉 Inseriti {total_added} giocatori con successo!', 'success')
+        
+        if errors:
+            flash(f'⚠️ Errori: {"; ".join(errors)}', 'warning')
+        
+        flash(f'📊 Riepilogo: {" | ".join(teams_stats)}', 'info')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore: {str(e)}', 'danger')
+    
+    return redirect(url_for('teams'))
+
+
+@app.route('/check_registration_points')
+def check_registration_points():
+    """Verifica i punti tesseramento di tutte le squadre."""
+    teams = Team.query.all()
+    
+    results = []
+    for team in teams:
+        total_points = team.player_points_total
+        status = "✅ OK" if total_points <= 20 else f"❌ LIMITE SUPERATO ({total_points}/20)"
+        
+        results.append(f"{team.name}: {total_points} punti {status}")
+    
+    flash(f"📊 Punti tesseramento: {' | '.join(results)}", 'info')
+    return redirect(url_for('teams'))
+
 
 if __name__ == '__main__':
      app.run(debug=True)

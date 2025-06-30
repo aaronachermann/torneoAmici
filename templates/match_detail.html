@@ -156,16 +156,18 @@
         <!-- Inserimento Risultato -->
         {% if not match.is_completed and match.team1 and match.team2 %}
             <div class="row mt-4">
-                <div class="col-md-6 mx-auto">
+                <div class="col-md-8 mx-auto">
                     <div class="card">
                         <div class="card-header bg-success text-white">
-                            <h4 class="mb-0">Inserisci Risultato</h4>
+                            <h4 class="mb-0">🏒 Inserisci Risultato</h4>
                         </div>
                         <div class="card-body">
                             <form method="post">
                                 {% if return_anchor %}
                                     <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                                 {% endif %}
+                                
+                                <!-- Punteggi -->
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -176,8 +178,50 @@
                                         <input type="number" class="form-control" id="team2_score" name="team2_score" min="0" required>
                                     </div>
                                 </div>
+                                
+                                <!-- Sistema Overtime/Rigori per le qualificazioni -->
+                                {% if match.phase == 'group' %}
+                                    <div class="alert alert-info mt-3">
+                                        <strong>🏒 Sistema Punti Hockey:</strong><br>
+                                        • <strong>3 punti</strong>: vittoria nei tempi regolamentari<br>
+                                        • <strong>2 punti</strong>: vittoria overtime/rigori<br>
+                                        • <strong>1 punto</strong>: sconfitta overtime/rigori<br>
+                                        • <strong>0 punti</strong>: sconfitta nei tempi regolamentari
+                                    </div>
+                                    
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <label class="form-label"><strong>Modalità di conclusione:</strong></label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio" name="conclusion_type" id="regulation" value="regulation" checked>
+                                                <label class="form-check-label" for="regulation">
+                                                    ⏱️ Tempi regolamentari
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="overtime" name="overtime">
+                                                <label class="form-check-label" for="overtime">
+                                                    ⏰ Overtime (tempi supplementari)
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="shootout" name="shootout">
+                                                <label class="form-check-label" for="shootout">
+                                                    🥅 Rigori (shootout)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Avviso pareggio -->
+                                    <div id="tie-warning" class="alert alert-warning mt-3" style="display: none;">
+                                        <strong>⚠️ Attenzione:</strong> Nelle qualificazioni non sono ammessi pareggi! 
+                                        Se il punteggio è pari, seleziona Overtime o Rigori per indicare come è stata decisa la partita.
+                                    </div>
+                                {% endif %}
+                                
                                 <div class="mt-3">
-                                    <button type="submit" class="btn btn-success">Salva Risultato</button>
+                                    <button type="submit" class="btn btn-success">💾 Salva Risultato</button>
                                 </div>
                             </form>
                         </div>
@@ -189,16 +233,18 @@
         <!-- Modifica Risultato -->
         {% if match.is_completed and match.team1 and match.team2 %}
             <div class="row mt-4">
-                <div class="col-md-6 mx-auto">
+                <div class="col-md-8 mx-auto">
                     <div class="card">
                         <div class="card-header bg-warning text-dark">
-                            <h4 class="mb-0">Modifica Risultato</h4>
+                            <h4 class="mb-0">✏️ Modifica Risultato</h4>
                         </div>
                         <div class="card-body">
                             <form method="post">
                                 {% if return_anchor %}
                                     <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                                 {% endif %}
+                                
+                                <!-- Punteggi -->
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -209,8 +255,43 @@
                                         <input type="number" class="form-control" id="team2_score" name="team2_score" value="{{ match.team2_score }}" min="0" required>
                                     </div>
                                 </div>
+                                
+                                <!-- Modalità conclusione per qualificazioni -->
+                                {% if match.phase == 'group' %}
+                                    <div class="row mt-3">
+                                        <div class="col-12">
+                                            <label class="form-label"><strong>Modalità di conclusione:</strong></label>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="overtime" name="overtime" {% if match.overtime %}checked{% endif %}>
+                                                <label class="form-check-label" for="overtime">
+                                                    ⏰ Overtime (tempi supplementari)
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="shootout" name="shootout" {% if match.shootout %}checked{% endif %}>
+                                                <label class="form-check-label" for="shootout">
+                                                    🥅 Rigori (shootout)
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Mostra punti assegnati -->
+                                    <div class="alert alert-success mt-3">
+                                        <strong>📊 Punti assegnati con questo risultato:</strong><br>
+                                        • {{ match.team1.name }}: <strong>{{ match.get_points_for_team(match.team1) }} punti</strong><br>
+                                        • {{ match.team2.name }}: <strong>{{ match.get_points_for_team(match.team2) }} punti</strong>
+                                        {% if match.overtime or match.shootout %}
+                                            <br><small class="text-muted">
+                                                {% if match.overtime %}⏰ Decisa in overtime{% endif %}
+                                                {% if match.shootout %}🥅 Decisa ai rigori{% endif %}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                                
                                 <div class="mt-3">
-                                    <button type="submit" class="btn btn-warning">Aggiorna Risultato</button>
+                                    <button type="submit" class="btn btn-warning">🔄 Aggiorna Risultato</button>
                                 </div>
                             </form>
                         </div>
@@ -461,6 +542,46 @@
                         }
                     }
                 }
+            }
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            const team1ScoreInput = document.getElementById('team1_score');
+            const team2ScoreInput = document.getElementById('team2_score');
+            const overtimeCheckbox = document.getElementById('overtime');
+            const shootoutCheckbox = document.getElementById('shootout');
+            const tieWarning = document.getElementById('tie-warning');
+            
+            function checkForTie() {
+                if (team1ScoreInput && team2ScoreInput && tieWarning) {
+                    const score1 = parseInt(team1ScoreInput.value) || 0;
+                    const score2 = parseInt(team2ScoreInput.value) || 0;
+                    const isOvertimeOrShootout = (overtimeCheckbox && overtimeCheckbox.checked) || (shootoutCheckbox && shootoutCheckbox.checked);
+                    
+                    if (score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
+                        tieWarning.style.display = 'block';
+                    } else {
+                        tieWarning.style.display = 'none';
+                    }
+                }
+            }
+            
+            // Aggiungi listener per controllare pareggi
+            if (team1ScoreInput) team1ScoreInput.addEventListener('input', checkForTie);
+            if (team2ScoreInput) team2ScoreInput.addEventListener('input', checkForTie);
+            if (overtimeCheckbox) overtimeCheckbox.addEventListener('change', checkForTie);
+            if (shootoutCheckbox) shootoutCheckbox.addEventListener('change', checkForTie);
+            
+            // Assicurati che overtime e shootout non siano selezionati insieme
+            if (overtimeCheckbox && shootoutCheckbox) {
+                overtimeCheckbox.addEventListener('change', function() {
+                    if (this.checked) shootoutCheckbox.checked = false;
+                    checkForTie();
+                });
+                
+                shootoutCheckbox.addEventListener('change', function() {
+                    if (this.checked) overtimeCheckbox.checked = false;
+                    checkForTie();
+                });
             }
         });
     </script>

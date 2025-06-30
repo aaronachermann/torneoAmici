@@ -6,6 +6,42 @@
     <title>{{ team.name }} - Gestione Torneo degli Amici</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .team-header {
+            background: linear-gradient(135deg, #007bff, #0056b3);
+            color: white;
+            border-radius: 10px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+        .points-card {
+            border-left: 4px solid #28a745;
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+        }
+        .points-card.warning {
+            border-left-color: #ffc107;
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        }
+        .points-card.danger {
+            border-left-color: #dc3545;
+            background: linear-gradient(135deg, #f8d7da, #f1aeb5);
+        }
+        .player-card {
+            transition: all 0.3s ease;
+            border-radius: 8px;
+        }
+        .player-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .category-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .action-buttons .btn {
+            margin: 0 2px;
+        }
+    </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
@@ -20,10 +56,16 @@
                         <a class="nav-link active" href="{{ url_for('teams') }}">Squadre</a>
                     </li>
                     <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('groups') }}">Gironi</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('schedule') }}">Calendario</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
                     </li>
                 </ul>
             </div>
@@ -42,70 +84,167 @@
             {% endif %}
         {% endwith %}
 
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>{{ team.name }}</h1>
-            <a href="{{ url_for('teams') }}" class="btn btn-secondary">Torna alle Squadre</a>
+        <!-- Header squadra -->
+        <div class="team-header text-center">
+            <h1 class="display-4 mb-3">🏒 {{ team.name }}</h1>
+            <div class="row">
+                <div class="col-md-3">
+                    <h5>Girone</h5>
+                    <span class="badge bg-light text-dark fs-6">
+                        {% if team.group %}Girone {{ team.group }}{% else %}Non assegnato{% endif %}
+                    </span>
+                </div>
+                <div class="col-md-3">
+                    <h5>Giocatori</h5>
+                    <span class="badge bg-light text-dark fs-6">{{ team.players|length }}</span>
+                </div>
+                <div class="col-md-3">
+                    <h5>Punti Tesseramento</h5>
+                    <span class="badge {% if team.player_points_total > 20 %}bg-danger{% elif team.player_points_total >= 18 %}bg-warning{% else %}bg-success{% endif %} fs-6">
+                        {{ team.player_points_total }}/20
+                    </span>
+                </div>
+                <div class="col-md-3">
+                    <h5>Punti Classifica</h5>
+                    <span class="badge bg-light text-dark fs-6">{{ team.points }}</span>
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <a href="{{ url_for('teams') }}" class="btn btn-light">
+                    ← Torna alle Squadre
+                </a>
+            </div>
         </div>
-        
-        <div class="row mt-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">Aggiungi Giocatore</h4>
+
+        <div class="row">
+            <!-- Sezione Aggiungi Giocatore -->
+            <div class="col-lg-5 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">👤 Aggiungi Giocatore</h4>
                     </div>
                     <div class="card-body">
                         <form method="post">
                             <div class="mb-3">
                                 <label for="player_name" class="form-label">Nome Giocatore</label>
-                                <input type="text" class="form-control" id="player_name" name="player_name" required>
+                                <input type="text" class="form-control" id="player_name" name="player_name" 
+                                       placeholder="Inserisci nome e cognome" required>
                             </div>
+                            
                             <div class="mb-3 form-check">
                                 <input type="checkbox" class="form-check-input" id="is_registered" name="is_registered">
-                                <label class="form-check-label" for="is_registered">Tesserato</label>
+                                <label class="form-check-label" for="is_registered">
+                                    <strong>Tesserato</strong>
+                                </label>
                             </div>
+                            
                             <div class="mb-3" id="category_div" style="display: none;">
                                 <label for="category" class="form-label">Categoria</label>
                                 <select class="form-select" id="category" name="category">
-                                    <option value="LNA/LNB">LNA/LNB (5 punti)</option>
-                                    <option value="1a Lega">1a Lega (3 punti)</option>
-                                    <option value="2a Lega">2a Lega (2 punti)</option>
+                                    <option value="LNA/LNB">🔴 LNA/LNB (5 punti)</option>
+                                    <option value="1a Lega">🟠 1° Lega (3 punti)</option>
+                                    <option value="2a Lega">🔵 2° Lega (2 punti)</option>
+                                    <option value="Femminile">🟢 Femminile (0 punti)</option>
+                                    <option value="Veterani">🟢 Veterani (0 punti)</option>
                                 </select>
                             </div>
-                            <button type="submit" class="btn btn-primary">Aggiungi</button>
+                            
+                            <!-- Anteprima punti -->
+                            <div class="alert alert-light border" id="points_preview">
+                                <strong>📊 Punti che verranno aggiunti:</strong> 
+                                <span id="preview_points" class="badge bg-secondary">0</span>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success w-100">
+                                ➕ Aggiungi Giocatore
+                            </button>
                         </form>
+                        
+                        <!-- Info sistema punti -->
+                        <div class="mt-4">
+                            <h6>📋 Sistema Punti Tesseramento:</h6>
+                            <ul class="small">
+                                <li><span class="badge bg-danger">LNA/LNB</span> = 5 punti</li>
+                                <li><span class="badge bg-warning">1° Lega</span> = 3 punti</li>
+                                <li><span class="badge bg-info">2° Lega</span> = 2 punti</li>
+                                <li><span class="badge bg-success">Femminile/Veterani</span> = 0 punti</li>
+                                <li><span class="badge bg-secondary">Non tesserati</span> = 0 punti</li>
+                            </ul>
+                            <small class="text-muted">Limite massimo: <strong>20 punti per squadra</strong></small>
+                        </div>
                     </div>
                 </div>
             </div>
             
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">Giocatori</h4>
+            <!-- Sezione Lista Giocatori -->
+            <div class="col-lg-7 mb-4">
+                <div class="card h-100">
+                    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">👥 Lista Giocatori</h4>
+                        <span class="badge bg-light text-dark">{{ team.players|length }} giocatori</span>
                     </div>
                     <div class="card-body">
                         {% if team.players %}
                             <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
+                                <table class="table table-hover">
+                                    <thead class="table-light">
                                         <tr>
-                                            <th>Nome</th>
-                                            <th>Tesserato</th>
-                                            <th>Categoria</th>
-                                            <th>Punti</th>
-                                            <th>Azioni</th>
+                                            <th width="30%">Nome</th>
+                                            <th width="15%">Tesserato</th>
+                                            <th width="20%">Categoria</th>
+                                            <th width="10%">Punti</th>
+                                            <th width="25%">Azioni</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {% for player in team.players %}
-                                            <tr>
-                                                <td>{{ player.name }}</td>
-                                                <td>{{ 'Sì' if player.is_registered else 'No' }}</td>
-                                                <td>{{ player.category if player.category else 'N/A' }}</td>
-                                                <td>{{ player.registration_points }}</td>
+                                            <tr class="player-card">
                                                 <td>
-                                                    <form action="{{ url_for('delete_player', player_id=player.id) }}" method="post" class="d-inline">
-                                                        <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Sei sicuro di voler eliminare questo giocatore?')">Elimina</button>
-                                                    </form>
+                                                    <strong>{{ player.name }}</strong>
+                                                </td>
+                                                <td>
+                                                    {% if player.is_registered %}
+                                                        <span class="badge bg-success">✓ Sì</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">✗ No</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if player.category %}
+                                                        <span class="badge category-badge {% if player.category == 'LNA/LNB' %}bg-danger{% elif player.category == '1a Lega' %}bg-warning text-dark{% elif player.category == '2a Lega' %}bg-info{% elif player.category == 'Femminile' %}bg-success{% elif player.category == 'Veterani' %}bg-success{% else %}bg-secondary{% endif %}">
+                                                            {{ player.category }}
+                                                        </span>
+                                                    {% else %}
+                                                        <span class="text-muted small">N/A</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    <strong class="{% if player.registration_points == 5 %}text-danger{% elif player.registration_points == 3 %}text-warning{% elif player.registration_points == 2 %}text-info{% else %}text-muted{% endif %}">
+                                                        {{ player.registration_points }}
+                                                    </strong>
+                                                </td>
+                                                <td>
+                                                    <div class="action-buttons">
+                                                        <!-- Pulsante Modifica -->
+                                                        <a href="{{ url_for('edit_player', player_id=player.id) }}" 
+                                                           class="btn btn-sm btn-warning" 
+                                                           title="Modifica {{ player.name }}">
+                                                            Modifica
+                                                        </a>
+                                                        
+                                                        <!-- Pulsante Elimina -->
+                                                        <form action="{{ url_for('delete_player', player_id=player.id) }}" 
+                                                              method="post" 
+                                                              class="d-inline">
+                                                            <button type="submit" 
+                                                                    class="btn btn-sm btn-danger" 
+                                                                    onclick="return confirm('Sei sicuro di voler eliminare {{ player.name }}?\n\nQuesta azione eliminerà anche tutte le sue statistiche di gioco.')"
+                                                                    title="Elimina {{ player.name }}">
+                                                                Elimina
+                                                            </button>
+                                                        </form>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         {% endfor %}
@@ -113,12 +252,122 @@
                                 </table>
                             </div>
                         {% else %}
-                            <p>Nessun giocatore registrato per questa squadra.</p>
+                            <div class="text-center py-5">
+                                <div class="mb-3">
+                                    <i class="display-1">👤</i>
+                                </div>
+                                <h5 class="text-muted">Nessun giocatore registrato</h5>
+                                <p class="text-muted">Usa il modulo a sinistra per aggiungere il primo giocatore a {{ team.name }}</p>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- Riepilogo Squadra -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card points-card {% if team.player_points_total > 20 %}danger{% elif team.player_points_total >= 18 %}warning{% endif %}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h5 class="mb-0">
+                                    📊 Riepilogo Tesseramento
+                                </h5>
+                                <div class="mt-2">
+                                    <strong>Punti totali:</strong> {{ team.player_points_total }}/20 
+                                    {% if team.player_points_total > 20 %}
+                                        <span class="badge bg-danger ms-2">LIMITE SUPERATO</span>
+                                        <br><small class="text-danger">
+                                            ⚠️ La squadra supera il limite di {{ team.player_points_total - 20 }} punti!
+                                        </small>
+                                    {% elif team.player_points_total >= 18 %}
+                                        <span class="badge bg-warning text-dark ms-2">VICINI AL LIMITE</span>
+                                        <br><small class="text-warning">
+                                            ⚠️ Rimangono solo {{ 20 - team.player_points_total }} punti disponibili.
+                                        </small>
+                                    {% else %}
+                                        <span class="badge bg-success ms-2">ENTRO I LIMITI</span>
+                                        <br><small class="text-success">
+                                            ✅ Rimangono {{ 20 - team.player_points_total }} punti per altri giocatori tesserati.
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="progress" style="height: 25px;">
+                                    <div class="progress-bar {% if team.player_points_total > 20 %}bg-danger{% elif team.player_points_total >= 18 %}bg-warning{% else %}bg-success{% endif %}" 
+                                         style="width: {{ (team.player_points_total / 20 * 100)|round }}%">
+                                        {{ team.player_points_total }}/20
+                                    </div>
+                                </div>
+                                <small class="text-muted">Progresso tesseramento</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Statistiche Squadra (se disponibili) -->
+        {% if team.games_played > 0 %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">📈 Statistiche Squadra</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-2">
+                                <h6>Partite</h6>
+                                <span class="badge bg-primary fs-6">{{ team.games_played }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <h6>Vittorie</h6>
+                                <span class="badge bg-success fs-6">{{ team.wins }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <h6>Pareggi</h6>
+                                <span class="badge bg-warning fs-6">{{ team.draws }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <h6>Sconfitte</h6>
+                                <span class="badge bg-danger fs-6">{{ team.losses }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <h6>Gol Fatti</h6>
+                                <span class="badge bg-info fs-6">{{ team.goals_for }}</span>
+                            </div>
+                            <div class="col-md-2">
+                                <h6>Gol Subiti</h6>
+                                <span class="badge bg-secondary fs-6">{{ team.goals_against }}</span>
+                            </div>
+                        </div>
+                        <div class="row text-center mt-3">
+                            <div class="col-md-4">
+                                <h6>Differenza Reti</h6>
+                                <span class="badge {% if team.goal_difference > 0 %}bg-success{% elif team.goal_difference < 0 %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+                                    {{ '+' if team.goal_difference > 0 else '' }}{{ team.goal_difference }}
+                                </span>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Punti Classifica</h6>
+                                <span class="badge bg-primary fs-6">{{ team.points }}</span>
+                            </div>
+                            <div class="col-md-4">
+                                <h6>Media Gol</h6>
+                                <span class="badge bg-info fs-6">
+                                    {{ (team.goals_for / team.games_played)|round(1) if team.games_played > 0 else 0 }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
@@ -132,12 +381,42 @@
         document.addEventListener('DOMContentLoaded', function() {
             const isRegisteredCheckbox = document.getElementById('is_registered');
             const categoryDiv = document.getElementById('category_div');
+            const categorySelect = document.getElementById('category');
+            const previewPoints = document.getElementById('preview_points');
             
+            // Mostra/nasconde la selezione categoria
             isRegisteredCheckbox.addEventListener('change', function() {
                 categoryDiv.style.display = this.checked ? 'block' : 'none';
+                updatePreview();
             });
+            
+            // Aggiorna anteprima punti
+            categorySelect.addEventListener('change', updatePreview);
+            
+            function updatePreview() {
+                let points = 0;
+                
+                if (isRegisteredCheckbox.checked) {
+                    const category = categorySelect.value;
+                    switch(category) {
+                        case 'LNA/LNB': points = 5; break;
+                        case '1a Lega': points = 3; break;
+                        case '2a Lega': points = 2; break;
+                        case 'Femminile':
+                        case 'Veterani': points = 0; break;
+                        default: points = 0;
+                    }
+                } else {
+                    points = 0; // Non tesserato
+                }
+                
+                previewPoints.textContent = points;
+                previewPoints.className = `badge ${points === 5 ? 'bg-danger' : points === 3 ? 'bg-warning' : points === 2 ? 'bg-info' : 'bg-secondary'}`;
+            }
+            
+            // Inizializza l'anteprima
+            updatePreview();
         });
     </script>
 </body>
 </html>
-

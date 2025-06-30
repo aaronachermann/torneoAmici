@@ -119,7 +119,49 @@
                 </div>
 
             </div>
+                        <div class="mt-4">
+                <h3>🏒 Sistema Punti Hockey</h3>
+                <div class="d-flex gap-2 flex-wrap">
+                    <!-- Migrazione per abilitare overtime/rigori -->
+                    <form method="post" action="{{ url_for('migrate_overtime_system') }}" class="d-inline">
+                        <button type="submit" class="btn btn-info" onclick="return confirm('Abilitare il sistema Overtime/Rigori? Questo aggiunge i campi necessari al database.')">
+                            🏒 Abilita Sistema Hockey
+                        </button>
+                    </form>
+                    
+                    <!-- Ricalcolo punti con nuovo sistema -->
+                    <form method="post" action="{{ url_for('recalculate_all_points') }}" class="d-inline">
+                        <button type="submit" class="btn btn-warning" onclick="return confirm('Ricalcolare tutti i punti delle squadre usando il sistema hockey? Questa operazione è sicura.')">
+                            🔢 Ricalcola Punti Hockey
+                        </button>
+                    </form>
+                </div>
+                <small class="text-muted d-block mt-2">
+                    <strong>🏒 Sistema Hockey:</strong> 3 punti vittoria regolare, 2 punti vittoria overtime/rigori, 1 punto sconfitta overtime/rigori, 0 punti sconfitta regolare.
+                </small>
+            </div>
             
+
+<div class="mt-4">
+    <h3>👥 Gestione Giocatori Automatica</h3>
+    <div class="d-flex gap-2 flex-wrap">
+        <!-- Inserimento automatico di tutti i giocatori -->
+        <form method="post" action="{{ url_for('insert_all_players') }}" class="d-inline">
+            <button type="submit" class="btn btn-success" onclick="return confirm('Inserire automaticamente tutti i giocatori del torneo? Questa operazione sostituirà i giocatori esistenti.')">
+                👥 Inserisci Tutti i Giocatori
+            </button>
+        </form>
+        
+        <!-- Verifica punti tesseramento -->
+        <a href="{{ url_for('check_registration_points') }}" class="btn btn-info">
+            📊 Verifica Punti Tesseramento
+        </a>
+    </div>
+    <small class="text-muted d-block mt-2">
+        <strong>👥 Inserimento Automatico:</strong> Inserisce tutti i 183 giocatori del torneo con le categorie e punti tesseramento corretti.
+        <br><strong>📊 Punti:</strong> LNA/LNB=5pt, 1°Lega=3pt, 2°Lega=2pt, Femminile/Veterani=0pt, Non tesserati=0pt.
+    </small>
+</div>
 
             <div class="mt-4">
                 <h3>Dati di Esempio</h3>

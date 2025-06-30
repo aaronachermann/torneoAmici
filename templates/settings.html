@@ -69,10 +69,10 @@
         {% endwith %}
 
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1>⚙️ Configurazioni Torneo</h1>
+            <h1>Configurazioni Torneo</h1>
             <div>
                 <form method="post" action="{{ url_for('migrate_settings') }}" class="d-inline">
-                    <button type="submit" class="btn btn-info">🔧 Inizializza Settings</button>
+                    <button type="submit" class="btn btn-info">Settings</button>
                 </form>
                 <a href="{{ url_for('index') }}" class="btn btn-secondary">Torna alla Home</a>
             </div>
@@ -106,7 +106,7 @@
             <div class="tab-pane fade show active" id="dates" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-primary text-white">
-                        <h4 class="mb-0">📅 Date del Torneo</h4>
+                        <h4 class="mb-0">Date del Torneo</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_dates') }}">
@@ -157,7 +157,7 @@
             <div class="tab-pane fade" id="times" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">⏰ Orari del Torneo</h4>
+                        <h4 class="mb-0">Orari del Torneo</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_times') }}">
@@ -252,7 +252,7 @@
             <div class="tab-pane fade" id="teams" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-info text-white">
-                        <h4 class="mb-0">👥 Configurazioni Squadre</h4>
+                        <h4 class="mb-0">Configurazioni Squadre</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_team_settings') }}">
@@ -288,7 +288,7 @@
             <div class="tab-pane fade" id="points" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-warning text-dark">
-                        <h4 class="mb-0">📊 Sistema Punti</h4>
+                        <h4 class="mb-0">Sistema Punti</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_points_system') }}">
@@ -322,7 +322,7 @@
             <div class="tab-pane fade" id="playoff" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-danger text-white">
-                        <h4 class="mb-0">🏆 Sistema Playoff</h4>
+                        <h4 class="mb-0">Sistema Playoff</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_playoff_system') }}">
@@ -391,7 +391,7 @@
             <div class="tab-pane fade" id="general" role="tabpanel">
                 <div class="card settings-card">
                     <div class="card-header bg-dark text-white">
-                        <h4 class="mb-0">⚙️ Configurazioni Generali</h4>
+                        <h4 class="mb-0">Configurazioni Generali</h4>
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_general_settings') }}">
