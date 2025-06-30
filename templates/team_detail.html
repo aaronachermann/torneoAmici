@@ -147,6 +147,8 @@
                                     <option value="2a Lega">🔵 2° Lega (2 punti)</option>
                                     <option value="Femminile">🟢 Femminile (0 punti)</option>
                                     <option value="Veterani">🟢 Veterani (0 punti)</option>
+                                    <option value="Portiere">🟢 Portiere (0 punti)</option>
+                                    <option value="Nato prima (e compreso) nel {{ tournament_dates.qualification_day1.date.year - 40 }}">🟢 Nato prima (e compreso) nel {{ tournament_dates.qualification_day1.date.year - 40 }} (0 punti)</option>
                                 </select>
                             </div>
                             
@@ -170,6 +172,8 @@
                                 <li><span class="badge bg-info">2° Lega</span> = 2 punti</li>
                                 <li><span class="badge bg-success">Femminile/Veterani</span> = 0 punti</li>
                                 <li><span class="badge bg-secondary">Non tesserati</span> = 0 punti</li>
+                                <li><span class="badge bg-secondary">Portiere</span> = 0 punti</li>
+                                <li><span class="badge bg-secondary">Nato prima (e compreso) nel {{ tournament_dates.qualification_day1.date.year - 40 }}</span> = 0 punti</li>
                             </ul>
                             <small class="text-muted">Limite massimo: <strong>20 punti per squadra</strong></small>
                         </div>
@@ -404,6 +408,8 @@
                         case '2a Lega': points = 2; break;
                         case 'Femminile':
                         case 'Veterani': points = 0; break;
+                        case 'Portiere': points = 0; break;
+                        case 'Nato prima (e compreso) nel {{ tournament_dates.qualification_day1.date.year - 40 }}': points = 0; break;
                         default: points = 0;
                     }
                 } else {

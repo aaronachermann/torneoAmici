@@ -76,7 +76,9 @@ class Player(db.Model):
             '1a Lega': 3,     # 1° Lega = 3 punti  
             '2a Lega': 2,     # 2° Lega = 2 punti
             'Femminile': 0,   # Femminile = 0 punti
-            'Veterani': 0     # Veterani = 0 punti
+            'Veterani': 0,     # Veterani = 0 punti
+            'Portiere': 0,     # Portiere = 0 punti
+            'Old': 0
         }
         return points_map.get(self.category, 0)  # Default 0 punti se categoria non riconosciuta
 
