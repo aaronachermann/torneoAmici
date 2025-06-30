@@ -895,6 +895,138 @@ class TournamentSettings(db.Model):
             return json.loads(self.registration_categories)
         return {}
 
+class AllStarTeam(db.Model):
+    """All Star Team - giocatori selezionati per posizione."""
+    __tablename__ = 'all_star_team'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    position = db.Column(db.String(20), nullable=False)  # 'Portiere', 'Difensore_1', 'Difensore_2', 'Attaccante_1', 'Attaccante_2'
+    category = db.Column(db.String(20), nullable=False)  # 'Tesserati', 'Non Tesserati'
+    
+    # Timestamp
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relazioni
+    player = db.relationship('Player', backref='all_star_selections')
+    
+    __table_args__ = (
+        db.UniqueConstraint('position', 'category', name='unique_position_category'),
+    )
+
+
+
+@app.route('/all_star_team')
+def all_star_team():
+    """Pagina gestione All Star Team."""
+    # Ottieni selezioni esistenti
+    selections = AllStarTeam.query.all()
+    
+    # Organizza per categoria e posizione
+    all_star_data = {
+        'Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        },
+        'Non Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        }
+    }
+    
+    for selection in selections:
+        category = selection.category  # Usa direttamente la categoria dal database
+        position = selection.position
+        if position in all_star_data[category]:
+            all_star_data[category][position] = selection.player
+    
+    # Ottieni tutte le squadre per il dropdown
+    teams = Team.query.order_by(Team.name).all()
+    
+    return render_template('all_star_team.html', 
+                         all_star_data=all_star_data, 
+                         teams=teams)
+
+@app.route('/get_team_players/<int:team_id>')
+def get_team_players(team_id):
+    """API per ottenere giocatori di una squadra."""
+    players = Player.query.filter_by(team_id=team_id).order_by(Player.name).all()
+    
+    players_data = []
+    for player in players:
+        players_data.append({
+            'id': player.id,
+            'name': player.name,
+            'is_registered': player.is_registered
+        })
+    
+    return jsonify(players_data)
+
+@app.route('/update_all_star_selection', methods=['POST'])
+def update_all_star_selection():
+    """Aggiorna una selezione All Star."""
+    try:
+        data = request.get_json()
+        position = data.get('position')
+        player_id = data.get('player_id')
+        
+        if not position or not player_id:
+            return jsonify({'success': False, 'message': 'Dati mancanti'})
+        
+        player = Player.query.get(player_id)
+        if not player:
+            return jsonify({'success': False, 'message': 'Giocatore non trovato'})
+        
+        category = 'Tesserati' if player.is_registered else 'Non Tesserati'
+        
+        # Rimuovi selezione esistente per questa posizione/categoria
+        AllStarTeam.query.filter_by(position=position, category=category).delete()
+        
+        # Aggiungi nuova selezione
+        new_selection = AllStarTeam(
+            player_id=player_id,
+            position=position,
+            category=category
+        )
+        
+        db.session.add(new_selection)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'player_name': player.name,
+            'team_name': player.team.name
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/remove_all_star_selection', methods=['POST'])
+def remove_all_star_selection():
+    """Rimuovi una selezione All Star."""
+    try:
+        data = request.get_json()
+        position = data.get('position')
+        category = data.get('category')
+        
+        AllStarTeam.query.filter_by(position=position, category=category).delete()
+        db.session.commit()
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    
+
 @app.route('/settings')
 def settings():
     """Pagina delle configurazioni del torneo."""
@@ -3430,7 +3562,34 @@ def standings():
     except Exception as e:
         print(f"❌ Errore nel controllo final_ranking: {e}")
         has_final_rankings = False
+    final_rankings = FinalRanking.query.order_by(FinalRanking.final_position).all()
+    selections = AllStarTeam.query.all()
     
+    # Organizza per categoria e posizione
+    all_star_data = {
+        'Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        },
+        'Non Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        }
+    }
+    
+    for selection in selections:
+        category = selection.category  
+        position = selection.position
+        if position in all_star_data[category]:
+            all_star_data[category][position] = selection.player
+    
+    teams = Team.query.order_by(Team.name).all()
     return render_template('standings.html', 
                           group_standings=group_standings,
                           top_scorers=top_scorers,
@@ -3438,9 +3597,25 @@ def standings():
                           most_penalties=most_penalties,
                           best_player_awards=best_player_awards,
                           fair_play_ranking=fair_play_ranking,
-                          has_final_rankings=has_final_rankings)
+                          has_final_rankings=has_final_rankings,
+                          final_rankings=final_rankings,
+                          teams=teams,
+                          all_star_data=all_star_data)
 
+    
 
+@app.route('/migrate_all_star_team', methods=['POST'])
+def migrate_all_star_team():
+    """Migra il database per aggiungere la tabella all_star_team."""
+    try:
+        # Crea tutte le tabelle (inclusa all_star_team se non esiste)
+        db.create_all()
+        flash('⭐ Tabella All Star Team creata con successo!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante la migrazione All Star Team: {str(e)}', 'danger')
+    
+    return redirect(url_for('standings'))
 
 
 
