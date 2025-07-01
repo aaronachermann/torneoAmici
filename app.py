@@ -7035,11 +7035,16 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
 
 if __name__ == '__main__':
     with app.app_context():
-        # Crea le tabelle se non esistono
-        db.create_all()
-        # Crea l'utente admin di default
-        create_admin_user()
+        try:
+            db.create_all()
+            # create_admin_user()
+            print("Database inizializzato con successo")
+        except Exception as e:
+            print(f"Errore inizializzazione database: {e}")
+    
 
+    # Configurazione per Railway
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    debug_mode = os.environ.get('FLASK_ENV') != 'production'
+    app.run(host='0.0.0.0', port=port, debug=debug_mode)
     
