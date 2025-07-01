@@ -21,8 +21,19 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
+
+# Configurazione per Railway vs sviluppo locale
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    # In produzione su Railway
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback-secret-key-change-this')
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///tournament.db')
+    app.config['DEBUG'] = False
+else:
+    # In sviluppo locale
+    app.config['SECRET_KEY'] = os.urandom(24)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
+    app.config['DEBUG'] = True
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
