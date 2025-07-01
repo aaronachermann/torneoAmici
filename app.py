@@ -2096,6 +2096,7 @@ def reset_playoff_teams_to_null():
 
 @app.route('/teams')
 @login_required
+@admin_required 
 def teams():
     # Ordina le squadre per girone e poi per group_order
     teams = Team.query.order_by(Team.group.nulls_last(), Team.group_order, Team.name).all()
@@ -3218,6 +3219,151 @@ def days_until_tournament():
         return delta.days
 
 
+
+
+@app.route('/match/<int:match_id>/reset', methods=['POST'])
+@login_required
+def reset_match(match_id):
+    """Reset completo di una singola partita - cancella risultato e tutte le statistiche."""
+    print(f"🔄 RESET MATCH CHIAMATO per partita {match_id}")
+    
+    match = Match.query.get_or_404(match_id)
+    return_anchor = request.form.get('return_anchor', '')
+    
+    try:
+        # Salva i vecchi punteggi per aggiornare le statistiche delle squadre
+        old_team1_score = match.team1_score
+        old_team2_score = match.team2_score
+        old_overtime = getattr(match, 'overtime', False) or False
+        old_shootout = getattr(match, 'shootout', False) or False
+        
+        print(f"📊 Vecchi punteggi: {old_team1_score}-{old_team2_score}, OT: {old_overtime}, SO: {old_shootout}")
+        
+        # 2. PRIMA reset statistiche squadre (solo se c'erano dei risultati)
+        if old_team1_score is not None and old_team2_score is not None and match.team1 and match.team2:
+            print("🔄 Resettando statistiche squadre...")
+            
+            # Assicurati che le statistiche delle squadre siano inizializzate
+            team1 = match.team1
+            team2 = match.team2
+            
+            # Inizializza campi None con 0
+            team1.goals_for = team1.goals_for or 0
+            team1.goals_against = team1.goals_against or 0
+            team1.wins = team1.wins or 0
+            team1.losses = team1.losses or 0
+            team1.draws = team1.draws or 0
+            team1.points = team1.points or 0
+            
+            team2.goals_for = team2.goals_for or 0
+            team2.goals_against = team2.goals_against or 0
+            team2.wins = team2.wins or 0
+            team2.losses = team2.losses or 0
+            team2.draws = team2.draws or 0
+            team2.points = team2.points or 0
+            
+            # Sottrai i vecchi valori dalle statistiche
+            team1.goals_for -= old_team1_score
+            team1.goals_against -= old_team2_score
+            team2.goals_for -= old_team2_score
+            team2.goals_against -= old_team1_score
+            
+            # Calcola e sottrai i vecchi punti usando il sistema hockey
+            # Crea match temporaneo con i vecchi valori per calcolare i punti da sottrarre
+            old_match = type('OldMatch', (), {
+                'team1_score': old_team1_score,
+                'team2_score': old_team2_score,
+                'overtime': old_overtime,
+                'shootout': old_shootout,
+                'is_completed': True,
+                'winner': team1 if old_team1_score > old_team2_score else (team2 if old_team2_score > old_team1_score else None),
+                'is_regulation_time': not (old_overtime or old_shootout),
+                'is_overtime_shootout': old_overtime or old_shootout
+            })()
+            
+            # Funzione per calcolare punti (copia da Match.get_points_for_team)
+            def get_old_points_for_team(team):
+                if old_team1_score == old_team2_score:
+                    return 1  # Pareggio
+                
+                is_winner = (team == team1 and old_team1_score > old_team2_score) or (team == team2 and old_team2_score > old_team1_score)
+                is_loser = not is_winner and old_team1_score != old_team2_score
+                
+                if is_winner:
+                    if not (old_overtime or old_shootout):
+                        return 3  # Vittoria nei tempi regolamentari
+                    else:
+                        return 2  # Vittoria overtime/rigori
+                elif is_loser:
+                    if old_overtime or old_shootout:
+                        return 1  # Sconfitta overtime/rigori
+                    else:
+                        return 0  # Sconfitta nei tempi regolamentari
+                else:
+                    return 1  # Pareggio
+            
+            # Sottrai i vecchi punti
+            old_team1_points = get_old_points_for_team(team1)
+            old_team2_points = get_old_points_for_team(team2)
+            team1.points -= old_team1_points
+            team2.points -= old_team2_points
+            
+            # Aggiorna record vittorie/sconfitte/pareggi (sottrai vecchi)
+            if old_team1_score > old_team2_score:
+                team1.wins -= 1
+                team2.losses -= 1
+            elif old_team2_score > old_team1_score:
+                team2.wins -= 1
+                team1.losses -= 1
+            else:
+                team1.draws -= 1
+                team2.draws -= 1
+            
+            print(f"📊 Team1 ({team1.name}): punti {team1.points}, gol {team1.goals_for}-{team1.goals_against}")
+            print(f"📊 Team2 ({team2.name}): punti {team2.points}, gol {team2.goals_for}-{team2.goals_against}")
+        
+        # 1. Reset risultato della partita (DOPO aver aggiornato le statistiche)
+        match.team1_score = None
+        match.team2_score = None
+        if hasattr(match, 'overtime'):
+            match.overtime = False
+        if hasattr(match, 'shootout'):
+            match.shootout = False
+        
+        # 3. Elimina tutte le statistiche dei giocatori per questa partita
+        stats_deleted = 0
+        try:
+            if db.inspect(db.engine).has_table('player_match_stats'):
+                stats_deleted = PlayerMatchStats.query.filter_by(match_id=match_id).count()
+                PlayerMatchStats.query.filter_by(match_id=match_id).delete()
+                print(f"🗑️ Eliminate {stats_deleted} statistiche giocatori per partita {match_id}")
+        except Exception as e:
+            print(f"⚠️ Errore eliminazione statistiche giocatori: {e}")
+        
+        db.session.commit()
+        
+        # Messaggio di successo
+        match_description = f"{match.get_team1_display_name()} vs {match.get_team2_display_name()}"
+        success_msg = f'🔄 Partita "{match_description}" resettata completamente!'
+        if stats_deleted > 0:
+            success_msg += f' Eliminate {stats_deleted} statistiche giocatori.'
+        
+        flash(success_msg, 'success')
+        print(f"✅ Reset partita {match_id} completato con successo")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ ERRORE reset partita: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        flash(f'❌ Errore durante il reset della partita: {str(e)}', 'danger')
+    
+    # Torna alla pagina corretta
+    if return_anchor:
+        return redirect(url_for('match_detail', match_id=match_id) + f'?return_anchor={return_anchor}')
+    else:
+        return redirect(url_for('match_detail', match_id=match_id))
+
 @app.route('/match/<int:match_id>', methods=['GET', 'POST'])
 def match_detail(match_id):
     match = Match.query.get_or_404(match_id)
@@ -4076,6 +4222,7 @@ def get_player_total_stats():
 #                 print(f"✅ Finali {league} aggiornate automaticamente!")
 #             except Exception as e:
 #                 print(f"❌ Errore aggiornamento finali {league}: {e}")
+
 def update_team_stats(match, old_team1_score=None, old_team2_score=None, old_overtime=None, old_shootout=None):
     """Aggiorna le statistiche delle squadre usando il sistema punti hockey."""
     
@@ -4581,6 +4728,7 @@ def init_db():
 
 @app.route('/groups')
 @login_required
+@admin_required 
 def groups():
     groups = {}
     all_teams = Team.query.all()
