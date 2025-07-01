@@ -15,7 +15,10 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 import tempfile
-
+# Aggiungi queste importazioni all'inizio del tuo app.py
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -23,6 +26,128 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
+
+# Aggiungi dopo l'inizializzazione di db
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Devi effettuare il login per accedere a questa pagina.'
+
+class User(UserMixin, db.Model):
+    """Modello per gli utenti del sistema."""
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    password_hash = db.Column(db.String(200), nullable=False)
+    role = db.Column(db.String(20), default='user')  # 'user' o 'admin'
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def set_password(self, password):
+        """Imposta la password hashata."""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verifica la password."""
+        return check_password_hash(self.password_hash, password)
+    
+    def is_admin(self):
+        """Controlla se l'utente è admin."""
+        return self.role == 'admin'
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        user = User.query.filter_by(username=username).first()
+        
+        if user and user.check_password(password):
+            login_user(user)
+            flash('Login effettuato con successo!', 'success')
+            
+            # Redirect alla pagina richiesta o alla home
+            next_page = request.args.get('next')
+            return redirect(next_page or url_for('index'))
+        else:
+            flash('Username o password errati', 'danger')
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        
+        # Controlla se l'username esiste già
+        if User.query.filter_by(username=username).first():
+            flash('Username già esistente', 'danger')
+            return render_template('register.html')
+        
+        # Crea nuovo utente (sempre come 'user', non admin)
+        user = User(username=username, role='user')
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        flash('Registrazione completata! Ora puoi effettuare il login.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    flash('Logout effettuato con successo', 'success')
+    return redirect(url_for('index'))
+
+# Decoratore personalizzato per admin
+def admin_required(f):
+    """Decoratore che richiede privilegi di admin."""
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_admin():
+            flash('Accesso negato. Privilegi di amministratore richiesti.', 'danger')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    decorated_function.__name__ = f.__name__
+    return decorated_function
+
+
+def create_admin_user():
+    """Crea un utente admin di default se non /esiste."""
+    admin = User.query.filter_by(username='admin').first()
+    if not admin:
+        admin = User(username='admin', role='admin')
+        admin.set_password('admin12345')  # Cambia questa password!
+        db.session.add(admin)
+        db.session.commit()
+        print("Utente admin creato: admin/admin123")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Models
 class Team(db.Model):
@@ -1037,7 +1162,9 @@ def remove_all_star_selection():
         return jsonify({'success': False, 'message': str(e)})
     
 
-@app.route('/settings')
+@app.route('/settings', methods=['GET', 'POST'])
+@login_required
+@admin_required
 def settings():
     """Pagina delle configurazioni del torneo."""
     try:
@@ -1957,6 +2084,7 @@ def reset_playoff_teams_to_null():
 
 
 @app.route('/teams')
+@login_required
 def teams():
     # Ordina le squadre per girone e poi per group_order
     teams = Team.query.order_by(Team.group.nulls_last(), Team.group_order, Team.name).all()
@@ -1966,6 +2094,8 @@ def teams():
 
 
 @app.route('/add_team', methods=['POST'])
+@login_required
+@admin_required 
 def add_team():
     team_name = request.form.get('team_name')
     group = request.form.get('group')
@@ -2354,6 +2484,7 @@ def fix_descriptions():
 
 
 @app.route('/schedule', methods=['GET', 'POST'])
+@login_required
 def schedule():
 
     
@@ -3476,6 +3607,7 @@ def get_player_statistics_for_standings():
 
 
 @app.route('/standings')
+@login_required
 def standings():
     # Group stage standings - usa l'ordinamento per gironi
     group_standings = {}
@@ -4437,6 +4569,7 @@ def init_db():
     return redirect(url_for('index'))
 
 @app.route('/groups')
+@login_required
 def groups():
     groups = {}
     all_teams = Team.query.all()
@@ -6901,4 +7034,9 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
     return "classifiche_complete.pdf"
 
 if __name__ == '__main__':
-     app.run(debug=True)
+    with app.app_context():
+        # Crea le tabelle se non esistono
+        db.create_all()
+        # Crea l'utente admin di default
+        create_admin_user()
+    app.run(debug=True)
