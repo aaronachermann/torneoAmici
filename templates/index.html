@@ -93,15 +93,13 @@
                     </div>
                 </div>
             </div>
-
+<!-- 
 <div class="mt-4">
                 <h3>Funzioni Amministrative</h3>
                 <div class="d-flex gap-2 flex-wrap">
                     <a href="{{ url_for('init_db') }}" class="btn btn-warning">Inizializza Database</a>
                     <button type="button" class="btn btn-danger" onclick="confirmResetDB()">Azzera Database</button>
-                    <!-- <form method="post" action="{{ url_for('fix_complete_playoff_system') }}" class="d-inline">
-                        <button type="submit" class="btn btn-success">🔧 Fix Completo Sistema Playoff</button>
-                    </form> -->
+
                     <form method="post" action="{{ url_for('migrate_best_player_fields') }}" class="d-inline">
                     <button type="submit" class="btn btn-info" onclick="return confirm('Aggiornare il database per supportare i migliori giocatori? Questo è sicuro e non eliminerà dati esistenti.')">
                         🏆 Abilita Migliori Giocatori
@@ -122,14 +120,12 @@
                         <div class="mt-4">
                 <h3>🏒 Sistema Punti Hockey</h3>
                 <div class="d-flex gap-2 flex-wrap">
-                    <!-- Migrazione per abilitare overtime/rigori -->
                     <form method="post" action="{{ url_for('migrate_overtime_system') }}" class="d-inline">
                         <button type="submit" class="btn btn-info" onclick="return confirm('Abilitare il sistema Overtime/Rigori? Questo aggiunge i campi necessari al database.')">
                             🏒 Abilita Sistema Hockey
                         </button>
                     </form>
                     
-                    <!-- Ricalcolo punti con nuovo sistema -->
                     <form method="post" action="{{ url_for('recalculate_all_points') }}" class="d-inline">
                         <button type="submit" class="btn btn-warning" onclick="return confirm('Ricalcolare tutti i punti delle squadre usando il sistema hockey? Questa operazione è sicura.')">
                             🔢 Ricalcola Punti Hockey
@@ -140,19 +136,17 @@
                     <strong>🏒 Sistema Hockey:</strong> 3 punti vittoria regolare, 2 punti vittoria overtime/rigori, 1 punto sconfitta overtime/rigori, 0 punti sconfitta regolare.
                 </small>
             </div>
-            
+             -->
 
-<div class="mt-4">
+<!-- <div class="mt-4">
     <h3>👥 Gestione Giocatori Automatica</h3>
     <div class="d-flex gap-2 flex-wrap">
-        <!-- Inserimento automatico di tutti i giocatori -->
         <form method="post" action="{{ url_for('insert_all_players') }}" class="d-inline">
             <button type="submit" class="btn btn-success" onclick="return confirm('Inserire automaticamente tutti i giocatori del torneo? Questa operazione sostituirà i giocatori esistenti.')">
                 👥 Inserisci Tutti i Giocatori
             </button>
         </form>
         
-        <!-- Verifica punti tesseramento -->
         <a href="{{ url_for('check_registration_points') }}" class="btn btn-info">
             📊 Verifica Punti Tesseramento
         </a>
@@ -161,8 +155,8 @@
         <strong>👥 Inserimento Automatico:</strong> Inserisce tutti i 183 giocatori del torneo con le categorie e punti tesseramento corretti.
         <br><strong>📊 Punti:</strong> LNA/LNB=5pt, 1°Lega=3pt, 2°Lega=2pt, Femminile/Veterani=0pt, Non tesserati=0pt.
     </small>
-</div>
-
+</div> -->
+<!-- 
             <div class="mt-4">
                 <h3>Dati di Esempio</h3>
                 <div class="d-flex gap-2 flex-wrap mb-2">
@@ -179,7 +173,6 @@
                     <a href="{{ url_for('verify_data') }}" class="btn btn-secondary">Verifica Dati</a>
                 </div>
                 
-                <!-- Pulsanti Debug -->
                 <div class="d-flex gap-1 flex-wrap mb-2">
                     <small class="text-muted me-2">Debug:</small>
                     <form method="post" action="{{ url_for('populate_step_by_step') }}" class="d-inline">
@@ -211,8 +204,8 @@
                     ⚠️ <strong>Attenzione:</strong> Questi pulsanti sono solo per test e demo. Rimuovili in produzione.
                 </small>
             </div>
-            
-        </div>
+             -->
+        <!-- </div> -->
 
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
@@ -220,13 +213,15 @@
         </div>
     </footer>
 
+
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function confirmResetDB() {
             if (confirm('Sei sicuro di voler azzerare il database? Questa azione eliminerà tutti i dati e non può essere annullata.')) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.action = '{{ url_for("reset_db") }}';
+                form.action = '{{ url_for("reset_database") }}';
                 
                 const input = document.createElement('input');
                 input.type = 'hidden';
