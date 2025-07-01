@@ -7039,4 +7039,7 @@ if __name__ == '__main__':
         db.create_all()
         # Crea l'utente admin di default
         create_admin_user()
-    app.run(debug=True)
+
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
+    
