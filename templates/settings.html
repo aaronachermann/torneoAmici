@@ -51,6 +51,7 @@
                     <li class="nav-item">
                         <a class="nav-link active" href="{{ url_for('settings') }}">Settings</a>
                     </li>
+
                 </ul>
             </div>
         </div>
@@ -71,10 +72,10 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Configurazioni Torneo</h1>
             <div>
-                <form method="post" action="{{ url_for('migrate_settings') }}" class="d-inline">
+                <!-- <form method="post" action="{{ url_for('migrate_settings') }}" class="d-inline">
                     <button type="submit" class="btn btn-info">Settings</button>
-                </form>
-                <a href="{{ url_for('index') }}" class="btn btn-secondary">Torna alla Home</a>
+                </form> -->
+                <!-- <a href="{{ url_for('index') }}" class="btn btn-secondary">Torna alla Home</a> -->
             </div>
         </div>
 
@@ -97,6 +98,9 @@
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">⚙️ Generale</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin" type="button" role="tab">Amministrazione</button>
             </li>
         </ul>
 
@@ -445,12 +449,152 @@
                     </div>
                 </div>
             </div>
+
+            <div class="tab-pane fade" id="admin" role="tabpanel">
+                <div class="row">
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <h5><i class="fas fa-exclamation-triangle"></i> Sezione Amministrazione</h5>
+                            <p>Questa sezione contiene strumenti avanzati per la gestione del database. <strong>Usa con cautela!</strong></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <!-- Export Database -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="fas fa-download"></i> Export Database</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Scarica tutti i dati del database in formato CSV compressi in un file ZIP.</p>
+                                <ul class="small">
+                                    <li>Teams & Players</li>
+                                    <li>Matches & Stats</li>
+                                    <li>Rankings & All Star</li>
+                                    <li>Settings</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <a href="{{ url_for('export_database_csv') }}" class="btn btn-info w-100">
+                                    <i class="fas fa-file-csv"></i> Scarica Database CSV
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Azzera Calendario -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="fas fa-calendar-times"></i> Azzera Calendario</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Cancella tutte le partite e azzera le statistiche, mantenendo squadre e giocatori.</p>
+                                <ul class="small text-danger">
+                                    <li>❌ Tutte le partite</li>
+                                    <li>❌ Statistiche squadre/giocatori</li>
+                                    <li>❌ Classifiche finali</li>
+                                    <li>✅ Squadre e giocatori</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <form method="post" action="{{ url_for('reset_schedule') }}" class="d-inline w-100">
+                                    <button type="submit" class="btn btn-warning w-100" 
+                                            onclick="return confirm('⚠️ Sei sicuro di voler azzerare tutte le partite e statistiche? Questa azione NON può essere annullata!')">
+                                        <i class="fas fa-broom"></i> Azzera Calendario
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Reset Completo Database -->
+                    <div class="col-md-4 mb-4">
+                        <div class="card h-100 border-danger">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0"><i class="fas fa-database"></i> Reset Database</h5>
+                            </div>
+                            <div class="card-body">
+                                <p><strong class="text-danger">PERICOLO!</strong> Cancella TUTTO il database e lo ricrea vuoto.</p>
+                                <ul class="small text-danger">
+                                    <li>❌ Tutte le squadre</li>
+                                    <li>❌ Tutti i giocatori</li>
+                                    <li>❌ Tutte le partite</li>
+                                    <li>❌ Tutte le statistiche</li>
+                                    <li>✅ Solo settings di base</li>
+                                </ul>
+                            </div>
+                            <div class="card-footer">
+                                <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal" data-bs-target="#resetDatabaseModal">
+                                    <i class="fas fa-nuclear"></i> Reset Database
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Informazioni Export -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-light">
+                            <h6><i class="fas fa-info-circle"></i> Informazioni Export</h6>
+                            <p class="mb-0">
+                                <strong>Backup consigliato:</strong> Prima di qualsiasi operazione di reset, scarica sempre il database con il pulsante "Export Database" per avere un backup completo.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal per Conferma Reset Database -->
+            <div class="modal fade" id="resetDatabaseModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title"><i class="fas fa-exclamation-triangle"></i> ATTENZIONE!</h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-danger">
+                                <strong>Questa azione è IRREVERSIBILE!</strong>
+                            </div>
+                            <p>Stai per cancellare <strong>TUTTO</strong> il database:</p>
+                            <ul class="text-danger">
+                                <li>Tutte le squadre e giocatori</li>
+                                <li>Tutte le partite e risultati</li>
+                                <li>Tutte le statistiche e classifiche</li>
+                                <li>All Star Team e MVP</li>
+                            </ul>
+                            <p>Rimarranno solo le configurazioni di base del torneo.</p>
+                            
+                            <form method="post" action="{{ url_for('reset_database') }}" id="resetForm">
+                                <div class="mb-3">
+                                    <label for="confirmation" class="form-label">
+                                        <strong>Per confermare, scrivi esattamente:</strong> 
+                                        <code>CANCELLA_TUTTO</code>
+                                    </label>
+                                    <input type="text" class="form-control" id="confirmation" name="confirmation" 
+                                        placeholder="Scrivi: CANCELLA_TUTTO" required>
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                            <button type="submit" form="resetForm" class="btn btn-danger">
+                                <i class="fas fa-nuclear"></i> CANCELLA TUTTO
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
-            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+            <p>© Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
         </div>
     </footer>
 

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, time, timedelta
 from itertools import combinations
@@ -6,6 +6,16 @@ import os
 import random
 from datetime import datetime, time, timedelta
 import calendar
+
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib import colors
+from reportlab.lib.units import cm
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from io import BytesIO
+import tempfile
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
@@ -3487,27 +3497,43 @@ def standings():
             # Query per i migliori marcatori
             top_scorers_query = db.session.query(
                 Player,
-                func.sum(PlayerMatchStats.goals).label('total_goals')
+                func.sum(PlayerMatchStats.goals).label('total_goals'),
+                func.count(PlayerMatchStats.match_id).label('total_matches'),
+                func.sum(PlayerMatchStats.assists).label('total_assists')
             ).join(PlayerMatchStats).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.goals) > 0
-            ).order_by(func.sum(PlayerMatchStats.goals).desc()).limit(10)
+            ).order_by(
+                func.sum(PlayerMatchStats.goals).desc(),        # 1° criterio: più gol
+                func.count(PlayerMatchStats.match_id).asc(),    # 2° criterio: meno partite
+                func.sum(PlayerMatchStats.assists).desc()       # 3° criterio: più assist
+            ).limit(10)
             
             top_scorers = []
-            for player, total_goals in top_scorers_query:
+            for player, total_goals, total_matches, total_assists in top_scorers_query:
                 player.display_goals = total_goals
+                player.display_matches = total_matches
+                player.display_assists_for_ranking = total_assists
                 top_scorers.append(player)
             
             # Query per i migliori assistman
             top_assists_query = db.session.query(
                 Player,
-                func.sum(PlayerMatchStats.assists).label('total_assists')
+                func.sum(PlayerMatchStats.assists).label('total_assists'),
+                func.count(PlayerMatchStats.match_id).label('total_matches'),
+                func.sum(PlayerMatchStats.goals).label('total_goals')
             ).join(PlayerMatchStats).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.assists) > 0
-            ).order_by(func.sum(PlayerMatchStats.assists).desc()).limit(10)
-            
+            ).order_by(
+                func.sum(PlayerMatchStats.assists).desc(),      # 1° criterio: più assist
+                func.count(PlayerMatchStats.match_id).asc(),    # 2° criterio: meno partite
+                func.sum(PlayerMatchStats.goals).desc()         # 3° criterio: più gol
+            ).limit(10)
+
             top_assists = []
-            for player, total_assists in top_assists_query:
+            for player, total_assists, total_matches, total_goals in top_assists_query:
                 player.display_assists = total_assists
+                player.display_matches = total_matches
+                player.display_goals_for_ranking = total_goals
                 top_assists.append(player)
             
             # Query per le penalità
@@ -3587,7 +3613,15 @@ def standings():
         category = selection.category  
         position = selection.position
         if position in all_star_data[category]:
-            all_star_data[category][position] = selection.player
+            # Converti il Player in dizionario per la serializzazione JSON
+            all_star_data[category][position] = {
+                'id': selection.player.id,
+                'name': selection.player.name,
+                'team': {
+                    'id': selection.player.team.id,
+                    'name': selection.player.team.name
+                }
+            }
     
     teams = Team.query.order_by(Team.name).all()
     return render_template('standings.html', 
@@ -4507,46 +4541,378 @@ def migrate_database():
 
 
 
-@app.route('/reset_db', methods=['POST'])
-def reset_db():
-    if request.form.get('confirm') == 'yes':
-        # Drop all tables
-        db.drop_all()
-        # Recreate all tables
-        db.create_all()
-        flash('Il database è stato azzerato con successo', 'success')
-    else:
-        flash('Conferma non ricevuta. Il database non è stato azzerato.', 'warning')
-    return redirect(url_for('index'))
+# @app.route('/reset_db', methods=['POST'])
+# def reset_db():
+#     if request.form.get('confirm') == 'yes':
+#         # Drop all tables
+#         db.drop_all()
+#         # Recreate all tables
+#         db.create_all()
+#         flash('Il database è stato azzerato con successo', 'success')
+#     else:
+#         flash('Conferma non ricevuta. Il database non è stato azzerato.', 'warning')
+#     return redirect(url_for('index'))
 
+# Aggiungi queste route nel file app.py
 
 @app.route('/reset_schedule', methods=['POST'])
 def reset_schedule():
+    """Azzera calendario partite e statistiche."""
     reset_matches()
-    return redirect(url_for('schedule'))
+    return redirect(url_for('settings'))
 
 def reset_matches():
-    """Elimina tutte le partite e le loro descrizioni."""
-    # Elimina le descrizioni delle partite
-    MatchDescription.query.delete()
-    
-    # Elimina tutte le partite
-    Match.query.delete()
-    
-    # Azzerare le statistiche delle squadre
-    teams = Team.query.all()
-    for team in teams:
-        team.wins = 0
-        team.losses = 0
-        team.draws = 0
-        team.goals_for = 0
-        team.goals_against = 0
-        team.points = 0
-    
-    db.session.commit()
-    flash('Il calendario delle partite e le statistiche delle squadre sono stati azzerati con successo')
+    """Elimina tutte le partite e azzera tutte le statistiche."""
+    try:
+        # Elimina le descrizioni delle partite
+        MatchDescription.query.delete()
+        
+        # Elimina le statistiche per partita dei giocatori (se esiste la tabella)
+        try:
+            if db.inspect(db.engine).has_table('player_match_stats'):
+                PlayerMatchStats.query.delete()
+        except:
+            pass
+        
+        # Elimina tutte le partite
+        Match.query.delete()
+        
+        # Azzerare le statistiche delle squadre
+        teams = Team.query.all()
+        for team in teams:
+            team.wins = 0
+            team.losses = 0
+            team.draws = 0
+            team.goals_for = 0
+            team.goals_against = 0
+            team.points = 0
+        
+        # Azzerare le statistiche dei giocatori
+        players = Player.query.all()
+        for player in players:
+            player.goals = 0
+            player.assists = 0
+            player.penalties = 0
+        
+        # Elimina classifiche finali e All Star Team
+        try:
+            if db.inspect(db.engine).has_table('final_ranking'):
+                FinalRanking.query.delete()
+        except:
+            pass
+        
+        try:
+            if db.inspect(db.engine).has_table('all_star_team'):
+                AllStarTeam.query.delete()
+        except:
+            pass
+        
+        db.session.commit()
+        flash('✅ Calendario e statistiche azzerati con successo!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'azzeramento: {str(e)}', 'danger')
 
+@app.route('/export_database_csv')
+def export_database_csv():
+    """Esporta tutto il database in file CSV compressi."""
+    try:
+        import zipfile
+        import csv
+        from io import StringIO
+        import tempfile
+        import os
+        from datetime import datetime
+        
+        # Crea un file temporaneo per il ZIP
+        temp_dir = tempfile.mkdtemp()
+        zip_path = os.path.join(temp_dir, 'database_export.zip')
+        
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            
+            # TABELLA TEAMS
+            teams = Team.query.all()
+            if teams:
+                csv_buffer = StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(['id', 'name', 'group', 'wins', 'losses', 'draws', 'goals_for', 'goals_against', 'points'])
+                for team in teams:
+                    writer.writerow([team.id, team.name, team.group, team.wins, team.losses, 
+                                   team.draws, team.goals_for, team.goals_against, team.points])
+                zipf.writestr('teams.csv', csv_buffer.getvalue())
+            
+            # TABELLA PLAYERS
+            players = Player.query.all()
+            if players:
+                csv_buffer = StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(['id', 'name', 'team_id', 'team_name', 'is_registered', 'category', 'goals', 'assists', 'penalties'])
+                for player in players:
+                    writer.writerow([player.id, player.name, player.team_id, player.team.name, 
+                                   player.is_registered, player.category, player.goals, player.assists, player.penalties])
+                zipf.writestr('players.csv', csv_buffer.getvalue())
+            
+            # TABELLA MATCHES
+            matches = Match.query.all()
+            if matches:
+                csv_buffer = StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(['id', 'team1_name', 'team2_name', 'date', 'time', 'team1_score', 'team2_score', 
+                               'is_completed', 'phase', 'league', 'winner_name'])
+                for match in matches:
+                    writer.writerow([
+                        match.id, 
+                        match.team1.name if match.team1 else 'TBD',
+                        match.team2.name if match.team2 else 'TBD',
+                        match.date.strftime('%Y-%m-%d') if match.date else '',
+                        match.time.strftime('%H:%M') if match.time else '',
+                        match.team1_score, match.team2_score, match.is_completed,
+                        match.phase, match.league,
+                        match.winner.name if match.winner else ''
+                    ])
+                zipf.writestr('matches.csv', csv_buffer.getvalue())
+            
+            # TABELLA PLAYER_MATCH_STATS (se esiste)
+            try:
+                if db.inspect(db.engine).has_table('player_match_stats'):
+                    stats = PlayerMatchStats.query.all()
+                    if stats:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['id', 'player_name', 'match_id', 'goals', 'assists', 'penalties'])
+                        for stat in stats:
+                            writer.writerow([stat.id, stat.player.name, stat.match_id, 
+                                           stat.goals, stat.assists, stat.penalties])
+                        zipf.writestr('player_match_stats.csv', csv_buffer.getvalue())
+            except:
+                pass
+            
+            # TABELLA FINAL_RANKING (se esiste)
+            try:
+                if db.inspect(db.engine).has_table('final_ranking'):
+                    rankings = FinalRanking.query.all()
+                    if rankings:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['id', 'team_name', 'final_position'])
+                        for ranking in rankings:
+                            writer.writerow([ranking.id, ranking.team.name, ranking.final_position])
+                        zipf.writestr('final_rankings.csv', csv_buffer.getvalue())
+            except:
+                pass
+            
+            # TABELLA ALL_STAR_TEAM (se esiste)
+            try:
+                if db.inspect(db.engine).has_table('all_star_team'):
+                    selections = AllStarTeam.query.all()
+                    if selections:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['id', 'player_name', 'team_name', 'position', 'category'])
+                        for selection in selections:
+                            writer.writerow([selection.id, selection.player.name, selection.player.team.name,
+                                           selection.position, selection.category])
+                        zipf.writestr('all_star_team.csv', csv_buffer.getvalue())
+            except:
+                pass
+            
+            # TABELLA TOURNAMENT_SETTINGS (se esiste)
+            try:
+                if db.inspect(db.engine).has_table('tournament_settings'):
+                    settings = TournamentSettings.query.all()
+                    if settings:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['id', 'tournament_name', 'qualification_day1', 'qualification_day2', 
+                                       'finals_date', 'max_teams', 'teams_per_group', 'max_registration_points'])
+                        for setting in settings:
+                            writer.writerow([setting.id, setting.tournament_name, setting.qualification_day1,
+                                           setting.qualification_day2, setting.finals_date, setting.max_teams,
+                                           setting.teams_per_group, setting.max_registration_points])
+                        zipf.writestr('tournament_settings.csv', csv_buffer.getvalue())
+            except:
+                pass
+            
+            # CLASSIFICHE CALCOLATE - Aggiunte nuove (DENTRO il with zipfile)
+            
+            # CLASSIFICA MARCATORI
+            try:
+                if db.inspect(db.engine).has_table('player_match_stats'):
+                    from sqlalchemy import func
+                    
+                    top_scorers_query = db.session.query(
+                        Player,
+                        func.sum(PlayerMatchStats.goals).label('total_goals'),
+                        func.count(PlayerMatchStats.match_id).label('total_matches'),
+                        func.sum(PlayerMatchStats.assists).label('total_assists')
+                    ).join(PlayerMatchStats).group_by(Player.id).having(
+                        func.sum(PlayerMatchStats.goals) > 0
+                    ).order_by(
+                        func.sum(PlayerMatchStats.goals).desc(),
+                        func.count(PlayerMatchStats.match_id).asc(),
+                        func.sum(PlayerMatchStats.assists).desc()
+                    ).all()
+                    
+                    if top_scorers_query:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['posizione', 'giocatore', 'squadra', 'gol', 'partite_giocate', 'assist'])
+                        for i, (player, total_goals, total_matches, total_assists) in enumerate(top_scorers_query, 1):
+                            writer.writerow([i, player.name, player.team.name, total_goals, total_matches, total_assists or 0])
+                        zipf.writestr('classifica_marcatori.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export marcatori: {e}")
+            
+            # CLASSIFICA ASSIST
+            try:
+                if db.inspect(db.engine).has_table('player_match_stats'):
+                    top_assists_query = db.session.query(
+                        Player,
+                        func.sum(PlayerMatchStats.assists).label('total_assists'),
+                        func.count(PlayerMatchStats.match_id).label('total_matches'),
+                        func.sum(PlayerMatchStats.goals).label('total_goals')
+                    ).join(PlayerMatchStats).group_by(Player.id).having(
+                        func.sum(PlayerMatchStats.assists) > 0
+                    ).order_by(
+                        func.sum(PlayerMatchStats.assists).desc(),
+                        func.count(PlayerMatchStats.match_id).asc(),
+                        func.sum(PlayerMatchStats.goals).desc()
+                    ).all()
+                    
+                    if top_assists_query:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['posizione', 'giocatore', 'squadra', 'assist', 'partite_giocate', 'gol'])
+                        for i, (player, total_assists, total_matches, total_goals) in enumerate(top_assists_query, 1):
+                            writer.writerow([i, player.name, player.team.name, total_assists, total_matches, total_goals or 0])
+                        zipf.writestr('classifica_assist.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export assist: {e}")
+            
+            # CLASSIFICA PENALITÀ
+            try:
+                if db.inspect(db.engine).has_table('player_match_stats'):
+                    top_penalties_query = db.session.query(
+                        Player,
+                        func.sum(PlayerMatchStats.penalties).label('total_penalties')
+                    ).join(PlayerMatchStats).group_by(Player.id).having(
+                        func.sum(PlayerMatchStats.penalties) > 0
+                    ).order_by(func.sum(PlayerMatchStats.penalties).desc()).all()
+                    
+                    if top_penalties_query:
+                        csv_buffer = StringIO()
+                        writer = csv.writer(csv_buffer)
+                        writer.writerow(['posizione', 'giocatore', 'squadra', 'penalita_minuti'])
+                        for i, (player, total_penalties) in enumerate(top_penalties_query, 1):
+                            writer.writerow([i, player.name, player.team.name, total_penalties])
+                        zipf.writestr('classifica_penalita.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export penalità: {e}")
+            
+            # MVP AWARDS
+            try:
+                mvp_awards = get_best_player_awards()
+                if mvp_awards:
+                    csv_buffer = StringIO()
+                    writer = csv.writer(csv_buffer)
+                    writer.writerow(['posizione', 'giocatore', 'squadra', 'mvp_awards'])
+                    for i, (player, awards_count) in enumerate(mvp_awards, 1):
+                        writer.writerow([i, player.name, player.team.name, awards_count])
+                    zipf.writestr('mvp_awards.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export MVP: {e}")
+            
+            # FAIR PLAY RANKING
+            try:
+                fair_play_data = get_fair_play_ranking()
+                if fair_play_data:
+                    csv_buffer = StringIO()
+                    writer = csv.writer(csv_buffer)
+                    writer.writerow(['posizione', 'squadra', 'girone', 'minuti_penalita', 'posizione_finale', 'has_final_ranking'])
+                    for i, entry in enumerate(fair_play_data, 1):
+                        if isinstance(entry, dict):
+                            team_name = entry['team'].name
+                            team_group = entry['team'].group or 'N/A'
+                            penalty_minutes = entry['penalty_minutes']
+                            final_position = entry['final_position']
+                            has_final_ranking = entry.get('has_final_ranking', True)
+                        else:
+                            team_name = entry.team.name
+                            team_group = entry.team.group or 'N/A'
+                            penalty_minutes = entry.penalty_minutes
+                            final_position = entry.final_position
+                            has_final_ranking = getattr(entry, 'has_final_ranking', True)
+                        
+                        writer.writerow([i, team_name, team_group, penalty_minutes, final_position, has_final_ranking])
+                    zipf.writestr('fair_play_ranking.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export Fair Play: {e}")
+            
+            # CLASSIFICHE GIRONI
+            try:
+                csv_buffer = StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(['girone', 'posizione', 'squadra', 'partite_giocate', 'vittorie', 'pareggi', 
+                               'sconfitte', 'gol_fatti', 'gol_subiti', 'differenza_reti', 'punti'])
+                
+                for group in ['A', 'B', 'C', 'D']:
+                    teams = Team.query.filter_by(group=group).order_by(
+                        Team.points.desc(), 
+                        (Team.goals_for - Team.goals_against).desc(),
+                        Team.goals_for.desc()
+                    ).all()
+                    
+                    for pos, team in enumerate(teams, 1):
+                        writer.writerow([
+                            group, pos, team.name, team.games_played, team.wins, team.draws,
+                            team.losses, team.goals_for, team.goals_against, team.goal_difference, team.points
+                        ])
+                
+                zipf.writestr('classifiche_gironi.csv', csv_buffer.getvalue())
+            except Exception as e:
+                print(f"Errore export gironi: {e}")
+        
+        # Genera nome file con data
+        date_str = datetime.now().strftime("%Y%m%d_%H%M")
+        filename = f"Database_Export_{date_str}.zip"
+        
+        return send_file(
+            zip_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/zip'
+        )
+        
+    except Exception as e:
+        flash(f'❌ Errore nell\'export del database: {str(e)}', 'danger')
+        return redirect(url_for('settings'))
 
+@app.route('/reset_database', methods=['POST'])
+def reset_database():
+    """ATTENZIONE: Cancella TUTTO il database e ricrea le tabelle vuote."""
+    try:
+        # Conferma doppia sicurezza
+        confirmation = request.form.get('confirmation')
+        if confirmation != 'CANCELLA_TUTTO':
+            flash('❌ Conferma non valida. Scrivi esattamente "CANCELLA_TUTTO" per confermare.', 'danger')
+            return redirect(url_for('settings'))
+        
+        # Drop tutte le tabelle
+        db.drop_all()
+        
+        # Ricrea le tabelle vuote
+        db.create_all()
+        
+        # Ricrea settings di default
+        TournamentSettings.create_default()
+        
+        flash('🗑️ Database completamente azzerato e ricreato!', 'warning')
+        
+    except Exception as e:
+        flash(f'❌ Errore nel reset del database: {str(e)}', 'danger')
+    
+    return redirect(url_for('settings'))
 def update_match_descriptions():
     """Aggiorna le descrizioni delle partite quando le squadre reali vengono determinate."""
     
@@ -5937,6 +6303,602 @@ def check_registration_points():
     flash(f"📊 Punti tesseramento: {' | '.join(results)}", 'info')
     return redirect(url_for('teams'))
 
+
+# Route per esportare le classifiche in PDF
+
+
+@app.route('/export_standings_pdf')
+def export_standings_pdf():
+    """Genera e scarica un PDF con tutte le classifiche del torneo."""
+    try:
+        print("🔍 Inizio generazione PDF...")
+        
+        # Prepara i dati come nella funzione standings()
+        group_standings = {}
+        for group in ['A', 'B', 'C', 'D']:
+            teams = Team.query.filter_by(group=group).order_by(
+                Team.points.desc(), 
+                (Team.goals_for - Team.goals_against).desc(),
+                Team.goals_for.desc(),
+                Team.group_order
+            ).all()
+            group_standings[group] = teams
+        print(f"✅ Group standings caricati: {len(group_standings)} gironi")
+        
+        # Player statistics
+        top_scorers = []
+        top_assists = []
+        most_penalties = []
+        
+        try:
+            if db.inspect(db.engine).has_table('player_match_stats'):
+                from sqlalchemy import func
+                
+                print("📊 Caricamento marcatori...")
+                # Marcatori con nuova logica
+                top_scorers_query = db.session.query(
+                    Player,
+                    func.sum(PlayerMatchStats.goals).label('total_goals'),
+                    func.count(PlayerMatchStats.match_id).label('total_matches'),
+                    func.sum(PlayerMatchStats.assists).label('total_assists')
+                ).join(PlayerMatchStats).group_by(Player.id).having(
+                    func.sum(PlayerMatchStats.goals) > 0
+                ).order_by(
+                    func.sum(PlayerMatchStats.goals).desc(),
+                    func.count(PlayerMatchStats.match_id).asc(),
+                    func.sum(PlayerMatchStats.assists).desc()
+                ).limit(15)
+                
+                for player, total_goals, total_matches, total_assists in top_scorers_query:
+                    player.display_goals = total_goals
+                    player.display_matches = total_matches
+                    player.display_assists_for_ranking = total_assists
+                    top_scorers.append(player)
+                print(f"✅ Marcatori caricati: {len(top_scorers)}")
+                
+                print("📊 Caricamento assist...")
+                # Assist con nuova logica
+                top_assists_query = db.session.query(
+                    Player,
+                    func.sum(PlayerMatchStats.assists).label('total_assists'),
+                    func.count(PlayerMatchStats.match_id).label('total_matches'),
+                    func.sum(PlayerMatchStats.goals).label('total_goals')
+                ).join(PlayerMatchStats).group_by(Player.id).having(
+                    func.sum(PlayerMatchStats.assists) > 0
+                ).order_by(
+                    func.sum(PlayerMatchStats.assists).desc(),
+                    func.count(PlayerMatchStats.match_id).asc(),
+                    func.sum(PlayerMatchStats.goals).desc()
+                ).limit(15)
+                
+                for player, total_assists, total_matches, total_goals in top_assists_query:
+                    player.display_assists = total_assists
+                    player.display_matches = total_matches
+                    player.display_goals_for_ranking = total_goals
+                    top_assists.append(player)
+                print(f"✅ Assist caricati: {len(top_assists)}")
+                
+                print("📊 Caricamento penalità...")
+                # Penalità
+                most_penalties_query = db.session.query(
+                    Player,
+                    func.sum(PlayerMatchStats.penalties).label('total_penalties')
+                ).join(PlayerMatchStats).group_by(Player.id).having(
+                    func.sum(PlayerMatchStats.penalties) > 0
+                ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(15)
+                
+                for player, total_penalties in most_penalties_query:
+                    player.display_penalties = total_penalties
+                    most_penalties.append(player)
+                print(f"✅ Penalità caricate: {len(most_penalties)}")
+                    
+            else:
+                print("⚠️ Fallback al sistema vecchio per player stats")
+                # Fallback
+                top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(15).all()
+                top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(15).all()
+                most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(15).all()
+                
+                for player in top_scorers:
+                    player.display_goals = player.goals
+                    player.display_matches = 0
+                    player.display_assists_for_ranking = player.assists
+                for player in top_assists:
+                    player.display_assists = player.assists  
+                    player.display_matches = 0
+                    player.display_goals_for_ranking = player.goals
+                for player in most_penalties:
+                    player.display_penalties = player.penalties
+        
+        except Exception as e:
+            print(f"❌ Errore statistiche: {e}")
+            top_scorers = []
+            top_assists = []
+            most_penalties = []
+        
+        # MVP Awards
+        try:
+            print("🏆 Caricamento MVP Awards...")
+            best_player_awards = get_best_player_awards()
+            if not best_player_awards:
+                best_player_awards = []
+            print(f"✅ MVP Awards caricati: {len(best_player_awards)}")
+        except Exception as e:
+            print(f"❌ Errore MVP awards: {e}")
+            best_player_awards = []
+        
+        # Fair Play
+        try:
+            print("🤝 Caricamento Fair Play...")
+            fair_play_ranking = get_fair_play_ranking()
+            if not fair_play_ranking:
+                fair_play_ranking = []
+            print(f"✅ Fair Play caricato: {len(fair_play_ranking)}")
+        except Exception as e:
+            print(f"❌ Errore Fair Play: {e}")
+            fair_play_ranking = []
+        
+        # Final Rankings
+        try:
+            print("🏆 Caricamento Final Rankings...")
+            # Controlla se la tabella esiste e ha dati
+            if db.inspect(db.engine).has_table('final_ranking'):
+                final_rankings = FinalRanking.query.order_by(FinalRanking.final_position).all()
+                if not final_rankings:
+                    final_rankings = []
+            else:
+                final_rankings = []
+            print(f"✅ Final Rankings caricati: {len(final_rankings)}")
+        except Exception as e:
+            print(f"❌ Errore Final Rankings: {e}")
+            final_rankings = []
+        
+        # All Star Team
+        try:
+            print("⭐ Caricamento All Star Team...")
+            selections = AllStarTeam.query.all()
+            all_star_data = {
+                'Tesserati': {
+                    'Portiere': None,
+                    'Difensore_1': None,
+                    'Difensore_2': None,
+                    'Attaccante_1': None,
+                    'Attaccante_2': None
+                },
+                'Non Tesserati': {
+                    'Portiere': None,
+                    'Difensore_1': None,
+                    'Difensore_2': None,
+                    'Attaccante_1': None,
+                    'Attaccante_2': None
+                }
+            }
+            
+            for selection in selections:
+                category = selection.category  
+                position = selection.position
+                if position in all_star_data[category]:
+                    all_star_data[category][position] = selection.player
+            print(f"✅ All Star Team caricato: {len(selections)} selezioni")
+        except Exception as e:
+            print(f"❌ Errore All Star Team: {e}")
+            all_star_data = {
+                'Tesserati': {'Portiere': None, 'Difensore_1': None, 'Difensore_2': None, 'Attaccante_1': None, 'Attaccante_2': None},
+                'Non Tesserati': {'Portiere': None, 'Difensore_1': None, 'Difensore_2': None, 'Attaccante_1': None, 'Attaccante_2': None}
+            }
+        
+        # Genera il PDF
+        print("📄 Generazione PDF...")
+        buffer = BytesIO()
+        pdf_filename = generate_standings_pdf(
+            buffer, 
+            group_standings, 
+            top_scorers, 
+            top_assists, 
+            most_penalties,
+            best_player_awards,
+            fair_play_ranking,
+            final_rankings,
+            all_star_data
+        )
+        
+        buffer.seek(0)
+        
+        # Genera nome file con data
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y%m%d_%H%M")
+        filename = f"Classifiche_Torneo_Amici_{date_str}.pdf"
+        
+        print(f"✅ PDF generato con successo: {filename}")
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        print(f"❌ ERRORE GENERALE PDF: {e}")
+        import traceback
+        traceback.print_exc()
+        flash(f'❌ Errore nella generazione del PDF: {str(e)}', 'danger')
+        return redirect(url_for('standings'))
+
+
+def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists, 
+                          most_penalties, best_player_awards, fair_play_ranking, 
+                          final_rankings, all_star_data):
+    """Genera il PDF con tutte le classifiche."""
+    
+    doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=2*cm, bottomMargin=2*cm)
+    story = []
+    
+    # Stili
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=16,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        textColor=colors.darkblue
+    )
+    
+    subtitle_style = ParagraphStyle(
+        'CustomSubtitle',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceAfter=15,
+        alignment=TA_CENTER,
+        textColor=colors.darkgreen
+    )
+    
+    # Titolo principale
+    story.append(Paragraph("TORNEO DEGLI AMICI DELLO SKATER", title_style))
+    story.append(Paragraph("Memorial Marzio Camponovo - Classifiche Finali", styles['Normal']))
+    story.append(Spacer(1, 20))
+    
+    # 1. CLASSIFICHE GIRONI
+    story.append(Paragraph("CLASSIFICHE GIRONI", subtitle_style))
+    
+    for group, teams in group_standings.items():
+        story.append(Paragraph(f"Girone {group}", styles['Heading3']))
+        
+        # Tabella girone
+        data = [['Pos', 'Squadra', 'PG', 'V', 'P', 'S', 'GF', 'GS', 'DR', 'Punti']]
+        
+        for i, team in enumerate(teams, 1):
+            data.append([
+                str(i),
+                team.name,
+                str(team.games_played),
+                str(team.wins),
+                str(team.draws), 
+                str(team.losses),
+                str(team.goals_for),
+                str(team.goals_against),
+                str(team.goal_difference),
+                str(team.points)
+            ])
+        
+        table = Table(data, colWidths=[1*cm, 4*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1.5*cm])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
+        story.append(Spacer(1, 15))
+    
+    story.append(PageBreak())
+    
+    # 2. CLASSIFICA MARCATORI
+    if top_scorers:
+        story.append(Paragraph("CLASSIFICA MARCATORI", subtitle_style))
+        
+        data = [['Pos', 'Giocatore', 'Squadra', 'Gol', 'PG', 'Assist']]
+        for i, player in enumerate(top_scorers, 1):
+            pos_icon = "1." if i == 1 else "2." if i == 2 else "3." if i == 3 else str(i)
+            data.append([
+                pos_icon,
+                player.name,
+                player.team.name,
+                str(player.display_goals),
+                str(getattr(player, 'display_matches', 0)),
+                str(getattr(player, 'display_assists_for_ranking', 0))
+            ])
+        
+        table = Table(data, colWidths=[1.5*cm, 4*cm, 4*cm, 1.5*cm, 1.5*cm, 1.5*cm])
+        # Crea gli stili base della tabella
+        base_styles = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.green),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgreen),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]
+        
+        # Aggiungi evidenziazione podio solo se ci sono abbastanza elementi
+        if len(top_scorers) >= 3:
+            base_styles.append(('BACKGROUND', (0, 1), (-1, 3), colors.gold))
+        
+        table.setStyle(TableStyle(base_styles))
+        
+        story.append(table)
+        story.append(Spacer(1, 20))
+    
+    story.append(PageBreak())
+    
+    # 3. CLASSIFICA ASSIST
+    if top_assists:
+        story.append(Paragraph("CLASSIFICA ASSIST", subtitle_style))
+        
+        data = [['Pos', 'Giocatore', 'Squadra', 'Assist', 'PG', 'Gol']]
+        for i, player in enumerate(top_assists, 1):
+            pos_icon = "1." if i == 1 else "2." if i == 2 else "3." if i == 3 else str(i)
+            data.append([
+                pos_icon,
+                player.name,
+                player.team.name,
+                str(player.display_assists),
+                str(getattr(player, 'display_matches', 0)),
+                str(getattr(player, 'display_goals_for_ranking', 0))
+            ])
+        
+        table = Table(data, colWidths=[1.5*cm, 4*cm, 4*cm, 1.5*cm, 1.5*cm, 1.5*cm])
+        # Crea gli stili base della tabella
+        base_styles = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.blue),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightblue),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]
+        
+        # Aggiungi evidenziazione podio solo se ci sono abbastanza elementi
+        if len(top_assists) >= 3:
+            base_styles.append(('BACKGROUND', (0, 1), (-1, 3), colors.lightyellow))
+        
+        table.setStyle(TableStyle(base_styles))
+        
+        story.append(table)
+        story.append(Spacer(1, 20))
+    
+    # 4. MVP AWARDS
+    if best_player_awards and len(best_player_awards) > 0:
+        story.append(Paragraph("PREMI MVP DELLA PARTITA", subtitle_style))
+        
+        data = [['Pos', 'Giocatore', 'Squadra', 'MVP Awards']]
+        for i, award_entry in enumerate(best_player_awards, 1):
+            # Gestisci sia tuple che liste
+            if isinstance(award_entry, (tuple, list)) and len(award_entry) >= 2:
+                player, awards_count = award_entry[0], award_entry[1]
+            else:
+                continue  # Salta entry malformate
+
+            pos_icon = "1." if i == 1 else "2." if i == 2 else "3." if i == 3 else str(i)
+            stars = "*" * awards_count
+            data.append([
+                pos_icon,
+                player.name,
+                player.team.name,
+                f"{stars} ({awards_count})"
+            ])
+        
+        if len(data) > 1:  # Solo se ci sono dati oltre l'header
+            table = Table(data, colWidths=[1.5*cm, 4*cm, 4*cm, 4*cm])
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightyellow),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('BACKGROUND', (0, 1), (-1, 1), colors.gold) if len(data) >= 2 else ('', '', '', '')
+            ]))
+            
+            story.append(table)
+            story.append(Spacer(1, 20))
+    else:
+        story.append(Paragraph("PREMI MVP DELLA PARTITA", subtitle_style))
+        story.append(Paragraph("Nessun premio MVP ancora assegnato.", styles['Normal']))
+        story.append(Spacer(1, 20))
+    
+    story.append(PageBreak())
+    
+    # 5. CLASSIFICA FINALE
+    if final_rankings and len(final_rankings) > 0:
+        story.append(Paragraph("CLASSIFICA FINALE DEL TORNEO", subtitle_style))
+        
+        data = [['Pos', 'Squadra', 'Girone', 'Categoria', 'Premio']]
+        for ranking in final_rankings:
+            pos_icon = "🥇" if ranking.final_position == 1 else "🥈" if ranking.final_position == 2 else "🥉" if ranking.final_position == 3 else str(ranking.final_position)
+            category = "Major League" if ranking.final_position <= 8 else "Beer League"
+            
+            if ranking.final_position == 1:
+                premio = "🏆 Campione"
+            elif ranking.final_position == 2:
+                premio = "🥈 Vicecampione"
+            elif ranking.final_position == 3:
+                premio = "🥉 Terzo posto"
+            elif ranking.final_position == 9:
+                premio = "🍺 Campione BL"
+            else:
+                premio = "-"
+            
+            data.append([
+                pos_icon,
+                ranking.team.name,
+                f"Girone {ranking.team.group}",
+                category,
+                premio
+            ])
+        
+        # Crea gli stili base della tabella
+        base_styles = [
+            ('BACKGROUND', (0, 0), (-1, 0), colors.purple),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lavender),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]
+        
+        # Evidenzia primi 3 solo se ci sono abbastanza elementi
+        if len(final_rankings) >= 3:
+            base_styles.append(('BACKGROUND', (0, 1), (-1, 3), colors.gold))
+        
+        table = Table(data, colWidths=[1.5*cm, 4*cm, 2*cm, 3*cm, 3*cm])
+        table.setStyle(TableStyle(base_styles))
+        
+        story.append(table)
+        story.append(Spacer(1, 20))
+    else:
+        story.append(Paragraph("CLASSIFICA FINALE DEL TORNEO", subtitle_style))
+        story.append(Paragraph("Classifica finale non ancora disponibile. Completa tutte le finali.", styles['Normal']))
+        story.append(Spacer(1, 20))
+    
+    story.append(PageBreak())
+    
+    # 6. FAIR PLAY
+    if fair_play_ranking and len(fair_play_ranking) > 0:
+        story.append(Paragraph("CLASSIFICA FAIR PLAY", subtitle_style))
+        
+        data = [['Pos', 'Squadra', 'Girone', 'Min Penalità', 'Pos Finale']]
+        for i, entry in enumerate(fair_play_ranking, 1):
+            try:
+                pos_icon = "1." if i == 1 else "2." if i == 2 else "3." if i == 3 else str(i)
+                
+                # Gestisci sia dizionari che oggetti
+                if isinstance(entry, dict):
+                    team_name = entry['team'].name
+                    team_group = entry['team'].group or 'N/A'
+                    penalty_minutes = entry['penalty_minutes']
+                    final_position = entry['final_position']
+                    has_final_ranking = entry.get('has_final_ranking', True)
+                else:
+                    team_name = entry.team.name
+                    team_group = entry.team.group or 'N/A'
+                    penalty_minutes = entry.penalty_minutes
+                    final_position = entry.final_position
+                    has_final_ranking = getattr(entry, 'has_final_ranking', True)
+                
+                final_pos = f"{final_position}°"
+                if not has_final_ranking:
+                    final_pos = f"~{final_position}°*"
+                
+                data.append([
+                    pos_icon,
+                    team_name,
+                    f"Girone {team_group}",
+                    f"{penalty_minutes}'",
+                    final_pos
+                ])
+            except Exception as e:
+                print(f"Errore processando entry Fair Play: {e}")
+                continue
+        
+        if len(data) > 1:  # Solo se ci sono dati oltre l'header
+            # Crea gli stili base della tabella
+            base_styles = [
+                ('BACKGROUND', (0, 0), (-1, 0), colors.teal),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                ('BACKGROUND', (0, 1), (-1, -1), colors.lightcyan),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]
+            
+            # Evidenzia primo posto solo se ci sono dati
+            if len(data) >= 2:  # Header + almeno 1 riga di dati
+                base_styles.append(('BACKGROUND', (0, 1), (-1, 1), colors.lightgreen))
+            
+            table = Table(data, colWidths=[1.5*cm, 4*cm, 2*cm, 2.5*cm, 2.5*cm])
+            table.setStyle(TableStyle(base_styles))
+            
+            story.append(table)
+            story.append(Spacer(1, 20))
+        else:
+            story.append(Paragraph("Nessun dato Fair Play disponibile.", styles['Normal']))
+            story.append(Spacer(1, 20))
+    else:
+        story.append(Paragraph("CLASSIFICA FAIR PLAY", subtitle_style))
+        story.append(Paragraph("Classifica Fair Play non ancora disponibile.", styles['Normal']))
+        story.append(Spacer(1, 20))
+    
+    story.append(PageBreak())
+    
+    # 7. ALL STAR TEAM
+    story.append(Paragraph("ALL STAR TEAM", subtitle_style))
+    
+    for category in ['Tesserati', 'Non Tesserati']:
+        story.append(Paragraph(f"ALL STAR TEAM - {category.upper()}", styles['Heading3']))
+        
+        data = [['Ruolo', 'Giocatore', 'Squadra']]
+        
+        positions = {
+            'Portiere': 'Portiere',
+            'Difensore_1': 'Difensore 1',
+            'Difensore_2': 'Difensore 2', 
+            'Attaccante_1': 'Attaccante 1',
+            'Attaccante_2': 'Attaccante 2'
+        }
+        
+        for position, display_name in positions.items():
+            player = all_star_data[category][position]
+            if player:
+                data.append([
+                    display_name,
+                    player.name,
+                    player.team.name
+                ])
+            else:
+                data.append([
+                    display_name,
+                    "Non selezionato",
+                    "-"
+                ])
+        
+        table = Table(data, colWidths=[3*cm, 4*cm, 5*cm])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.darkgrey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.lightgrey),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
+        story.append(Spacer(1, 20))
+    
+    # Footer
+    story.append(Spacer(1, 30))
+    story.append(Paragraph("©  Torneo degli Amici dello Skater - Memorial Marzio Camponovo", styles['Normal']))
+    
+    doc.build(story)
+    return "classifiche_complete.pdf"
 
 if __name__ == '__main__':
      app.run(debug=True)

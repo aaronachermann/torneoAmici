@@ -6,6 +6,7 @@
     <title>Classifiche - Gestione Torneo degli Amici</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
         .award-badge {
             background: linear-gradient(45deg, #ffd700, #ffed4e);
@@ -49,6 +50,125 @@
         .estimated-position {
             font-style: italic;
             color: #6c757d;
+        }
+        
+        /* STILI ALL STAR TEAM */
+        .all-star-grid {
+            padding: 1rem;
+        }
+        
+        .position-box {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+        }
+        
+        .position-box h6 {
+            text-align: center;
+            margin-bottom: 1rem;
+            font-weight: bold;
+            color: #495057;
+        }
+        
+        .player-slot {
+            min-height: 80px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .player-slot:hover {
+            border-color: #007bff;
+            background-color: #f0f8ff;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .player-slot.selected {
+            border-color: #28a745;
+            background-color: #d4edda;
+            border-width: 3px;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+            animation: pulse 1s infinite;
+        }
+        
+        .player-slot.occupied {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+            border-style: solid;
+        }
+        
+        .player-slot.occupied:hover {
+            border-color: #e0a800;
+            background-color: #ffeaa7;
+        }
+        
+        .placeholder-text {
+            color: #6c757d;
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+        
+        .player-name {
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .team-name {
+            color: #6c757d;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+        
+        /* Stili per le posizioni specifiche */
+        .portiere {
+            border-color: #17a2b8;
+            background-color: #d1ecf1;
+        }
+        
+        .difensori {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+        
+        .attaccanti {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        
+        /* Animazioni */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .player-slot {
+                min-height: 60px;
+                padding: 10px;
+            }
+            
+            .position-box {
+                padding: 0.5rem;
+            }
+            
+            .all-star-grid {
+                padding: 0.5rem;
+            }
         }
     </style>
 </head>
@@ -96,11 +216,11 @@
         <div class="d-flex justify-content-between align-items-center">
             <h1>Classifiche</h1>
             <div>
-                <!-- Pulsante per migrare fair play -->
-                <!-- <form method="post" action="{{ url_for('migrate_fair_play') }}" class="d-inline">
-                    <button type="submit" class="btn btn-info btn-sm">Abilita Fair Play</button>
-                </form>
-                 -->
+                <!-- Pulsante per scaricare PDF -->
+                <a href="{{ url_for('export_standings_pdf') }}" class="btn btn-danger btn-sm me-2">
+                    <i class="fas fa-file-pdf"></i> Scarica PDF Classifiche
+                </a>
+                
                 <!-- Pulsante per migrare final ranking -->
                 <form method="post" action="{{ url_for('migrate_final_ranking') }}" class="d-inline">
                     <button type="submit" class="btn btn-warning btn-sm">Crea Tabella Finali</button>
@@ -128,15 +248,15 @@
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="fairplay-tab" data-bs-toggle="tab" data-bs-target="#fairplay" type="button" role="tab">Fair Play</button>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" id="final-tab" data-bs-toggle="tab" href="#final" role="tab">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="final-tab" data-bs-toggle="tab" data-bs-target="#final" type="button" role="tab">
                     <i class="fas fa-trophy"></i> Classifica Finale
-                </a>
+                </button>
             </li>
-            <li class="nav-item">
-                <a class="nav-link" id="allstar-tab" data-bs-toggle="tab" href="#allstar" role="tab">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="allstar-tab" data-bs-toggle="tab" data-bs-target="#allstar" type="button" role="tab">
                     <i class="fas fa-star"></i> All Star Team
-                </a>
+                </button>
             </li>
         </ul>
         
@@ -209,6 +329,8 @@
                                                 <th>Giocatore</th>
                                                 <th>Squadra</th>
                                                 <th>Gol</th>
+                                                <th>PG</th>
+                                                <th>Assist</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -226,6 +348,8 @@
                                                     <td>{{ player.name }}</td>
                                                     <td>{{ player.team.name }}</td>
                                                     <td><strong>{{ player.display_goals }}</strong></td>
+                                                    <td><small class="text-muted">{{ player.display_matches }}</small></td>
+                                                    <td><small class="text-muted">{{ player.display_assists_for_ranking or 0 }}</small></td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
@@ -249,6 +373,8 @@
                                                 <th>Giocatore</th>
                                                 <th>Squadra</th>
                                                 <th>Assist</th>
+                                                <th>PG</th>
+                                                <th>Gol</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -266,6 +392,8 @@
                                                     <td>{{ player.name }}</td>
                                                     <td>{{ player.team.name }}</td>
                                                     <td><strong>{{ player.display_assists }}</strong></td>
+                                                    <td><small class="text-muted">{{ player.display_matches }}</small></td>
+                                                    <td><small class="text-muted">{{ player.display_goals_for_ranking or 0 }}</small></td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
@@ -549,7 +677,6 @@
                                 </div>
                             </div>
                         {% endif %}
-                        
 
                     {% else %}
                         <div class="col-12">
@@ -566,245 +693,249 @@
                             </div>
                         </div>
                     {% endif %}
-                                        <!-- TAB CLASSIFICA FINALE -->
-                    <div class="tab-pane fade" id="final" role="tabpanel">
-                        {% if final_rankings %}
-                            <div class="row">
-                                <div class="col-12">
-                                    <div class="card">
-                                        <div class="card-header bg-warning text-dark text-center">
-                                            <h4 class="mb-0">🏆 Classifica Finale del Torneo</h4>
-                                            <small>Posizioni finali dal 1° al 16° posto</small>
-                                        </div>
-                                        <div class="card-body">
-                                            <div class="table-responsive">
-                                                <table class="table table-striped">
-                                                    <thead>
-                                                        <tr>
-                                                            <th width="80">Posizione</th>
-                                                            <th>Squadra</th>
-                                                            <th>Girone</th>
-                                                            <th width="120" class="text-center">Categoria</th>
-                                                            <th width="100" class="text-center">Premio</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for ranking in final_rankings %}
-                                                            <tr {% if ranking.final_position <= 3 %}class="table-warning"{% elif ranking.final_position <= 8 %}class="table-success"{% endif %}>
-                                                                <td class="text-center">
-                                                                    {% if ranking.final_position == 1 %}
-                                                                        <span class="fs-3">🥇</span>
-                                                                    {% elif ranking.final_position == 2 %}
-                                                                        <span class="fs-4">🥈</span>
-                                                                    {% elif ranking.final_position == 3 %}
-                                                                        <span class="fs-4">🥉</span>
-                                                                    {% else %}
-                                                                        {{ ranking.final_position }}°
-                                                                    {% endif %}
-                                                                </td>
-                                                                <td><strong>{{ ranking.team.name }}</strong></td>
-                                                                <td><span class="badge bg-primary">{{ ranking.team.group }}</span></td>
-                                                                <td class="text-center">
-                                                                    {% if ranking.final_position <= 8 %}
-                                                                        <span class="badge bg-success">Major League</span>
-                                                                    {% else %}
-                                                                        <span class="badge bg-warning text-dark">Beer League</span>
-                                                                    {% endif %}
-                                                                </td>
-                                                                <td class="text-center">
-                                                                    {% if ranking.final_position == 1 %}
-                                                                        <span class="badge bg-warning text-dark">🏆 Campione</span>
-                                                                    {% elif ranking.final_position == 2 %}
-                                                                        <span class="badge bg-light text-dark">🥈 Vicecampione</span>
-                                                                    {% elif ranking.final_position == 3 %}
-                                                                        <span class="badge bg-secondary">🥉 Terzo posto</span>
-                                                                    {% elif ranking.final_position == 9 %}
-                                                                        <span class="badge bg-warning text-dark">🍺 Campione BL</span>
-                                                                    {% else %}
-                                                                        <span class="badge bg-light text-dark">-</span>
-                                                                    {% endif %}
-                                                                </td>
-                                                            </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
+                </div>
+            </div>
+            
+            <!-- TAB CLASSIFICA FINALE -->
+            <div class="tab-pane fade" id="final" role="tabpanel">
+                {% if final_rankings %}
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="card">
+                                <div class="card-header bg-warning text-dark text-center">
+                                    <h4 class="mb-0">🏆 Classifica Finale del Torneo</h4>
+                                    <small>Posizioni finali dal 1° al 16° posto</small>
+                                </div>
+                                <div class="card-body">
+                                    <div class="table-responsive">
+                                        <table class="table table-striped">
+                                            <thead>
+                                                <tr>
+                                                    <th width="80">Posizione</th>
+                                                    <th>Squadra</th>
+                                                    <th>Girone</th>
+                                                    <th width="120" class="text-center">Categoria</th>
+                                                    <th width="100" class="text-center">Premio</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for ranking in final_rankings %}
+                                                    <tr {% if ranking.final_position <= 3 %}class="table-warning"{% elif ranking.final_position <= 8 %}class="table-success"{% endif %}>
+                                                        <td class="text-center">
+                                                            {% if ranking.final_position == 1 %}
+                                                                <span class="fs-3">🥇</span>
+                                                            {% elif ranking.final_position == 2 %}
+                                                                <span class="fs-4">🥈</span>
+                                                            {% elif ranking.final_position == 3 %}
+                                                                <span class="fs-4">🥉</span>
+                                                            {% else %}
+                                                                {{ ranking.final_position }}°
+                                                            {% endif %}
+                                                        </td>
+                                                        <td><strong>{{ ranking.team.name }}</strong></td>
+                                                        <td><span class="badge bg-primary">{{ ranking.team.group }}</span></td>
+                                                        <td class="text-center">
+                                                            {% if ranking.final_position <= 8 %}
+                                                                <span class="badge bg-success">Major League</span>
+                                                            {% else %}
+                                                                <span class="badge bg-warning text-dark">Beer League</span>
+                                                            {% endif %}
+                                                        </td>
+                                                        <td class="text-center">
+                                                            {% if ranking.final_position == 1 %}
+                                                                <span class="badge bg-warning text-dark">🏆 Campione</span>
+                                                            {% elif ranking.final_position == 2 %}
+                                                                <span class="badge bg-light text-dark">🥈 Vicecampione</span>
+                                                            {% elif ranking.final_position == 3 %}
+                                                                <span class="badge bg-secondary">🥉 Terzo posto</span>
+                                                            {% elif ranking.final_position == 9 %}
+                                                                <span class="badge bg-warning text-dark">🍺 Campione BL</span>
+                                                            {% else %}
+                                                                <span class="badge bg-light text-dark">-</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </div>
-                        {% else %}
-                            <div class="col-12">
-                                <div class="alert alert-warning text-center">
-                                    <h4><i class="fas fa-trophy"></i> Classifica finale non ancora disponibile</h4>
-                                    <p>Completa tutte le finali e clicca il pulsante "🏆 Calcola Classifiche Finali" per generare la classifica finale del torneo.</p>
-                                </div>
-                            </div>
-                        {% endif %}
+                        </div>
                     </div>
-                    <!-- TAB ALL STAR TEAM -->
-                    <div class="tab-pane fade" id="allstar" role="tabpanel">
-                        <div class="row">
-                            <div class="col-12 mb-4">
-                                <div class="alert alert-info">
-                                    <h4><i class="fas fa-star"></i> All Star Team</h4>
-                                    <p>Seleziona i migliori giocatori del torneo per posizione: 1 Portiere, 2 Difensori e 2 Attaccanti sia per tesserati che non tesserati.</p>
-                                </div>
+                {% else %}
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-warning text-center">
+                                <h4><i class="fas fa-trophy"></i> Classifica finale non ancora disponibile</h4>
+                                <p>Completa tutte le finali e clicca il pulsante "🏆 Calcola Classifiche Finali" per generare la classifica finale del torneo.</p>
                             </div>
-                            
-                            <!-- All Star Tesserati -->
-                            <div class="col-lg-6 mb-4">
-                                <div class="card">
-                                    <div class="card-header bg-dark text-white text-center">
-                                        <h4 class="mb-0">⭐ ALL STAR TEAM - TESSERATI</h4>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="all-star-grid">
-                                            <!-- Portiere -->
-                                            <div class="position-box portiere mb-3">
-                                                <h6>🥅 Portiere</h6>
-                                                <div id="portiere-tesserati" class="player-slot" 
-                                                    data-position="Portiere" data-category="Tesserati">
-                                                    <span class="placeholder-text">Seleziona giocatore</span>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Difensori -->
-                                            <div class="position-box difensori mb-3">
-                                                <h6>🛡️ Difensori</h6>
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <div id="difensore1-tesserati" class="player-slot" 
-                                                            data-position="Difensore_1" data-category="Tesserati">
-                                                            <span class="placeholder-text">Difensore 1</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div id="difensore2-tesserati" class="player-slot" 
-                                                            data-position="Difensore_2" data-category="Tesserati">
-                                                            <span class="placeholder-text">Difensore 2</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Attaccanti -->
-                                            <div class="position-box attaccanti">
-                                                <h6>⚡ Attaccanti</h6>
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <div id="attaccante1-tesserati" class="player-slot" 
-                                                            data-position="Attaccante_1" data-category="Tesserati">
-                                                            <span class="placeholder-text">Attaccante 1</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div id="attaccante2-tesserati" class="player-slot" 
-                                                            data-position="Attaccante_2" data-category="Tesserati">
-                                                            <span class="placeholder-text">Attaccante 2</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- TAB ALL STAR TEAM -->
+            <div class="tab-pane fade" id="allstar" role="tabpanel">
+                <div class="row">
+                    <div class="col-12 mb-4">
+                        <div class="alert alert-info">
+                            <h4><i class="fas fa-star"></i> All Star Team</h4>
+                            <p>Seleziona i migliori giocatori del torneo per posizione: 1 Portiere, 2 Difensori e 2 Attaccanti sia per tesserati che non tesserati.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- All Star Tesserati -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white text-center">
+                                <h4 class="mb-0">⭐ ALL STAR TEAM - TESSERATI</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="all-star-grid">
+                                    <!-- Portiere -->
+                                    <div class="position-box portiere mb-3">
+                                        <h6>🥅 Portiere</h6>
+                                        <div id="portiere-tesserati" class="player-slot" 
+                                            data-position="Portiere" data-category="Tesserati">
+                                            <span class="placeholder-text">Seleziona giocatore</span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            
-                            <!-- All Star Non Tesserati -->
-                            <div class="col-lg-6 mb-4">
-                                <div class="card">
-                                    <div class="card-header bg-dark text-white text-center">
-                                        <h4 class="mb-0">⭐ ALL STAR TEAM - NON TESSERATI</h4>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="all-star-grid">
-                                            <!-- Portiere -->
-                                            <div class="position-box portiere mb-3">
-                                                <h6>🥅 Portiere</h6>
-                                                <div id="portiere-non-tesserati" class="player-slot" 
-                                                    data-position="Portiere" data-category="Non Tesserati">
-                                                    <span class="placeholder-text">Seleziona giocatore</span>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Difensori -->
-                                            <div class="position-box difensori mb-3">
-                                                <h6>🛡️ Difensori</h6>
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <div id="difensore1-non-tesserati" class="player-slot" 
-                                                            data-position="Difensore_1" data-category="Non Tesserati">
-                                                            <span class="placeholder-text">Difensore 1</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div id="difensore2-non-tesserati" class="player-slot" 
-                                                            data-position="Difensore_2" data-category="Non Tesserati">
-                                                            <span class="placeholder-text">Difensore 2</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            <!-- Attaccanti -->
-                                            <div class="position-box attaccanti">
-                                                <h6>⚡ Attaccanti</h6>
-                                                <div class="row">
-                                                    <div class="col-6">
-                                                        <div id="attaccante1-non-tesserati" class="player-slot" 
-                                                            data-position="Attaccante_1" data-category="Non Tesserati">
-                                                            <span class="placeholder-text">Attaccante 1</span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-6">
-                                                        <div id="attaccante2-non-tesserati" class="player-slot" 
-                                                            data-position="Attaccante_2" data-category="Non Tesserati">
-                                                            <span class="placeholder-text">Attaccante 2</span>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Pannello di controllo -->
-                            <div class="col-12">
-                                <div class="card">
-                                    <div class="card-header bg-success text-white">
-                                        <h5 class="mb-0">🎯 Seleziona Giocatore</h5>
-                                    </div>
-                                    <div class="card-body">
+                                    
+                                    <!-- Difensori -->
+                                    <div class="position-box difensori mb-3">
+                                        <h6>🛡️ Difensori</h6>
                                         <div class="row">
-                                            <div class="col-md-4">
-                                                <label for="team-select" class="form-label">Squadra:</label>
-                                                <select id="team-select" class="form-select">
-                                                    <option value="">Seleziona squadra...</option>
-                                                    {% for team in teams %}
-                                                        <option value="{{ team.id }}">{{ team.name }}</option>
-                                                    {% endfor %}
-                                                </select>
+                                            <div class="col-6">
+                                                <div id="difensore1-tesserati" class="player-slot" 
+                                                    data-position="Difensore_1" data-category="Tesserati">
+                                                    <span class="placeholder-text">Difensore 1</span>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4">
-                                                <label for="player-select" class="form-label">Giocatore:</label>
-                                                <select id="player-select" class="form-select" disabled>
-                                                    <option value="">Prima seleziona una squadra...</option>
-                                                </select>
+                                            <div class="col-6">
+                                                <div id="difensore2-tesserati" class="player-slot" 
+                                                    data-position="Difensore_2" data-category="Tesserati">
+                                                    <span class="placeholder-text">Difensore 2</span>
+                                                </div>
                                             </div>
-                                            <div class="col-md-4 d-flex align-items-end">
-                                                <button id="assign-player" class="btn btn-success" disabled>
-                                                    ⭐ Assegna Giocatore
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="mt-2">
-                                            <small id="selection-info" class="text-muted">
-                                                Clicca su una posizione sopra per selezionare
-                                            </small>
                                         </div>
                                     </div>
+                                    
+                                    <!-- Attaccanti -->
+                                    <div class="position-box attaccanti">
+                                        <h6>⚡ Attaccanti</h6>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div id="attaccante1-tesserati" class="player-slot" 
+                                                    data-position="Attaccante_1" data-category="Tesserati">
+                                                    <span class="placeholder-text">Attaccante 1</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div id="attaccante2-tesserati" class="player-slot" 
+                                                    data-position="Attaccante_2" data-category="Tesserati">
+                                                    <span class="placeholder-text">Attaccante 2</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- All Star Non Tesserati -->
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white text-center">
+                                <h4 class="mb-0">⭐ ALL STAR TEAM - NON TESSERATI</h4>
+                            </div>
+                            <div class="card-body">
+                                <div class="all-star-grid">
+                                    <!-- Portiere -->
+                                    <div class="position-box portiere mb-3">
+                                        <h6>🥅 Portiere</h6>
+                                        <div id="portiere-non-tesserati" class="player-slot" 
+                                            data-position="Portiere" data-category="Non Tesserati">
+                                            <span class="placeholder-text">Seleziona giocatore</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Difensori -->
+                                    <div class="position-box difensori mb-3">
+                                        <h6>🛡️ Difensori</h6>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div id="difensore1-non-tesserati" class="player-slot" 
+                                                    data-position="Difensore_1" data-category="Non Tesserati">
+                                                    <span class="placeholder-text">Difensore 1</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div id="difensore2-non-tesserati" class="player-slot" 
+                                                    data-position="Difensore_2" data-category="Non Tesserati">
+                                                    <span class="placeholder-text">Difensore 2</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Attaccanti -->
+                                    <div class="position-box attaccanti">
+                                        <h6>⚡ Attaccanti</h6>
+                                        <div class="row">
+                                            <div class="col-6">
+                                                <div id="attaccante1-non-tesserati" class="player-slot" 
+                                                    data-position="Attaccante_1" data-category="Non Tesserati">
+                                                    <span class="placeholder-text">Attaccante 1</span>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div id="attaccante2-non-tesserati" class="player-slot" 
+                                                    data-position="Attaccante_2" data-category="Non Tesserati">
+                                                    <span class="placeholder-text">Attaccante 2</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Pannello di controllo -->
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">🎯 Seleziona Giocatore</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="team-select" class="form-label">Squadra:</label>
+                                        <select id="team-select" class="form-select">
+                                            <option value="">Seleziona squadra...</option>
+                                            {% for team in teams %}
+                                                <option value="{{ team.id }}">{{ team.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="player-select" class="form-label">Giocatore:</label>
+                                        <select id="player-select" class="form-select" disabled>
+                                            <option value="">Prima seleziona una squadra...</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button id="assign-player" class="btn btn-success" disabled>
+                                            ⭐ Assegna Giocatore
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mt-2">
+                                    <small id="selection-info" class="text-muted">
+                                        Clicca su una posizione sopra per selezionare
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -812,16 +943,13 @@
                 </div>
             </div>
         </div>
-        
     </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
-            <p>© 2025 Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
+            <p>© Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
         </div>
     </footer>
-
-  
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
@@ -831,38 +959,42 @@
     // Inizializza gli slot con i dati esistenti
     document.addEventListener('DOMContentLoaded', function() {
         // Carica selezioni tesserati
-        Object.entries(existingSelections['Tesserati']).forEach(([position, player]) => {
-            if (player) {
-                const slot = document.querySelector(`[data-position="${position}"][data-category="Tesserati"]`);
-                if (slot) {
-                    slot.innerHTML = `
-                        <div class="player-name">${player.name}</div>
-                        <div class="team-name">${player.team.name}</div>
-                        <button class="btn btn-sm btn-outline-danger mt-1" onclick="removePlayer('${position}', 'Tesserati')">
-                            ✕ Rimuovi
-                        </button>
-                    `;
-                    slot.classList.add('occupied');
+        if (existingSelections && existingSelections['Tesserati']) {
+            Object.entries(existingSelections['Tesserati']).forEach(([position, player]) => {
+                if (player) {
+                    const slot = document.querySelector(`[data-position="${position}"][data-category="Tesserati"]`);
+                    if (slot) {
+                        slot.innerHTML = `
+                            <div class="player-name">${player.name}</div>
+                            <div class="team-name">${player.team.name}</div>
+                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="removePlayer('${position}', 'Tesserati')">
+                                ✕ Rimuovi
+                            </button>
+                        `;
+                        slot.classList.add('occupied');
+                    }
                 }
-            }
-        });
+            });
+        }
         
         // Carica selezioni non tesserati
-        Object.entries(existingSelections['Non Tesserati']).forEach(([position, player]) => {
-            if (player) {
-                const slot = document.querySelector(`[data-position="${position}"][data-category="Non Tesserati"]`);
-                if (slot) {
-                    slot.innerHTML = `
-                        <div class="player-name">${player.name}</div>
-                        <div class="team-name">${player.team.name}</div>
-                        <button class="btn btn-sm btn-outline-danger mt-1" onclick="removePlayer('${position}', 'Non Tesserati')">
-                            ✕ Rimuovi
-                        </button>
-                    `;
-                    slot.classList.add('occupied');
+        if (existingSelections && existingSelections['Non Tesserati']) {
+            Object.entries(existingSelections['Non Tesserati']).forEach(([position, player]) => {
+                if (player) {
+                    const slot = document.querySelector(`[data-position="${position}"][data-category="Non Tesserati"]`);
+                    if (slot) {
+                        slot.innerHTML = `
+                            <div class="player-name">${player.name}</div>
+                            <div class="team-name">${player.team.name}</div>
+                            <button class="btn btn-sm btn-outline-danger mt-1" onclick="removePlayer('${position}', 'Non Tesserati')">
+                                ✕ Rimuovi
+                            </button>
+                        `;
+                        slot.classList.add('occupied');
+                    }
                 }
-            }
-        });
+            });
+        }
 
         let selectedSlot = null;
 
@@ -882,6 +1014,19 @@
                 document.getElementById('selection-info').textContent = 
                     `Selezionato: ${position.replace('_', ' ')} - ${category}`;
                 
+                // Reset e ricarica dropdown giocatori se c'è una squadra selezionata
+                const teamSelect = document.getElementById('team-select');
+                const playerSelect = document.getElementById('player-select');
+                
+                if (teamSelect.value) {
+                    // Ricarica giocatori filtrati per la nuova categoria
+                    teamSelect.dispatchEvent(new Event('change'));
+                } else {
+                    // Reset dropdown giocatori
+                    playerSelect.innerHTML = '<option value="">Prima seleziona una squadra...</option>';
+                    playerSelect.disabled = true;
+                }
+                
                 // Abilita il pulsante se c'è un giocatore selezionato
                 updateAssignButton();
             });
@@ -898,12 +1043,34 @@
                 return;
             }
             
+            // Se non c'è uno slot selezionato, non caricare giocatori
+            if (!selectedSlot) {
+                playerSelect.innerHTML = '<option value="">Prima seleziona una posizione...</option>';
+                playerSelect.disabled = true;
+                return;
+            }
+            
+            // Determina se serve un tesserato o non tesserato
+            const selectedCategory = selectedSlot.dataset.category;
+            const needsRegistered = selectedCategory === 'Tesserati';
+            
             // Carica giocatori della squadra
             fetch(`/get_team_players/${teamId}`)
                 .then(response => response.json())
                 .then(players => {
                     playerSelect.innerHTML = '<option value="">Seleziona giocatore...</option>';
-                    players.forEach(player => {
+                    
+                    // Filtra giocatori in base alla categoria richiesta
+                    const filteredPlayers = players.filter(player => player.is_registered === needsRegistered);
+                    
+                    if (filteredPlayers.length === 0) {
+                        const categoryText = needsRegistered ? 'tesserati' : 'non tesserati';
+                        playerSelect.innerHTML = `<option value="">Nessun giocatore ${categoryText} in questa squadra</option>`;
+                        playerSelect.disabled = true;
+                        return;
+                    }
+                    
+                    filteredPlayers.forEach(player => {
                         const option = document.createElement('option');
                         option.value = player.id;
                         option.textContent = `${player.name} ${player.is_registered ? '(T)' : '(NT)'}`;
@@ -934,10 +1101,10 @@
             const position = selectedSlot.dataset.position;
             const category = selectedSlot.dataset.category;
             
-            // Verifica compatibilità tesseramento
+            // Questa verifica ora dovrebbe essere superflua dato il filtro, ma la manteniamo per sicurezza
             if ((category === 'Tesserati' && !isRegistered) || 
                 (category === 'Non Tesserati' && isRegistered)) {
-                alert(`Attenzione: Il giocatore selezionato non è compatibile con la categoria ${category}`);
+                alert(`Errore: Il giocatore selezionato non è compatibile con la categoria ${category}`);
                 return;
             }
             
@@ -984,14 +1151,17 @@
                 alert('Errore nella comunicazione con il server');
             });
         });
-    });
-
-    function updateAssignButton() {
-        const button = document.getElementById('assign-player');
-        const playerSelect = document.getElementById('player-select');
         
-        button.disabled = !selectedSlot || !playerSelect.value;
-    }
+        function updateAssignButton() {
+            const button = document.getElementById('assign-player');
+            const playerSelect = document.getElementById('player-select');
+            
+            button.disabled = !selectedSlot || !playerSelect.value;
+        }
+        
+        // Rendi la funzione accessibile globalmente
+        window.updateAssignButton = updateAssignButton;
+    });
 
     function removePlayer(position, category) {
         if (!confirm('Sei sicuro di voler rimuovere questo giocatore?')) return;
