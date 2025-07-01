@@ -191,4 +191,48 @@ footer {
 }
 
 
+/* Logo IHC Malcantone in alto a destra nella navbar */
+.navbar-logo {
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 1000;
+}
 
+.navbar-logo img {
+    height: 50px;
+    width: auto;
+    
+}
+
+/* Banner/Striscione sopra il footer */
+.memorial-banner {
+    width: 100%;
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    text-align: center;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.memorial-banner img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .navbar-logo {
+        position: static;
+        transform: none;
+        margin-left: auto;
+    }
+    .navbar-logo img {
+        height: 40px;
+    }
+}

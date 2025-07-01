@@ -9,7 +9,7 @@
 </head>
 <body class="d-flex flex-column min-vh-100">
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
+        <div class="container position-relative">
             <a class="navbar-brand" href="{{ url_for('index') }}">Torneo degli Amici</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
@@ -31,8 +31,12 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{{ url_for('settings') }}">Settings</a>
                     </li>
-
                 </ul>
+            </div>
+            
+            <!-- LOGO IHC MALCANTONE AGGIUNTO -->
+            <div class="navbar-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IHC Malcantone" />
             </div>
         </div>
     </nav>
@@ -93,6 +97,8 @@
                     </div>
                 </div>
             </div>
+        </div>  
+    </div>
 <!-- 
 <div class="mt-4">
                 <h3>Funzioni Amministrative</h3>
@@ -206,7 +212,11 @@
             </div>
              -->
         <!-- </div> -->
-
+    <div class="container">
+            <div class="memorial-banner">
+                <img src="{{ url_for('static', filename='striscione.jpg') }}" alt="Memorial Marzio Camponovo - Ciao Marzione" />
+            </div>
+    </div>
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
             <p>© Torneo degli Amici dello Skater - Memorial Marzio Camponovo</p>
