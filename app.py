@@ -1477,7 +1477,7 @@ def reset_settings():
     return redirect(url_for('settings'))
 
 
-@app.route('/fix_category_field', methods=['POST'])
+@app.route('/fix_category_field', methods=['GET', 'POST'])
 def fix_category_field():
     """Aggiorna il campo category per supportare stringhe più lunghe."""
     try:
@@ -1486,14 +1486,19 @@ def fix_category_field():
             conn.execute(db.text('ALTER TABLE player ALTER COLUMN category TYPE VARCHAR(100)'))
             conn.commit()
         
-        flash('✅ Campo category aggiornato a 100 caratteri!', 'success')
+        return '''
+        <h2>✅ Campo category aggiornato con successo!</h2>
+        <p>Il campo category ora supporta fino a 100 caratteri.</p>
+        <p><a href="/migrate_from_sqlite">← Riprova la migrazione</a></p>
+        <p><a href="/">← Torna alla Home</a></p>
+        '''
         
     except Exception as e:
-        flash(f'❌ Errore: {str(e)}', 'danger')
-    
-    return redirect(url_for('index'))
-
-
+        return f'''
+        <h2>❌ Errore nell'aggiornamento</h2>
+        <p><strong>Errore:</strong> {str(e)}</p>
+        <p><a href="/">← Torna alla Home</a></p>
+        '''
 
 @app.route('/settings/migrate', methods=['POST'])
 def migrate_settings():
