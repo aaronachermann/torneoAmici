@@ -716,10 +716,10 @@ def migrate_fair_play():
     try:
         # Crea la tabella se non esiste
         db.create_all()
-        flash('🔧 Migrazione Fair Play completata con successo!', 'success')
+        #flash('🔧 Migrazione Fair Play completata con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore durante la migrazione Fair Play: {str(e)}', 'danger')
+        #flash(f'❌ Errore durante la migrazione Fair Play: {str(e)}', 'danger')
     
     return redirect(url_for('standings'))
 
@@ -892,20 +892,89 @@ class PlayerMatchStats(db.Model):
     )
     
     id = db.Column(db.Integer, primary_key=True)
-    # AGGIUNTO: ondelete='CASCADE' per eliminazione automatica
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
-    match_id = db.Column(db.Integer, db.ForeignKey('match.id', ondelete='CASCADE'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    match_id = db.Column(db.Integer, db.ForeignKey('match.id'), nullable=False)
+    
+    # Statistiche base
     goals = db.Column(db.Integer, default=0)
     assists = db.Column(db.Integer, default=0)
     penalties = db.Column(db.Integer, default=0)
+    
+    # NUOVI CAMPI: Tempi per ogni azione
+    goal_times = db.Column(db.Text)  # Es: "15,23,67" per gol al 15°, 23° e 67° minuto
+    assist_times = db.Column(db.Text)  # Es: "10,45" per assist al 10° e 45° minuto
+    penalty_times = db.Column(db.Text)  # Es: "30" per penalità al 30° minuto
+    
+    # NUOVO CAMPO: Numero di maglia per questa partita
+    jersey_number = db.Column(db.Integer)  # Numero di maglia per questa specifica partita
+    
+    # Campi esistenti per migliori giocatori
     is_best_player_team1 = db.Column(db.Boolean, default=False)
     is_best_player_team2 = db.Column(db.Boolean, default=False)
     
-    # Relazioni con cascade
-    player = db.relationship('Player', backref=db.backref('match_stats', cascade='all, delete-orphan'))
-    match = db.relationship('Match', backref=db.backref('player_stats', cascade='all, delete-orphan'))
-
-
+    # Relazioni
+    player = db.relationship('Player', backref='match_stats')
+    match = db.relationship('Match', backref='player_stats')
+    
+    def get_goal_times_list(self):
+        """Restituisce una lista dei tempi dei gol."""
+        if not self.goal_times:
+            return []
+        return [int(time.strip()) for time in self.goal_times.split(',') if time.strip()]
+    
+    def set_goal_times_list(self, times_list):
+        """Imposta i tempi dei gol da una lista."""
+        if times_list:
+            self.goal_times = ','.join(map(str, sorted(times_list)))
+        else:
+            self.goal_times = None
+    
+    def get_assist_times_list(self):
+        """Restituisce una lista dei tempi degli assist."""
+        if not self.assist_times:
+            return []
+        return [int(time.strip()) for time in self.assist_times.split(',') if time.strip()]
+    
+    def set_assist_times_list(self, times_list):
+        """Imposta i tempi degli assist da una lista."""
+        if times_list:
+            self.assist_times = ','.join(map(str, sorted(times_list)))
+        else:
+            self.assist_times = None
+    
+    def get_penalty_times_list(self):
+        """Restituisce una lista dei tempi delle penalità."""
+        if not self.penalty_times:
+            return []
+        return [int(time.strip()) for time in self.penalty_times.split(',') if time.strip()]
+    
+    def set_penalty_times_list(self, times_list):
+        """Imposta i tempi delle penalità da una lista."""
+        if times_list:
+            self.penalty_times = ','.join(map(str, sorted(times_list)))
+        else:
+            self.penalty_times = None
+    
+    def get_formatted_times_display(self):
+        """Restituisce una stringa formattata con tutti i tempi per il display."""
+        display_parts = []
+        
+        if self.goals > 0:
+            goal_times = self.get_goal_times_list()
+            if goal_times:
+                display_parts.append(f"Gol: {', '.join(map(str, goal_times))}'")
+        
+        if self.assists > 0:
+            assist_times = self.get_assist_times_list()
+            if assist_times:
+                display_parts.append(f"Assist: {', '.join(map(str, assist_times))}'")
+        
+        if self.penalties > 0:
+            penalty_times = self.get_penalty_times_list()
+            if penalty_times:
+                display_parts.append(f"Penalità: {', '.join(map(str, penalty_times))}'")
+        
+        return " | ".join(display_parts) if display_parts else "-"
 
 class TournamentSettings(db.Model):
     """Configurazioni del torneo."""
@@ -1228,10 +1297,10 @@ def update_dates():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('📅 Date del torneo aggiornate con successo!', 'success')
+        flash('Date del torneo aggiornate con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento delle date: {str(e)}', 'danger')
+        flash(f' Errore nell\'aggiornamento delle date: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1287,10 +1356,10 @@ def update_times():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('⏰ Orari del torneo aggiornati con successo!', 'success')
+        flash('Orari del torneo aggiornati con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento degli orari: {str(e)}', 'danger')
+        flash(f'Errore nell\'aggiornamento degli orari: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1309,10 +1378,10 @@ def update_team_settings():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('👥 Configurazioni squadre aggiornate con successo!', 'success')
+        flash('Configurazioni squadre aggiornate con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento configurazioni squadre: {str(e)}', 'danger')
+        flash(f'Errore nell\'aggiornamento configurazioni squadre: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1329,10 +1398,10 @@ def update_points_system():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('📊 Sistema punti aggiornato con successo!', 'success')
+        flash('Sistema punti aggiornato con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento sistema punti: {str(e)}', 'danger')
+        flash(f'Errore nell\'aggiornamento sistema punti: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1361,10 +1430,10 @@ def update_playoff_system():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('🏆 Sistema playoff aggiornato con successo!', 'success')
+        flash('Sistema playoff aggiornato con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento sistema playoff: {str(e)}', 'danger')
+        flash(f'Errore nell\'aggiornamento sistema playoff: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1380,10 +1449,10 @@ def update_general_settings():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('⚙️ Configurazioni generali aggiornate con successo!', 'success')
+        flash('Configurazioni generali aggiornate con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nell\'aggiornamento configurazioni generali: {str(e)}', 'danger')
+        flash(f'Errore nell\'aggiornamento configurazioni generali: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1398,10 +1467,10 @@ def reset_settings():
         # Crea nuove configurazioni di default
         TournamentSettings.create_default()
         
-        flash('🔄 Configurazioni ripristinate ai valori di default!', 'success')
+        flash('Configurazioni ripristinate ai valori di default!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore nel reset delle configurazioni: {str(e)}', 'danger')
+        flash(f'Errore nel reset delle configurazioni: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1415,10 +1484,10 @@ def migrate_settings():
         # Assicurati che esistano configurazioni di default
         settings = TournamentSettings.get_settings()
         
-        flash('🔧 Migrazione settings completata con successo!', 'success')
+        flash('Migrazione settings completata con successo!', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'❌ Errore durante la migrazione: {str(e)}', 'danger')
+        flash(f'Errore durante la migrazione: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
 
@@ -1820,6 +1889,83 @@ def debug_finals_mapping():
     flash(f'Debug Beer League Finals: {debug_info}', 'info')
     return redirect(url_for('schedule'))
 
+
+# Aggiungi questa route alla tua app.py per eseguire la migrazione
+
+@app.route('/migrate_player_stats_schema', methods=['GET', 'POST'])
+def migrate_player_stats_schema():
+    """Migra il database per aggiungere i nuovi campi alle statistiche giocatori."""
+    try:
+        # Verifica se la tabella PlayerMatchStats esiste
+        if not db.inspect(db.engine).has_table('player_match_stats'):
+            flash('❌ La tabella PlayerMatchStats non esiste. Crea prima il database.', 'danger')
+            return redirect(url_for('index'))
+        
+        # Lista delle nuove colonne da aggiungere
+        new_columns = [
+            ('goal_times', 'TEXT'),
+            ('assist_times', 'TEXT'), 
+            ('penalty_times', 'TEXT'),
+            ('jersey_number', 'INTEGER')
+        ]
+        
+        # Ottieni le colonne esistenti
+        inspector = db.inspect(db.engine)
+        existing_columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+        
+        # Aggiungi le nuove colonne se non esistono
+        columns_added = []
+        for column_name, column_type in new_columns:
+            if column_name not in existing_columns:
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text(f'ALTER TABLE player_match_stats ADD COLUMN {column_name} {column_type}'))
+                        conn.commit()
+                    columns_added.append(column_name)
+                except Exception as e:
+                    flash(f'❌ Errore nell\'aggiungere la colonna {column_name}: {str(e)}', 'danger')
+                    return redirect(url_for('index'))
+        
+        if columns_added:
+            flash(f'✅ Migrazione completata! Aggiunte colonne: {", ".join(columns_added)}', 'success')
+        else:
+            flash('ℹ️ Tutte le colonne sono già presenti nel database.', 'info')
+        
+        # Verifica finale
+        updated_columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+        flash(f'📊 Colonne attuali nella tabella: {", ".join(updated_columns)}', 'info')
+        
+    except Exception as e:
+        flash(f'❌ Errore durante la migrazione: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
+
+
+# Aggiungi anche questa route per verificare lo schema attuale
+@app.route('/verify_database_schema')
+def verify_database_schema():
+    """Verifica lo schema attuale del database."""
+    try:
+        inspector = db.inspect(db.engine)
+        
+        # Verifica tabelle esistenti
+        tables = inspector.get_table_names()
+        flash(f'📋 Tabelle nel database: {", ".join(tables)}', 'info')
+        
+        # Se esiste PlayerMatchStats, mostra le colonne
+        if 'player_match_stats' in tables:
+            columns = inspector.get_columns('player_match_stats')
+            column_info = []
+            for col in columns:
+                column_info.append(f"{col['name']} ({col['type']})")
+            flash(f'🔍 Colonne in player_match_stats: {", ".join(column_info)}', 'info')
+        else:
+            flash('⚠️ La tabella player_match_stats non esiste', 'warning')
+        
+    except Exception as e:
+        flash(f'❌ Errore nella verifica schema: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
 
 
 # 4. AGGIUNGI questa route per applicare il fix
@@ -3340,8 +3486,8 @@ def reset_match(match_id):
                 team1.draws -= 1
                 team2.draws -= 1
             
-            print(f"📊 Team1 ({team1.name}): punti {team1.points}, gol {team1.goals_for}-{team1.goals_against}")
-            print(f"📊 Team2 ({team2.name}): punti {team2.points}, gol {team2.goals_for}-{team2.goals_against}")
+            print(f"Team1 ({team1.name}): punti {team1.points}, gol {team1.goals_for}-{team1.goals_against}")
+            print(f"Team2 ({team2.name}): punti {team2.points}, gol {team2.goals_for}-{team2.goals_against}")
         
         # 1. Reset risultato della partita (DOPO aver aggiornato le statistiche)
         match.team1_score = None
@@ -3365,12 +3511,12 @@ def reset_match(match_id):
         
         # Messaggio di successo
         match_description = f"{match.get_team1_display_name()} vs {match.get_team2_display_name()}"
-        success_msg = f'🔄 Partita "{match_description}" resettata completamente!'
+        success_msg = f'Partita "{match_description}" resettata completamente!'
         if stats_deleted > 0:
             success_msg += f' Eliminate {stats_deleted} statistiche giocatori.'
         
         flash(success_msg, 'success')
-        print(f"✅ Reset partita {match_id} completato con successo")
+        print(f"Reset partita {match_id} completato con successo")
         
     except Exception as e:
         db.session.rollback()
@@ -3385,53 +3531,126 @@ def reset_match(match_id):
     else:
         return redirect(url_for('match_detail', match_id=match_id))
 
+
 @app.route('/match/<int:match_id>', methods=['GET', 'POST'])
 def match_detail(match_id):
     match = Match.query.get_or_404(match_id)
-    
-    # Ottieni il parametro di riferimento per tornare alla posizione corretta
     return_anchor = request.args.get('return_anchor', '')
     
     if request.method == 'POST':
+        # SALVA TUTTO IN UN COLPO SOLO: RISULTATO + STATISTICHE + MIGLIORI GIOCATORI
+        
+        # 1. SALVA RISULTATO (se fornito)
         team1_score_str = request.form.get('team1_score')
         team2_score_str = request.form.get('team2_score')
-        overtime = 'overtime' in request.form
-        shootout = 'shootout' in request.form
         
         if team1_score_str and team2_score_str:
             old_team1_score = match.team1_score
-            old_team2_score = match.team2_score            
-            old_overtime = match.overtime
-            old_shootout = match.shootout
+            old_team2_score = match.team2_score
+            old_overtime = getattr(match, 'overtime', False)
+            old_shootout = getattr(match, 'shootout', False)
             
             match.team1_score = int(team1_score_str)
             match.team2_score = int(team2_score_str)
-            match.overtime = overtime
-            match.shootout = shootout
             
-            if match.phase == 'group' and match.team1_score == match.team2_score:
-                if not overtime and not shootout:
-                    flash('⚠️ Nelle qualificazioni non sono ammessi pareggi! Seleziona Overtime o Rigori.', 'warning')
-                    return redirect(url_for('match_detail', match_id=match_id))
+            # Gestione overtime/shootout se disponibile
+            if hasattr(match, 'overtime'):
+                match.overtime = request.form.get('overtime') == 'on'
+            if hasattr(match, 'shootout'):
+                match.shootout = request.form.get('shootout') == 'on'
             
-            # Aggiorna le statistiche delle squadre
             update_team_stats(match, old_team1_score, old_team2_score, old_overtime, old_shootout)
-            
-            
-            db.session.commit()
-            flash('Risultato della partita registrato')
-            
-            # Dopo aver salvato, torna alla posizione corretta
-            if return_anchor:
-                return redirect(url_for('schedule') + f'#{return_anchor}')
-            else:
-                return redirect(url_for('match_detail', match_id=match_id))
+        
+        # 2. SALVA STATISTICHE GIOCATORI + MIGLIORI GIOCATORI
+        try:
+            # Assicurati che la tabella PlayerMatchStats esista
+            if db.inspect(db.engine).has_table('player_match_stats'):
+                
+                # Ottieni tutti i giocatori di entrambe le squadre
+                all_players = []
+                team1_players = []
+                team2_players = []
+                
+                if match.team1:
+                    team1_players = list(match.team1.players)
+                    all_players.extend(team1_players)
+                if match.team2:
+                    team2_players = list(match.team2.players)
+                    all_players.extend(team2_players)
+                
+                # Ottieni i migliori giocatori selezionati
+                best_player_team1_id = request.form.get('best_player_team1')
+                best_player_team2_id = request.form.get('best_player_team2')
+                
+                # Aggiorna le statistiche per tutti i giocatori
+                for player in all_players:
+                    # Leggi i valori dal form
+                    goals = int(request.form.get(f'player_{player.id}_goals', 0))
+                    assists = int(request.form.get(f'player_{player.id}_assists', 0))
+                    penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
+                    jersey_number = request.form.get(f'player_{player.id}_jersey')
+                    goal_times = request.form.get(f'player_{player.id}_goal_times', '')
+                    assist_times = request.form.get(f'player_{player.id}_assist_times', '')
+                    penalty_times = request.form.get(f'player_{player.id}_penalty_times', '')
+                    
+                    # Determina se è il miglior giocatore della sua squadra
+                    is_best_team1 = (str(player.id) == best_player_team1_id and player in team1_players)
+                    is_best_team2 = (str(player.id) == best_player_team2_id and player in team2_players)
+                    
+                    # Trova o crea le statistiche per questo giocatore in questa partita
+                    stats = PlayerMatchStats.query.filter_by(
+                        player_id=player.id,
+                        match_id=match_id
+                    ).first()
+                    
+                    if not stats:
+                        # Crea nuove statistiche per questa partita
+                        stats = PlayerMatchStats(
+                            player_id=player.id,
+                            match_id=match_id,
+                            goals=goals,
+                            assists=assists,
+                            penalties=penalties,
+                            jersey_number=jersey_number if jersey_number else None,
+                            goal_times=goal_times if goal_times else None,
+                            assist_times=assist_times if assist_times else None,
+                            penalty_times=penalty_times if penalty_times else None,
+                            is_best_player_team1=is_best_team1,
+                            is_best_player_team2=is_best_team2
+                        )
+                        db.session.add(stats)
+                    else:
+                        # Aggiorna le statistiche esistenti per questa partita
+                        stats.goals = goals
+                        stats.assists = assists
+                        stats.penalties = penalties
+                        stats.jersey_number = jersey_number if jersey_number else None
+                        stats.goal_times = goal_times if goal_times else None
+                        stats.assist_times = assist_times if assist_times else None
+                        stats.penalty_times = penalty_times if penalty_times else None
+                        stats.is_best_player_team1 = is_best_team1
+                        stats.is_best_player_team2 = is_best_team2
+                
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Errore nel salvataggio statistiche: {str(e)}', 'danger')
+            return redirect(url_for('match_detail', match_id=match_id))
+        
+        # 3. COMMITTA TUTTO
+        db.session.commit()
+        flash('✅ Partita salvata completamente: risultato, statistiche e migliori giocatori!', 'success')
+        
+        # Redirect con anchor se specificato
+        if return_anchor:
+            return redirect(url_for('schedule') + f'#{return_anchor}')
+        else:
+            return redirect(url_for('match_detail', match_id=match_id))
     
-    # Ottieni le statistiche per questa partita specifica
+    # GET: Carica i dati per visualizzazione
     team1_players = match.team1.players if match.team1 else []
     team2_players = match.team2.players if match.team2 else []
     
-    # Crea un dizionario per le statistiche di questa partita
+    # Crea un dizionario per le statistiche di questa partita con i NUOVI CAMPI
     match_stats = {}
     best_player_team1 = None
     best_player_team2 = None
@@ -3448,7 +3667,14 @@ def match_detail(match_id):
                 match_stats[player.id] = {
                     'goals': stats.goals,
                     'assists': stats.assists,
-                    'penalties': stats.penalties
+                    'penalties': stats.penalties,
+                    'jersey_number': stats.jersey_number,
+                    'goal_times': stats.goal_times,
+                    'assist_times': stats.assist_times,
+                    'penalty_times': stats.penalty_times,
+                    'is_best_player_team1': stats.is_best_player_team1,
+                    'is_best_player_team2': stats.is_best_player_team2,
+                    'formatted_times': stats.get_formatted_times_display() if hasattr(stats, 'get_formatted_times_display') else '-'
                 }
                 
                 # Trova i migliori giocatori
@@ -3460,15 +3686,30 @@ def match_detail(match_id):
                 match_stats[player.id] = {
                     'goals': 0,
                     'assists': 0,
-                    'penalties': 0
+                    'penalties': 0,
+                    'jersey_number': None,
+                    'goal_times': None,
+                    'assist_times': None,
+                    'penalty_times': None,
+                    'is_best_player_team1': False,
+                    'is_best_player_team2': False,
+                    'formatted_times': '-'
                 }
-    except:
-        # Se la tabella non esiste, usa valori vuoti
+    except Exception as e:
+        print(f"Errore nel caricamento statistiche: {e}")
+        # Se la tabella non esiste o c'è un errore, usa valori vuoti
         for player in team1_players + team2_players:
             match_stats[player.id] = {
                 'goals': 0,
                 'assists': 0,
-                'penalties': 0
+                'penalties': 0,
+                'jersey_number': None,
+                'goal_times': None,
+                'assist_times': None,
+                'penalty_times': None,
+                'is_best_player_team1': False,
+                'is_best_player_team2': False,
+                'formatted_times': '-'
             }
     
     return render_template('match_detail.html', 
@@ -3479,6 +3720,7 @@ def match_detail(match_id):
                            best_player_team1=best_player_team1,
                            best_player_team2=best_player_team2,
                            return_anchor=return_anchor)
+
 
 @app.route('/migrate_overtime_system', methods=['POST'])
 def migrate_overtime_system():
@@ -3665,6 +3907,7 @@ def test_mvp_simple():
     
     return redirect(url_for('standings'))
 
+
 @app.route('/match/<int:match_id>/update_player_stats', methods=['POST'])
 def update_player_stats(match_id):
     """Aggiorna le statistiche dei giocatori SOLO per questa partita specifica."""
@@ -3695,10 +3938,49 @@ def update_player_stats(match_id):
         
         # Aggiorna le statistiche per tutti i giocatori
         for player in all_players:
-            # Leggi i valori dal form
+            # Leggi i valori base dal form
             goals = int(request.form.get(f'player_{player.id}_goals', 0))
             assists = int(request.form.get(f'player_{player.id}_assists', 0))
             penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
+            
+            # NUOVO: Leggi il numero di maglia
+            jersey_number = request.form.get(f'player_{player.id}_jersey_number')
+            jersey_number = int(jersey_number) if jersey_number and jersey_number.strip() else None
+            
+            # NUOVO: Leggi i tempi delle azioni
+            goal_times_str = request.form.get(f'player_{player.id}_goal_times', '').strip()
+            assist_times_str = request.form.get(f'player_{player.id}_assist_times', '').strip()
+            penalty_times_str = request.form.get(f'player_{player.id}_penalty_times', '').strip()
+            
+            # Converte i tempi in liste di interi
+            goal_times = []
+            if goal_times_str:
+                try:
+                    goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
+                except:
+                    goal_times = []
+            
+            assist_times = []
+            if assist_times_str:
+                try:
+                    assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
+                except:
+                    assist_times = []
+            
+            penalty_times = []
+            if penalty_times_str:
+                try:
+                    penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
+                except:
+                    penalty_times = []
+            
+            # Validazioni: il numero di tempi deve corrispondere al numero di azioni
+            if len(goal_times) != goals and goals > 0:
+                flash(f'Attenzione: {player.name} ha {goals} gol ma solo {len(goal_times)} tempi specificati', 'warning')
+            if len(assist_times) != assists and assists > 0:
+                flash(f'Attenzione: {player.name} ha {assists} assist ma solo {len(assist_times)} tempi specificati', 'warning')
+            if len(penalty_times) != penalties and penalties > 0:
+                flash(f'Attenzione: {player.name} ha {penalties} penalità ma solo {len(penalty_times)} tempi specificati', 'warning')
             
             # Determina se è il miglior giocatore della sua squadra
             is_best_team1 = (str(player.id) == best_player_team1_id and player in team1_players)
@@ -3718,6 +4000,7 @@ def update_player_stats(match_id):
                     goals=goals,
                     assists=assists,
                     penalties=penalties,
+                    jersey_number=jersey_number,
                     is_best_player_team1=is_best_team1,
                     is_best_player_team2=is_best_team2
                 )
@@ -3727,8 +4010,14 @@ def update_player_stats(match_id):
                 stats.goals = goals
                 stats.assists = assists
                 stats.penalties = penalties
+                stats.jersey_number = jersey_number
                 stats.is_best_player_team1 = is_best_team1
                 stats.is_best_player_team2 = is_best_team2
+            
+            # Imposta i tempi usando i metodi helper
+            stats.set_goal_times_list(goal_times)
+            stats.set_assist_times_list(assist_times)
+            stats.set_penalty_times_list(penalty_times)
         
         db.session.commit()
         flash('Statistiche della partita aggiornate con successo!', 'success')
@@ -3742,6 +4031,7 @@ def update_player_stats(match_id):
         return redirect(url_for('match_detail', match_id=match_id) + f'?return_anchor={return_anchor}')
     else:
         return redirect(url_for('match_detail', match_id=match_id))
+
 # Aggiorna anche la funzione per il calcolo dei totali nelle classifiche
 def get_player_statistics_for_standings():
     """Calcola le statistiche totali dei giocatori sommando tutte le partite."""
@@ -6801,7 +7091,7 @@ def export_standings_pdf():
             }
         
         # Genera il PDF
-        print("📄 Generazione PDF...")
+        print("Generazione PDF...")
         buffer = BytesIO()
         pdf_filename = generate_standings_pdf(
             buffer, 

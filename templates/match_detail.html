@@ -220,9 +220,9 @@
                                     </div>
                                 {% endif %}
                                 
-                                <div class="mt-3">
+                                <!-- <div class="mt-3">
                                     <button type="submit" class="btn btn-success">💾 Salva Risultato</button>
-                                </div>
+                                </div> -->
                             </form>
                         </div>
                     </div>
@@ -236,7 +236,7 @@
                 <div class="col-md-8 mx-auto">
                     <div class="card">
                         <div class="card-header bg-warning text-dark">
-                            <h4 class="mb-0">✏️ Modifica Risultato</h4>
+                            <h4 class="mb-0">Modifica Risultato</h4>
                         </div>
                         <div class="card-body">
                             <form method="post">
@@ -311,178 +311,434 @@
             </div>
         {% endif %}
 
-        <!-- Statistiche Giocatori - FORM UNICO CON MIGLIORI GIOCATORI -->
+       <!-- Statistiche Giocatori - FORM UNICO CON MIGLIORI GIOCATORI -->
         {% if match.team1 and match.team2 %}
-            <div class="row mt-4">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-header bg-info text-white">
-                            <h4 class="mb-0">📊 Statistiche Giocatori e Migliori della Partita</h4>
-                        </div>
-                        <div class="card-body">
-                            <!-- FORM UNICO PER TUTTO -->
-                            <form method="post" action="{{ url_for('update_player_stats', match_id=match.id) }}">
-                                {% if return_anchor %}
-                                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
-                                {% endif %}
-                                
-                                <!-- SELETTORI MIGLIORI GIOCATORI -->
-                                <div class="best-player-selector">
-                                    <h5 class="text-warning mb-3">🏆 Migliori Giocatori della Partita</h5>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <label for="best_player_team1" class="form-label">
-                                                <strong>⭐ Miglior giocatore {{ match.team1.name }}:</strong>
-                                            </label>
-                                            <select class="form-select" id="best_player_team1" name="best_player_team1">
-                                                <option value="">Nessuna selezione</option>
-                                                {% for player in team1_players %}
-                                                    <option value="{{ player.id }}" 
-                                                            {% if best_player_team1 and best_player_team1.id == player.id %}selected{% endif %}>
-                                                        {{ player.name }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <label for="best_player_team2" class="form-label">
-                                                <strong>⭐ Miglior giocatore {{ match.team2.name }}:</strong>
-                                            </label>
-                                            <select class="form-select" id="best_player_team2" name="best_player_team2">
-                                                <option value="">Nessuna selezione</option>
-                                                {% for player in team2_players %}
-                                                    <option value="{{ player.id }}" 
-                                                            {% if best_player_team2 and best_player_team2.id == player.id %}selected{% endif %}>
-                                                        {{ player.name }}
-                                                    </option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h4 class="mb-0">Statistiche Giocatori e Migliori della Partita</h4>
+                    </div>
+                    <div class="card-body">
+                        <!-- FORM UNICO PER TUTTO -->
+                        <form method="post" action="{{ url_for('match_detail', match_id=match.id) }}">
 
+                            {% if return_anchor %}
+                                <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+                            {% endif %}
+                            
+                            <!-- SELETTORI MIGLIORI GIOCATORI -->
+                            <div class="best-player-selector mb-4">
+                                <h5 class="text-warning mb-3">Migliori Giocatori della Partita</h5>
                                 <div class="row">
-                                    <!-- Squadra 1 -->
                                     <div class="col-md-6">
-                                        <h5 class="text-primary">{{ match.team1.name }}</h5>
-                                        {% if team1_players %}
-                                            <div class="table-responsive">
-                                                <table class="table table-sm">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Giocatore</th>
-                                                            <th>Gol</th>
-                                                            <th>Assist</th>
-                                                            <th>Penalità</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for player in team1_players %}
-                                                            <tr id="player_{{ player.id }}_row" 
-                                                                {% if best_player_team1 and best_player_team1.id == player.id %}
-                                                                    class="best-player-highlight"
-                                                                {% endif %}>
-                                                                <td>
-                                                                    {{ player.name }}
-                                                                    {% if best_player_team1 and best_player_team1.id == player.id %}
-                                                                        <span class="badge award-badge ms-1">⭐ MVP</span>
-                                                                    {% endif %}
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_goals" 
-                                                                           value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_assists" 
-                                                                           value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_penalties" 
-                                                                           value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                            </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        {% else %}
-                                            <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
-                                        {% endif %}
+                                        <label for="best_player_team1" class="form-label">
+                                            <strong>⭐ Miglior giocatore {{ match.team1.name }}:</strong>
+                                        </label>
+                                        <select class="form-select" name="best_player_team1" id="best_player_team1">
+                                            <option value="">-- Seleziona giocatore --</option>
+                                            {% for player in team1_players %}
+                                                <option value="{{ player.id }}"
+                                                        {% if match_stats[player.id].is_best_player_team1 %}selected{% endif %}>
+                                                    {{ player.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
                                     </div>
+                                    <div class="col-md-6">
+                                        <label for="best_player_team2" class="form-label">
+                                            <strong>⭐ Miglior giocatore {{ match.team2.name }}:</strong>
+                                        </label>
+                                        <select class="form-select" name="best_player_team2" id="best_player_team2">
+                                            <option value="">-- Seleziona giocatore --</option>
+                                            {% for player in team2_players %}
+                                                <option value="{{ player.id }}"
+                                                        {% if match_stats[player.id].is_best_player_team2 %}selected{% endif %}>
+                                                    {{ player.name }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- STATISTICHE SQUADRE -->
+                            <div class="row">
+                                <!-- Squadra 1 -->
+                                <div class="col-md-6">
+                                    <h5 class="text-primary">{{ match.team1.name }}</h5>
+                                    {% if team1_players %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Giocatore</th>
+                                                        <th>Nr.</th>
+                                                        <th>Gol</th>
+                                                        <th>Assist</th>
+                                                        <th>Penalità</th>
+                                                        <th>Tempi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for player in team1_players %}
+                                                        <tr>
+                                                            <td><strong>{{ player.name }}</strong></td>
+                                                            <td>
+                                                                <!-- NUOVO: Campo numero maglia -->
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_jersey_number" 
+                                                                    value="{{ match_stats[player.id].jersey_number if player.id in match_stats and match_stats[player.id].jersey_number else '' }}" 
+                                                                    min="1" max="99" style="width: 50px;" 
+                                                                    placeholder="N°">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_goals" 
+                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_assists" 
+                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_penalties" 
+                                                                    value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <!-- NUOVO: Campi per i tempi -->
+                                                                <div class="d-flex flex-column gap-1">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_goal_times" 
+                                                                        value="{{ match_stats[player.id].goal_times if player.id in match_stats and match_stats[player.id].goal_times else '' }}" 
+                                                                        placeholder="Gol: 15,30,45" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_assist_times" 
+                                                                        value="{{ match_stats[player.id].assist_times if player.id in match_stats and match_stats[player.id].assist_times else '' }}" 
+                                                                        placeholder="Assist: 10,25" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25)">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_penalty_times" 
+                                                                        value="{{ match_stats[player.id].penalty_times if player.id in match_stats and match_stats[player.id].penalty_times else '' }}" 
+                                                                        placeholder="Penalità: 35" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi delle penalità separati da virgola (es: 35)">
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
+                                    {% endif %}
+                                </div>
 
-                                    <!-- Squadra 2 -->
-                                    <div class="col-md-6">
-                                        <h5 class="text-success">{{ match.team2.name }}</h5>
-                                        {% if team2_players %}
-                                            <div class="table-responsive">
-                                                <table class="table table-sm">
-                                                    <thead>
+                                <!-- Squadra 2 -->
+                                <div class="col-md-6">
+                                    <h5 class="text-success">{{ match.team2.name }}</h5>
+                                    {% if team2_players %}
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-striped">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>Giocatore</th>
+                                                        <th>Nr.</th>
+                                                        <th>Gol</th>
+                                                        <th>Assist</th>
+                                                        <th>Penalità</th>
+                                                        <th>Tempi</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for player in team2_players %}
                                                         <tr>
-                                                            <th>Giocatore</th>
-                                                            <th>Gol</th>
-                                                            <th>Assist</th>
-                                                            <th>Penalità</th>
+                                                            <td><strong>{{ player.name }}</strong></td>
+                                                            <td>
+                                                                <!-- NUOVO: Campo numero maglia -->
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_jersey_number" 
+                                                                    value="{{ match_stats[player.id].jersey_number if player.id in match_stats and match_stats[player.id].jersey_number else '' }}" 
+                                                                    min="1" max="99" style="width: 50px;" 
+                                                                    placeholder="N°">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_goals" 
+                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_assists" 
+                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <input type="number" class="form-control form-control-sm" 
+                                                                    name="player_{{ player.id }}_penalties" 
+                                                                    value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
+                                                                    min="0" max="10" style="width: 60px;">
+                                                            </td>
+                                                            <td>
+                                                                <!-- NUOVO: Campi per i tempi -->
+                                                                <div class="d-flex flex-column gap-1">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_goal_times" 
+                                                                        value="{{ match_stats[player.id].goal_times if player.id in match_stats and match_stats[player.id].goal_times else '' }}" 
+                                                                        placeholder="Gol: 15,30,45" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_assist_times" 
+                                                                        value="{{ match_stats[player.id].assist_times if player.id in match_stats and match_stats[player.id].assist_times else '' }}" 
+                                                                        placeholder="Assist: 10,25" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25)">
+                                                                    <input type="text" class="form-control form-control-sm" 
+                                                                        name="player_{{ player.id }}_penalty_times" 
+                                                                        value="{{ match_stats[player.id].penalty_times if player.id in match_stats and match_stats[player.id].penalty_times else '' }}" 
+                                                                        placeholder="Penalità: 35" 
+                                                                        style="font-size: 11px; width: 120px;"
+                                                                        title="Tempi delle penalità separati da virgola (es: 35)">
+                                                                </div>
+                                                            </td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for player in team2_players %}
-                                                            <tr id="player_{{ player.id }}_row" 
-                                                                {% if best_player_team2 and best_player_team2.id == player.id %}
-                                                                    class="best-player-highlight"
-                                                                {% endif %}>
-                                                                <td>
-                                                                    {{ player.name }}
-                                                                    {% if best_player_team2 and best_player_team2.id == player.id %}
-                                                                        <span class="badge award-badge ms-1">⭐ MVP</span>
-                                                                    {% endif %}
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_goals" 
-                                                                           value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_assists" 
-                                                                           value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                                <td>
-                                                                    <input type="number" class="form-control form-control-sm" 
-                                                                           name="player_{{ player.id }}_penalties" 
-                                                                           value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                           min="0" max="10" style="width: 60px;">
-                                                                </td>
-                                                            </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        {% else %}
-                                            <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
-                                        {% endif %}
-                                    </div>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    {% else %}
+                                        <p class="text-muted">Nessun giocatore registrato per questa squadra.</p>
+                                    {% endif %}
                                 </div>
-                                
-                                <!-- Bottone unico per salvare tutte le statistiche -->
-                                <div class="text-center mt-3">
-                                    <button type="submit" class="btn btn-primary btn-lg">
-                                        💾 Salva Statistiche e Migliori Giocatori
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                            </div>
+                            
+                            <!-- Istruzioni per l'uso -->
+                            <div class="alert alert-info mt-3">
+                                <h6><i class="fas fa-info-circle"></i> Istruzioni:</h6>
+                                <ul class="mb-0">
+                                    <li><strong>Nr.:</strong> Numero di maglia per questa partita (opzionale)</li>
+                                    <li><strong>Tempi:</strong> Inserisci i minuti separati da virgola (es: "15,30,45" per gol al 15°, 30° e 45° minuto)</li>
+                                    <li><strong>Validazione:</strong> Il numero di tempi deve corrispondere al numero di azioni</li>
+                                </ul>
+                            </div>
+                            
+                            <!-- Bottone unico per salvare tutte le statistiche -->
+                            <div class="text-center mt-3">
+                               <button type="submit" class="btn btn-success btn-lg w-100">
+                                    <i class="fas fa-save"></i> 💾 Salva Tutto (Risultato + Statistiche + MVP)
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
+        </div>
         {% endif %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5>Statistiche Complete della Partita</h5>
+            </div>
+            <div class="card-body">
+                {% if match.is_completed %}
+                    <!-- Tabella riassuntiva con tempi -->
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Squadra</th>
+                                    <th>Giocatore</th>
+                                    <th>Nr.</th>
+                                    <th>Gol</th>
+                                    <th>Assist</th>
+                                    <th>Penalità</th>
+                                    <th>Dettaglio Tempi</th>
+                                    <th>Note</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- Giocatori Squadra 1 -->
+                                {% for player in team1_players %}
+                                    {% set stats = match_stats[player.id] %}
+                                    {% if stats.goals > 0 or stats.assists > 0 or stats.penalties > 0 or stats.jersey_number %}
+                                        <tr>
+                                            <td><span class="badge bg-primary">{{ match.team1.name }}</span></td>
+                                            <td>
+                                                <strong>{{ player.name }}</strong>
+                                                {% if stats.is_best_player_team1 %}
+                                                    <span class="badge bg-warning text-dark ms-1">⭐ MVP</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.jersey_number %}
+                                                    <span class="badge bg-secondary">#{{ stats.jersey_number }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.goals > 0 %}
+                                                    <span class="badge bg-success">{{ stats.goals }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.assists > 0 %}
+                                                    <span class="badge bg-info">{{ stats.assists }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.penalties > 0 %}
+                                                    <span class="badge bg-danger">{{ stats.penalties }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ stats.formatted_times }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if stats.is_best_player_team1 %}
+                                                    <small class="text-warning"><i class="fas fa-star"></i> Miglior giocatore</small>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                <!-- Giocatori Squadra 2 -->
+                                {% for player in team2_players %}
+                                    {% set stats = match_stats[player.id] %}
+                                    {% if stats.goals > 0 or stats.assists > 0 or stats.penalties > 0 or stats.jersey_number %}
+                                        <tr>
+                                            <td><span class="badge bg-success">{{ match.team2.name }}</span></td>
+                                            <td>
+                                                <strong>{{ player.name }}</strong>
+                                                {% if stats.is_best_player_team2 %}
+                                                    <span class="badge bg-warning text-dark ms-1">⭐ MVP</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.jersey_number %}
+                                                    <span class="badge bg-secondary">#{{ stats.jersey_number }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">-</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.goals > 0 %}
+                                                    <span class="badge bg-success">{{ stats.goals }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.assists > 0 %}
+                                                    <span class="badge bg-info">{{ stats.assists }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                {% if stats.penalties > 0 %}
+                                                    <span class="badge bg-danger">{{ stats.penalties }}</span>
+                                                {% else %}
+                                                    <span class="text-muted">0</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <small class="text-muted">
+                                                    {{ stats.formatted_times }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% if stats.is_best_player_team2 %}
+                                                    <small class="text-warning"><i class="fas fa-star"></i> Miglior giocatore</small>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Riepilogo cronologico delle azioni -->
+                    {% if match_stats %}
+                        <div class="mt-4">
+                            <h6>🕐 Cronologia Partita</h6>
+                            <div class="timeline-container">
+                                {% set all_events = [] %}
+                                {% for player in team1_players + team2_players %}
+                                    {% set stats = match_stats[player.id] %}
+                                    {% if stats.goal_times %}
+                                        {% for time in stats.goal_times.split(',') if time.strip() %}
+                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Gol', 'jersey': stats.jersey_number}) %}{% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% if stats.assist_times %}
+                                        {% for time in stats.assist_times.split(',') if time.strip() %}
+                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Assist', 'jersey': stats.jersey_number}) %}{% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% if stats.penalty_times %}
+                                        {% for time in stats.penalty_times.split(',') if time.strip() %}
+                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Penalità', 'jersey': stats.jersey_number}) %}{% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {% if all_events %}
+                                    {% set sorted_events = all_events|sort(attribute='time') %}
+                                    <div class="list-group">
+                                        {% for event in sorted_events %}
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <strong>{{ event.time }}'</strong> - 
+                                                    {% if event.action == 'Gol' %}
+                                                        <i class="fas fa-futbol text-success"></i>
+                                                    {% elif event.action == 'Assist' %}
+                                                        <i class="fas fa-hands-helping text-info"></i>
+                                                    {% elif event.action == 'Penalità' %}
+                                                        <i class="fas fa-exclamation-triangle text-danger"></i>
+                                                    {% endif %}
+                                                    <strong>{{ event.action }}</strong> 
+                                                    {{ event.player }}
+                                                    {% if event.jersey %}
+                                                        <span class="badge bg-secondary">#{{ event.jersey }}</span>
+                                                    {% endif %}
+                                                    <small class="text-muted">({{ event.team }})</small>
+                                                </div>
+                                                <span class="badge bg-light text-dark">{{ event.time }}'</span>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <p class="text-muted">Nessun evento con orari registrato per questa partita.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <p class="text-muted">Le statistiche saranno disponibili dopo che la partita sarà stata completata.</p>
+                {% endif %}
+            </div>
+        </div>
 
         <!-- Messaggio per partite placeholder -->
         {% if not match.team1 or not match.team2 %}
@@ -507,11 +763,11 @@
                     <h6><i class="fas fa-warning"></i> Attenzione!</h6>
                     <p class="mb-2">Questa azione cancellerà <strong>TUTTI</strong> i dati della partita:</p>
                     <ul class="mb-2">
-                        <li>❌ Risultato finale</li>
-                        <li>❌ Gol, assist e penalità di tutti i giocatori</li>
-                        <li>❌ Overtime/Rigori</li>
-                        <li>❌ Migliori giocatori selezionati</li>
-                        <li>🔄 Le statistiche delle squadre verranno aggiornate</li>
+                        <li>Risultato finale</li>
+                        <li>Gol, assist e penalità di tutti i giocatori</li>
+                        <li>Overtime/Rigori</li>
+                        <li>Migliori giocatori selezionati</li>
+                        <li>Le statistiche delle squadre verranno aggiornate</li>
                     </ul>
                     <p class="mb-0"><strong>La partita tornerà come "non ancora giocata".</strong></p>
                 </div>
