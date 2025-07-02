@@ -4604,8 +4604,8 @@ def migrate_from_sqlite():
             
             results = []
             
-            # Lista delle tabelle da migrare nell'ordine corretto
-            tables_order = ['user','users', 'team', 'player', 'match','match_description','player_match_stat', 'player_match_stats', 'tournament_config', 'all_star_team', 'final_ranking']
+            # Lista delle tabelle da migrare nell'ordine corretto (eliminazione prima)
+            tables_order = ['player_match_stats', 'match', 'player', 'team', 'user', 'tournament_config', 'all_star_team', 'final_ranking']
             
             for table_name in tables_order:
                 try:
@@ -4622,18 +4622,18 @@ def migrate_from_sqlite():
                         results.append(f"⚠️ {table_name}: 0 record")
                         continue
                     
-                    # Elimina i dati esistenti in PostgreSQL per questa tabella
-                    if table_name == 'user':
-                        User.query.delete()
-                    elif table_name == 'team':
-                        Team.query.delete()
-                    elif table_name == 'player':
-                        Player.query.delete()
-                    elif table_name == 'match':
-                        Match.query.delete()
-                    elif table_name == 'player_match_stats':
+                    # Elimina i dati esistenti in PostgreSQL per questa tabella (nell'ordine corretto)
+                    if table_name == 'player_match_stats':
                         if db.inspect(db.engine).has_table('player_match_stats'):
                             PlayerMatchStats.query.delete()
+                    elif table_name == 'match':
+                        Match.query.delete()
+                    elif table_name == 'player':
+                        Player.query.delete()
+                    elif table_name == 'team':
+                        Team.query.delete()
+                    elif table_name == 'user':
+                        User.query.delete()
                     # Aggiungi altre tabelle se necessario
                     
                     db.session.commit()
@@ -4685,8 +4685,6 @@ def migrate_from_sqlite():
         <p><strong>Errore:</strong> {str(e)}</p>
         <p><a href="/migrate_from_sqlite">← Riprova</a></p>
         '''
-
-
 # Aggiungi anche questa route per importare da CSV
 
 @app.route('/import_from_csv', methods=['GET', 'POST'])
