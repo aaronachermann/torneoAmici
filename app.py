@@ -911,6 +911,8 @@ class PlayerMatchStats(db.Model):
     # Campi esistenti per migliori giocatori
     is_best_player_team1 = db.Column(db.Boolean, default=False)
     is_best_player_team2 = db.Column(db.Boolean, default=False)
+
+    is_removed = db.Column(db.Boolean, default=False)
     
     # Relazioni
     player = db.relationship('Player', backref='match_stats')
@@ -3533,6 +3535,7 @@ def reset_match(match_id):
 
 
 @app.route('/match/<int:match_id>', methods=['GET', 'POST'])
+@login_required
 def match_detail(match_id):
     match = Match.query.get_or_404(match_id)
     return_anchor = request.args.get('return_anchor', '')
@@ -3616,7 +3619,8 @@ def match_detail(match_id):
                             assist_times=assist_times if assist_times else None,
                             penalty_times=penalty_times if penalty_times else None,
                             is_best_player_team1=is_best_team1,
-                            is_best_player_team2=is_best_team2
+                            is_best_player_team2=is_best_team2,
+                            is_removed=False  # NUOVO: Assicurati che non sia rimosso di default
                         )
                         db.session.add(stats)
                     else:
@@ -3630,6 +3634,7 @@ def match_detail(match_id):
                         stats.penalty_times = penalty_times if penalty_times else None
                         stats.is_best_player_team1 = is_best_team1
                         stats.is_best_player_team2 = is_best_team2
+                        # IMPORTANTE: Non modificare is_removed qui, mantieni il valore esistente
                 
         except Exception as e:
             db.session.rollback()
@@ -3650,7 +3655,7 @@ def match_detail(match_id):
     team1_players = match.team1.players if match.team1 else []
     team2_players = match.team2.players if match.team2 else []
     
-    # Crea un dizionario per le statistiche di questa partita con i NUOVI CAMPI
+    # Crea un dizionario per le statistiche di questa partita con i NUOVI CAMPI incluso is_removed
     match_stats = {}
     best_player_team1 = None
     best_player_team2 = None
@@ -3674,13 +3679,14 @@ def match_detail(match_id):
                     'penalty_times': stats.penalty_times,
                     'is_best_player_team1': stats.is_best_player_team1,
                     'is_best_player_team2': stats.is_best_player_team2,
+                    'is_removed': getattr(stats, 'is_removed', False),  # NUOVO: Gestisci is_removed
                     'formatted_times': stats.get_formatted_times_display() if hasattr(stats, 'get_formatted_times_display') else '-'
                 }
                 
-                # Trova i migliori giocatori
-                if stats.is_best_player_team1:
+                # Trova i migliori giocatori (solo se NON rimossi)
+                if stats.is_best_player_team1 and not getattr(stats, 'is_removed', False):
                     best_player_team1 = player
-                elif stats.is_best_player_team2:
+                elif stats.is_best_player_team2 and not getattr(stats, 'is_removed', False):
                     best_player_team2 = player
             else:
                 match_stats[player.id] = {
@@ -3693,6 +3699,7 @@ def match_detail(match_id):
                     'penalty_times': None,
                     'is_best_player_team1': False,
                     'is_best_player_team2': False,
+                    'is_removed': False,  # NUOVO: Default non rimosso
                     'formatted_times': '-'
                 }
     except Exception as e:
@@ -3709,6 +3716,7 @@ def match_detail(match_id):
                 'penalty_times': None,
                 'is_best_player_team1': False,
                 'is_best_player_team2': False,
+                'is_removed': False,  # NUOVO: Default non rimosso
                 'formatted_times': '-'
             }
     
@@ -3720,6 +3728,58 @@ def match_detail(match_id):
                            best_player_team1=best_player_team1,
                            best_player_team2=best_player_team2,
                            return_anchor=return_anchor)
+
+@app.route('/match/<int:match_id>/toggle_player/<int:player_id>', methods=['POST'])
+@login_required
+def toggle_player_in_match(match_id, player_id):
+    """Rimuove o ripristina un giocatore da una partita specifica."""
+    match = Match.query.get_or_404(match_id)
+    player = Player.query.get_or_404(player_id)
+    
+    try:
+        # Verifica che la tabella PlayerMatchStats esista
+        if not db.inspect(db.engine).has_table('player_match_stats'):
+            flash('Errore: Sistema statistiche per partita non disponibile', 'danger')
+            return redirect(url_for('match_detail', match_id=match_id))
+        
+        # Trova o crea le statistiche per questo giocatore in questa partita
+        stats = PlayerMatchStats.query.filter_by(
+            player_id=player_id,
+            match_id=match_id
+        ).first()
+        
+        if not stats:
+            # Crea nuove statistiche per questa partita
+            stats = PlayerMatchStats(
+                player_id=player_id,
+                match_id=match_id,
+                goals=0,
+                assists=0,
+                penalties=0,
+                is_removed=True  # Segna come rimosso
+            )
+            db.session.add(stats)
+            action = "rimosso dalla"
+        else:
+            # Cambia lo stato di rimozione
+            stats.is_removed = not stats.is_removed
+            action = "rimosso dalla" if stats.is_removed else "ripristinato nella"
+            
+            # Se viene rimosso, azzera anche i best player flags
+            if stats.is_removed:
+                stats.is_best_player_team1 = False
+                stats.is_best_player_team2 = False
+        
+        db.session.commit()
+        flash(f'{player.name} è stato {action} partita.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nel toggle del giocatore: {str(e)}', 'danger')
+    
+    return redirect(url_for('match_detail', match_id=match_id))
+
+
 
 
 @app.route('/migrate_overtime_system', methods=['POST'])
@@ -4100,7 +4160,9 @@ def standings():
                 func.sum(PlayerMatchStats.goals).label('total_goals'),
                 func.count(PlayerMatchStats.match_id).label('total_matches'),
                 func.sum(PlayerMatchStats.assists).label('total_assists')
-            ).join(PlayerMatchStats).group_by(Player.id).having(
+            ).join(PlayerMatchStats).filter(
+                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
+            ).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.goals) > 0
             ).order_by(
                 func.sum(PlayerMatchStats.goals).desc(),        # 1° criterio: più gol
@@ -4121,7 +4183,9 @@ def standings():
                 func.sum(PlayerMatchStats.assists).label('total_assists'),
                 func.count(PlayerMatchStats.match_id).label('total_matches'),
                 func.sum(PlayerMatchStats.goals).label('total_goals')
-            ).join(PlayerMatchStats).group_by(Player.id).having(
+            ).join(PlayerMatchStats).filter(
+                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
+            ).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.assists) > 0
             ).order_by(
                 func.sum(PlayerMatchStats.assists).desc(),      # 1° criterio: più assist
@@ -4140,7 +4204,9 @@ def standings():
             most_penalties_query = db.session.query(
                 Player,
                 func.sum(PlayerMatchStats.penalties).label('total_penalties')
-            ).join(PlayerMatchStats).group_by(Player.id).having(
+            ).join(PlayerMatchStats).filter(
+                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
+            ).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.penalties) > 0
             ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(10)
             
@@ -4149,7 +4215,7 @@ def standings():
                 player.display_penalties = total_penalties
                 most_penalties.append(player)
             
-            # NUOVO: Migliori giocatori (più nomination)
+            #  Migliori giocatori (più nomination)
             best_player_awards = get_best_player_awards()
                 
         else:
@@ -4236,7 +4302,9 @@ def standings():
                           teams=teams,
                           all_star_data=all_star_data)
 
-    
+
+  
+  
 
 @app.route('/migrate_all_star_team', methods=['POST'])
 def migrate_all_star_team():
@@ -4250,6 +4318,89 @@ def migrate_all_star_team():
         flash(f'❌ Errore durante la migrazione All Star Team: {str(e)}', 'danger')
     
     return redirect(url_for('standings'))
+
+
+
+@app.route('/migrate_add_is_removed', methods=['GET', 'POST'])
+@login_required
+def migrate_add_is_removed():
+    """Aggiunge la colonna is_removed alla tabella PlayerMatchStats."""
+    
+    if request.method == 'GET':
+        # Mostra una pagina di conferma per la migrazione
+        return '''
+        <div style="max-width: 600px; margin: 50px auto; padding: 20px; font-family: Arial;">
+            <h2>🔧 Migrazione Database - Campo is_removed</h2>
+            <p>Questa migrazione aggiungerà la colonna <code>is_removed</code> alla tabella <code>player_match_stats</code>.</p>
+            <p><strong>Cosa fa:</strong></p>
+            <ul>
+                <li>Aggiunge il campo per tracciare i giocatori rimossi dalle partite</li>
+                <li>Imposta il valore di default a FALSE per tutti i giocatori esistenti</li>
+                <li>Abilita la funzionalità X rossa per rimuovere giocatori</li>
+            </ul>
+            
+            <form method="POST" style="margin-top: 30px;">
+                <button type="submit" style="background: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">
+                    ✅ Esegui Migrazione
+                </button>
+                <a href="/" style="margin-left: 10px; padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 5px;">
+                    ❌ Annulla
+                </a>
+            </form>
+        </div>
+        '''
+    
+    # POST: Esegui la migrazione
+    try:
+        # Controlla se la colonna esiste già
+        inspector = db.inspect(db.engine)
+        if inspector.has_table('player_match_stats'):
+            columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+            
+            if 'is_removed' not in columns:
+                # Aggiungi la colonna is_removed
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN is_removed BOOLEAN DEFAULT 0'))
+                    conn.commit()
+                flash('✅ Colonna is_removed aggiunta con successo alla tabella player_match_stats!', 'success')
+            else:
+                flash('ℹ️ La colonna is_removed esiste già nella tabella player_match_stats.', 'info')
+        else:
+            # Se la tabella non esiste, creala
+            db.create_all()
+            flash('✅ Tabella player_match_stats creata con successo!', 'success')
+            
+    except Exception as e:
+        flash(f'❌ Errore durante la migrazione: {str(e)}', 'danger')
+        print(f"Errore migrazione is_removed: {e}")
+    
+    return redirect(url_for('index'))
+
+# ALTERNATIVO: Script manuale da eseguire nel terminale
+def add_is_removed_column_manual():
+    """Funzione da chiamare manualmente per aggiungere la colonna."""
+    try:
+        with app.app_context():
+            inspector = db.inspect(db.engine)
+            if inspector.has_table('player_match_stats'):
+                columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+                
+                if 'is_removed' not in columns:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN is_removed BOOLEAN DEFAULT 0'))
+                        conn.commit()
+                    print("✅ Colonna is_removed aggiunta con successo!")
+                else:
+                    print("ℹ️ La colonna is_removed esiste già.")
+            else:
+                print("❌ Tabella player_match_stats non trovata.")
+                print("💡 Esegui prima db.create_all() per creare le tabelle.")
+                
+    except Exception as e:
+        print(f"❌ Errore durante la migrazione: {e}")
+
+# Per eseguire la migrazione manualmente nel terminale:
+# python -c "from app import add_is_removed_column_manual; add_is_removed_column_manual()"
 
 
 

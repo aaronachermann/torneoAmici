@@ -24,6 +24,51 @@
             font-weight: bold;
             text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
+
+
+        .player-removed {
+            color: #6c757d !important;
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        .remove-player-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .remove-player-btn:hover {
+            background: #c82333;
+        }
+
+        .restore-player-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 5px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .restore-player-btn:hover {
+            background: #218838;
+        }
     </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -154,12 +199,12 @@
         </div>
 
         <!-- Inserimento Risultato -->
-        {% if not match.is_completed and match.team1 and match.team2 %}
+        <!-- {% if not match.is_completed and match.team1 and match.team2 %}
             <div class="row mt-4">
                 <div class="col-md-8 mx-auto">
                     <div class="card">
                         <div class="card-header bg-success text-white">
-                            <h4 class="mb-0">🏒 Inserisci Risultato</h4>
+                            <h4 class="mb-0">Inserisci Risultato</h4>
                         </div>
                         <div class="card-body">
                             <form method="post">
@@ -167,7 +212,6 @@
                                     <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                                 {% endif %}
                                 
-                                <!-- Punteggi -->
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -179,10 +223,9 @@
                                     </div>
                                 </div>
                                 
-                                <!-- Sistema Overtime/Rigori per le qualificazioni -->
                                 {% if match.phase == 'group' %}
                                     <div class="alert alert-info mt-3">
-                                        <strong>🏒 Sistema Punti Hockey:</strong><br>
+                                        <strong>Sistema Punti:</strong><br>
                                         • <strong>3 punti</strong>: vittoria nei tempi regolamentari<br>
                                         • <strong>2 punti</strong>: vittoria overtime/rigori<br>
                                         • <strong>1 punto</strong>: sconfitta overtime/rigori<br>
@@ -195,13 +238,13 @@
                                             <div class="form-check">
                                                 <input class="form-check-input" type="radio" name="conclusion_type" id="regulation" value="regulation" checked>
                                                 <label class="form-check-label" for="regulation">
-                                                    ⏱️ Tempi regolamentari
+                                                    Tempi regolamentari
                                                 </label>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="overtime" name="overtime">
                                                 <label class="form-check-label" for="overtime">
-                                                    ⏰ Overtime (tempi supplementari)
+                                                   Overtime (tempi supplementari)
                                                 </label>
                                             </div>
                                             <div class="form-check">
@@ -213,22 +256,18 @@
                                         </div>
                                     </div>
                                     
-                                    <!-- Avviso pareggio -->
                                     <div id="tie-warning" class="alert alert-warning mt-3" style="display: none;">
                                         <strong>⚠️ Attenzione:</strong> Nelle qualificazioni non sono ammessi pareggi! 
                                         Se il punteggio è pari, seleziona Overtime o Rigori per indicare come è stata decisa la partita.
                                     </div>
                                 {% endif %}
-                                
-                                <!-- <div class="mt-3">
-                                    <button type="submit" class="btn btn-success">💾 Salva Risultato</button>
-                                </div> -->
+                           
                             </form>
                         </div>
                     </div>
                 </div>
             </div>
-        {% endif %}
+        {% endif %} -->
 
         <!-- Modifica Risultato -->
         {% if match.is_completed and match.team1 and match.team2 %}
@@ -316,57 +355,102 @@
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h4 class="mb-0">Statistiche Giocatori e Migliori della Partita</h4>
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">📊 Inserisci/Modifica: Risultato + Statistiche + MVP</h4>
                     </div>
                     <div class="card-body">
-                        <!-- FORM UNICO PER TUTTO -->
+                        <!-- FORM UNICO CHE GESTISCE TUTTO -->
                         <form method="post" action="{{ url_for('match_detail', match_id=match.id) }}">
-
                             {% if return_anchor %}
                                 <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                             {% endif %}
                             
-                            <!-- SELETTORI MIGLIORI GIOCATORI -->
-                            <div class="best-player-selector mb-4">
-                                <h5 class="text-warning mb-3">Migliori Giocatori della Partita</h5>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <label for="best_player_team1" class="form-label">
-                                            <strong>⭐ Miglior giocatore {{ match.team1.name }}:</strong>
-                                        </label>
-                                        <select class="form-select" name="best_player_team1" id="best_player_team1">
-                                            <option value="">-- Seleziona giocatore --</option>
-                                            {% for player in team1_players %}
-                                                <option value="{{ player.id }}"
-                                                        {% if match_stats[player.id].is_best_player_team1 %}selected{% endif %}>
-                                                    {{ player.name }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="best_player_team2" class="form-label">
-                                            <strong>⭐ Miglior giocatore {{ match.team2.name }}:</strong>
-                                        </label>
-                                        <select class="form-select" name="best_player_team2" id="best_player_team2">
-                                            <option value="">-- Seleziona giocatore --</option>
-                                            {% for player in team2_players %}
-                                                <option value="{{ player.id }}"
-                                                        {% if match_stats[player.id].is_best_player_team2 %}selected{% endif %}>
-                                                    {{ player.name }}
-                                                </option>
-                                            {% endfor %}
-                                        </select>
+                            <!-- SEZIONE RISULTATO -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5 class="text-primary mb-3">🏒 Risultato Partita</h5>
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
+                                            <input type="number" class="form-control" id="team1_score" name="team1_score" 
+                                                value="{{ match.team1_score if match.team1_score is not none else '' }}" 
+                                                min="0" placeholder="Gol">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label for="team2_score" class="form-label">{{ match.team2.name }}</label>
+                                            <input type="number" class="form-control" id="team2_score" name="team2_score" 
+                                                value="{{ match.team2_score if match.team2_score is not none else '' }}" 
+                                                min="0" placeholder="Gol">
+                                        </div>
+                                        <div class="col-md-4">
+                                            {% if match.phase == 'group' %}
+                                                <label class="form-label">Modalità</label><br>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox" id="overtime" name="overtime" 
+                                                        {% if match.overtime %}checked{% endif %}>
+                                                    <label class="form-check-label" for="overtime">⏰ OT</label>
+                                                </div>
+                                                <div class="form-check form-check-inline">
+                                                    <input class="form-check-input" type="checkbox" id="shootout" name="shootout" 
+                                                        {% if match.shootout %}checked{% endif %}>
+                                                    <label class="form-check-label" for="shootout">🥅 Rigori</label>
+                                                </div>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                             
-                            <!-- STATISTICHE SQUADRE -->
-                            <div class="row">
+                            <hr>
+                            
+                            <!-- SEZIONE MVP -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5 class="text-warning mb-3">⭐ Migliori Giocatori della Partita</h5>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <label for="best_player_team1" class="form-label">
+                                                <strong>🏆 Miglior giocatore {{ match.team1.name }}:</strong>
+                                            </label>
+                                            <select class="form-select" name="best_player_team1" id="best_player_team1">
+                                                <option value="">-- Seleziona giocatore --</option>
+                                                {% for player in team1_players %}
+                                                    <option value="{{ player.id }}"
+                                                            {% if match_stats[player.id].is_best_player_team1 %}selected{% endif %}>
+                                                        {{ player.name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label for="best_player_team2" class="form-label">
+                                                <strong>🏆 Miglior giocatore {{ match.team2.name }}:</strong>
+                                            </label>
+                                            <select class="form-select" name="best_player_team2" id="best_player_team2">
+                                                <option value="">-- Seleziona giocatore --</option>
+                                                {% for player in team2_players %}
+                                                    <option value="{{ player.id }}"
+                                                            {% if match_stats[player.id].is_best_player_team2 %}selected{% endif %}>
+                                                        {{ player.name }}
+                                                    </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <hr>
+                            
+                            <!-- SEZIONE STATISTICHE GIOCATORI -->
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <h5 class="text-info mb-3">📊 Statistiche Giocatori</h5>
+                                </div>
+                                
                                 <!-- Squadra 1 -->
                                 <div class="col-md-6">
-                                    <h5 class="text-primary">{{ match.team1.name }}</h5>
+                                    <h6 class="text-primary">{{ match.team1.name }}</h6>
                                     {% if team1_players %}
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped">
@@ -382,55 +466,80 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for player in team1_players %}
-                                                        <tr>
-                                                            <td><strong>{{ player.name }}</strong></td>
+                                                        <tr {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                             <td>
-                                                                <!-- NUOVO: Campo numero maglia -->
+                                                                <strong {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
+                                                                    {{ player.name }}
+                                                                </strong>
+                                                                
+                                                                <!-- Bottone X per rimuovere/ripristinare giocatore -->
+                                                                <form method="POST" action="{{ url_for('toggle_player_in_match', match_id=match.id, player_id=player.id) }}" style="display: inline;">
+                                                                    {% if match_stats[player.id]['is_removed'] %}
+                                                                        <!-- Bottone verde per ripristinare -->
+                                                                        <button type="submit" class="restore-player-btn" title="Ripristina giocatore nella partita">
+                                                                            ↻
+                                                                        </button>
+                                                                    {% else %}
+                                                                        <!-- Bottone rosso X per rimuovere -->
+                                                                        <button type="submit" class="remove-player-btn" title="Rimuovi giocatore dalla partita" 
+                                                                                onclick="return confirm('Sei sicuro di voler rimuovere {{ player.name }} da questa partita?')">
+                                                                            ×
+                                                                        </button>
+                                                                    {% endif %}
+                                                                </form>
+                                                            </td>
+                                                            <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_jersey_number" 
-                                                                    value="{{ match_stats[player.id].jersey_number if player.id in match_stats and match_stats[player.id].jersey_number else '' }}" 
+                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}" 
                                                                     min="1" max="99" style="width: 50px;" 
-                                                                    placeholder="N°">
+                                                                    placeholder="N°"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_goals" 
                                                                     value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_assists" 
                                                                     value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_penalties" 
                                                                     value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <!-- NUOVO: Campi per i tempi -->
                                                                 <div class="d-flex flex-column gap-1">
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_goal_times" 
-                                                                        value="{{ match_stats[player.id].goal_times if player.id in match_stats and match_stats[player.id].goal_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}" 
                                                                         placeholder="Gol: 15,30,45" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)">
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_assist_times" 
-                                                                        value="{{ match_stats[player.id].assist_times if player.id in match_stats and match_stats[player.id].assist_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}" 
                                                                         placeholder="Assist: 10,25" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi degli assist separati da virgola (es: 10,25)">
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_penalty_times" 
-                                                                        value="{{ match_stats[player.id].penalty_times if player.id in match_stats and match_stats[player.id].penalty_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].penalty_times if match_stats[player.id].penalty_times else '' }}" 
                                                                         placeholder="Penalità: 35" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi delle penalità separati da virgola (es: 35)">
+                                                                        title="Tempi delle penalità separati da virgola (es: 35)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -445,7 +554,7 @@
 
                                 <!-- Squadra 2 -->
                                 <div class="col-md-6">
-                                    <h5 class="text-success">{{ match.team2.name }}</h5>
+                                    <h6 class="text-success">{{ match.team2.name }}</h6>
                                     {% if team2_players %}
                                         <div class="table-responsive">
                                             <table class="table table-sm table-striped">
@@ -461,55 +570,80 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for player in team2_players %}
-                                                        <tr>
-                                                            <td><strong>{{ player.name }}</strong></td>
+                                                        <tr {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                             <td>
-                                                                <!-- NUOVO: Campo numero maglia -->
+                                                                <strong {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
+                                                                    {{ player.name }}
+                                                                </strong>
+                                                                
+                                                                <!-- Bottone X per rimuovere/ripristinare giocatore -->
+                                                                <form method="POST" action="{{ url_for('toggle_player_in_match', match_id=match.id, player_id=player.id) }}" style="display: inline;">
+                                                                    {% if match_stats[player.id]['is_removed'] %}
+                                                                        <!-- Bottone verde per ripristinare -->
+                                                                        <button type="submit" class="restore-player-btn" title="Ripristina giocatore nella partita">
+                                                                            ↻
+                                                                        </button>
+                                                                    {% else %}
+                                                                        <!-- Bottone rosso X per rimuovere -->
+                                                                        <button type="submit" class="remove-player-btn" title="Rimuovi giocatore dalla partita" 
+                                                                                onclick="return confirm('Sei sicuro di voler rimuovere {{ player.name }} da questa partita?')">
+                                                                            ×
+                                                                        </button>
+                                                                    {% endif %}
+                                                                </form>
+                                                            </td>
+                                                            <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_jersey_number" 
-                                                                    value="{{ match_stats[player.id].jersey_number if player.id in match_stats and match_stats[player.id].jersey_number else '' }}" 
+                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}" 
                                                                     min="1" max="99" style="width: 50px;" 
-                                                                    placeholder="N°">
+                                                                    placeholder="N°"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_goals" 
                                                                     value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_assists" 
                                                                     value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
                                                                     name="player_{{ player.id }}_penalties" 
                                                                     value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;">
+                                                                    min="0" max="10" style="width: 60px;"
+                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <!-- NUOVO: Campi per i tempi -->
                                                                 <div class="d-flex flex-column gap-1">
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_goal_times" 
-                                                                        value="{{ match_stats[player.id].goal_times if player.id in match_stats and match_stats[player.id].goal_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}" 
                                                                         placeholder="Gol: 15,30,45" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)">
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_assist_times" 
-                                                                        value="{{ match_stats[player.id].assist_times if player.id in match_stats and match_stats[player.id].assist_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}" 
                                                                         placeholder="Assist: 10,25" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi degli assist separati da virgola (es: 10,25)">
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm" 
                                                                         name="player_{{ player.id }}_penalty_times" 
-                                                                        value="{{ match_stats[player.id].penalty_times if player.id in match_stats and match_stats[player.id].penalty_times else '' }}" 
+                                                                        value="{{ match_stats[player.id].penalty_times if match_stats[player.id].penalty_times else '' }}" 
                                                                         placeholder="Penalità: 35" 
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi delle penalità separati da virgola (es: 35)">
+                                                                        title="Tempi delle penalità separati da virgola (es: 35)"
+                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -527,16 +661,18 @@
                             <div class="alert alert-info mt-3">
                                 <h6><i class="fas fa-info-circle"></i> Istruzioni:</h6>
                                 <ul class="mb-0">
+                                    <li><strong>Risultato:</strong> Inserisci i gol delle due squadre. Per le qualificazioni, spunta OT o Rigori se il pareggio è stato risolto</li>
                                     <li><strong>Nr.:</strong> Numero di maglia per questa partita (opzionale)</li>
                                     <li><strong>Tempi:</strong> Inserisci i minuti separati da virgola (es: "15,30,45" per gol al 15°, 30° e 45° minuto)</li>
-                                    <li><strong>Validazione:</strong> Il numero di tempi deve corrispondere al numero di azioni</li>
+                                    <li><strong>MVP:</strong> Seleziona il miglior giocatore di ogni squadra</li>
+                                    <li><strong>X Rossa:</strong> Rimuovi un giocatore dalla partita (non conterà nelle statistiche)</li>
                                 </ul>
                             </div>
                             
-                            <!-- Bottone unico per salvare tutte le statistiche -->
-                            <div class="text-center mt-3">
-                               <button type="submit" class="btn btn-success btn-lg w-100">
-                                    <i class="fas fa-save"></i> 💾 Salva Tutto (Risultato + Statistiche + MVP)
+                            <!-- BOTTONE UNICO PER SALVARE TUTTO -->
+                            <div class="text-center mt-4">
+                                <button type="submit" class="btn btn-success btn-lg w-100">
+                                    <i class="fas fa-save"></i> SALVA TUTTO (Risultato + Statistiche + MVP)
                                 </button>
                             </div>
                         </form>
