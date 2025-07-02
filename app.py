@@ -224,7 +224,7 @@ class Player(db.Model):
     name = db.Column(db.String(100), nullable=False)
     team_id = db.Column(db.Integer, db.ForeignKey('team.id'), nullable=False)
     is_registered = db.Column(db.Boolean, default=False)
-    category = db.Column(db.String(20))  # LNA/LNB, 1a Lega, 2a Lega, Non tesserato
+    category = db.Column(db.String(100))  # LNA/LNB, 1a Lega, 2a Lega, Non tesserato
     
     # Player stats
     goals = db.Column(db.Integer, default=0)
@@ -1139,8 +1139,8 @@ class AllStarTeam(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    position = db.Column(db.String(20), nullable=False)  # 'Portiere', 'Difensore_1', 'Difensore_2', 'Attaccante_1', 'Attaccante_2'
-    category = db.Column(db.String(20), nullable=False)  # 'Tesserati', 'Non Tesserati'
+    position = db.Column(db.String(100), nullable=False)  # 'Portiere', 'Difensore_1', 'Difensore_2', 'Attaccante_1', 'Attaccante_2'
+    category = db.Column(db.String(100), nullable=False)  # 'Tesserati', 'Non Tesserati'
     
     # Timestamp
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -1475,6 +1475,25 @@ def reset_settings():
         flash(f'Errore nel reset delle configurazioni: {str(e)}', 'danger')
     
     return redirect(url_for('settings'))
+
+
+@app.route('/fix_category_field', methods=['POST'])
+def fix_category_field():
+    """Aggiorna il campo category per supportare stringhe più lunghe."""
+    try:
+        # Per PostgreSQL, dobbiamo alterare la colonna
+        with db.engine.connect() as conn:
+            conn.execute(db.text('ALTER TABLE player ALTER COLUMN category TYPE VARCHAR(100)'))
+            conn.commit()
+        
+        flash('✅ Campo category aggiornato a 100 caratteri!', 'success')
+        
+    except Exception as e:
+        flash(f'❌ Errore: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
+
+
 
 @app.route('/settings/migrate', methods=['POST'])
 def migrate_settings():
@@ -4581,7 +4600,7 @@ def migrate_from_sqlite():
             results = []
             
             # Lista delle tabelle da migrare nell'ordine corretto
-            tables_order = ['user', 'team', 'player', 'match', 'player_match_stats', 'tournament_config', 'all_star_team', 'final_ranking']
+            tables_order = ['user','users', 'team', 'player', 'match','match_description','player_match_stat', 'player_match_stats', 'tournament_config', 'all_star_team', 'final_ranking']
             
             for table_name in tables_order:
                 try:
@@ -4660,6 +4679,145 @@ def migrate_from_sqlite():
         <h2>❌ Errore durante la migrazione</h2>
         <p><strong>Errore:</strong> {str(e)}</p>
         <p><a href="/migrate_from_sqlite">← Riprova</a></p>
+        '''
+
+
+# Aggiungi anche questa route per importare da CSV
+
+@app.route('/import_from_csv', methods=['GET', 'POST'])
+def import_from_csv():
+    """Importa dati da file CSV (da export precedente)."""
+    
+    if request.method == 'GET':
+        return '''
+        <h2>📁 Importa da CSV</h2>
+        <p>Carica il file ZIP esportato in precedenza con /export_database_csv</p>
+        
+        <form method="post" enctype="multipart/form-data">
+            <h3>Upload del file ZIP:</h3>
+            <input type="file" name="csv_zip" accept=".zip" required>
+            <br><br>
+            <label>
+                <input type="checkbox" name="confirm" required>
+                Confermo di voler importare i dati
+            </label>
+            <br><br>
+            <button type="submit">📤 Importa Dati</button>
+        </form>
+        
+        <p><a href="/">← Torna alla Home</a></p>
+        '''
+    
+    try:
+        import zipfile
+        import csv
+        import tempfile
+        from io import StringIO
+        
+        # Verifica conferma
+        if not request.form.get('confirm'):
+            return "❌ Devi confermare l'importazione"
+        
+        # Ottieni il file ZIP
+        zip_file = request.files.get('csv_zip')
+        if not zip_file:
+            return "❌ Nessun file caricato"
+        
+        results = []
+        
+        with tempfile.NamedTemporaryFile() as temp_file:
+            zip_file.save(temp_file.name)
+            
+            with zipfile.ZipFile(temp_file.name, 'r') as zf:
+                
+                # Importa squadre
+                if 'teams.csv' in zf.namelist():
+                    Team.query.delete()
+                    teams_csv = zf.read('teams.csv').decode('utf-8')
+                    reader = csv.DictReader(StringIO(teams_csv))
+                    count = 0
+                    for row in reader:
+                        team = Team(
+                            name=row['name'],
+                            group=row['group'],
+                            wins=int(row['wins'] or 0),
+                            losses=int(row['losses'] or 0),
+                            draws=int(row['draws'] or 0),
+                            goals_for=int(row['goals_for'] or 0),
+                            goals_against=int(row['goals_against'] or 0),
+                            points=int(row['points'] or 0)
+                        )
+                        db.session.add(team)
+                        count += 1
+                    db.session.commit()
+                    results.append(f"✅ Squadre: {count} importate")
+                
+                # Importa giocatori
+                if 'players.csv' in zf.namelist():
+                    Player.query.delete()
+                    players_csv = zf.read('players.csv').decode('utf-8')
+                    reader = csv.DictReader(StringIO(players_csv))
+                    count = 0
+                    for row in reader:
+                        team = Team.query.filter_by(name=row['team_name']).first()
+                        if team:
+                            player = Player(
+                                name=row['name'],
+                                team_id=team.id,
+                                is_registered=row['is_registered'].lower() == 'true',
+                                category=row['category'] if row['category'] != 'None' else None,
+                                goals=int(row['goals'] or 0),
+                                assists=int(row['assists'] or 0),
+                                penalties=int(row['penalties'] or 0)
+                            )
+                            db.session.add(player)
+                            count += 1
+                    db.session.commit()
+                    results.append(f"✅ Giocatori: {count} importati")
+                
+                # Importa partite
+                if 'matches.csv' in zf.namelist():
+                    Match.query.delete()
+                    matches_csv = zf.read('matches.csv').decode('utf-8')
+                    reader = csv.DictReader(StringIO(matches_csv))
+                    count = 0
+                    for row in reader:
+                        team1 = Team.query.filter_by(name=row['team1_name']).first()
+                        team2 = Team.query.filter_by(name=row['team2_name']).first()
+                        
+                        if team1 and team2:
+                            match = Match(
+                                team1_id=team1.id,
+                                team2_id=team2.id,
+                                date=datetime.strptime(row['date'], '%Y-%m-%d').date() if row['date'] else None,
+                                time=datetime.strptime(row['time'], '%H:%M').time() if row['time'] else None,
+                                team1_score=int(row['team1_score']) if row['team1_score'] else None,
+                                team2_score=int(row['team2_score']) if row['team2_score'] else None,
+                                is_completed=row['is_completed'].lower() == 'true',
+                                phase=row['phase'],
+                                league=row['league'] if row['league'] else None
+                            )
+                            db.session.add(match)
+                            count += 1
+                    db.session.commit()
+                    results.append(f"✅ Partite: {count} importate")
+        
+        return f'''
+        <h2>🎉 Importazione Completata!</h2>
+        <h3>Risultati:</h3>
+        <ul>
+        {''.join([f"<li>{result}</li>" for result in results])}
+        </ul>
+        
+        <p><a href="/">← Vai alla Home per vedere i dati</a></p>
+        '''
+        
+    except Exception as e:
+        db.session.rollback()
+        return f'''
+        <h2>❌ Errore durante l'importazione</h2>
+        <p><strong>Errore:</strong> {str(e)}</p>
+        <p><a href="/import_from_csv">← Riprova</a></p>
         '''
 
 @app.route('/debug_mvp_awards')
