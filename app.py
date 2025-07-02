@@ -4530,6 +4530,138 @@ def force_create_tables():
         <p><a href="/">← Torna alla Home</a></p>
         """
 
+
+# Aggiungi questa route al tuo app.py per migrare i dati
+
+@app.route('/migrate_from_sqlite', methods=['GET', 'POST'])
+def migrate_from_sqlite():
+    """Migra dati da SQLite locale a PostgreSQL."""
+    
+    if request.method == 'GET':
+        return '''
+        <h2>🔄 Migrazione da SQLite a PostgreSQL</h2>
+        <p>Questa funzione migrerà tutti i dati dal database SQLite locale al PostgreSQL.</p>
+        
+        <form method="post" enctype="multipart/form-data">
+            <h3>Upload del database SQLite:</h3>
+            <input type="file" name="sqlite_file" accept=".db" required>
+            <br><br>
+            <label>
+                <input type="checkbox" name="confirm" required>
+                Confermo di voler migrare i dati (sovrascriverà i dati esistenti)
+            </label>
+            <br><br>
+            <button type="submit">🚀 Inizia Migrazione</button>
+        </form>
+        
+        <p><a href="/">← Torna alla Home</a></p>
+        '''
+    
+    try:
+        # Verifica checkbox di conferma
+        if not request.form.get('confirm'):
+            return "❌ Devi confermare la migrazione"
+        
+        # Ottieni il file caricato
+        sqlite_file = request.files.get('sqlite_file')
+        if not sqlite_file:
+            return "❌ Nessun file caricato"
+        
+        # Salva temporaneamente il file
+        import tempfile
+        import sqlite3
+        
+        with tempfile.NamedTemporaryFile(suffix='.db') as temp_file:
+            sqlite_file.save(temp_file.name)
+            
+            # Connessione al SQLite caricato
+            sqlite_conn = sqlite3.connect(temp_file.name)
+            sqlite_conn.row_factory = sqlite3.Row
+            
+            results = []
+            
+            # Lista delle tabelle da migrare nell'ordine corretto
+            tables_order = ['user', 'team', 'player', 'match', 'player_match_stats', 'tournament_config', 'all_star_team', 'final_ranking']
+            
+            for table_name in tables_order:
+                try:
+                    # Controlla se la tabella esiste nel SQLite
+                    cursor = sqlite_conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+                    if not cursor.fetchone():
+                        continue
+                    
+                    # Leggi tutti i dati dalla tabella SQLite
+                    sqlite_cursor = sqlite_conn.execute(f"SELECT * FROM {table_name}")
+                    rows = sqlite_cursor.fetchall()
+                    
+                    if not rows:
+                        results.append(f"⚠️ {table_name}: 0 record")
+                        continue
+                    
+                    # Elimina i dati esistenti in PostgreSQL per questa tabella
+                    if table_name == 'user':
+                        User.query.delete()
+                    elif table_name == 'team':
+                        Team.query.delete()
+                    elif table_name == 'player':
+                        Player.query.delete()
+                    elif table_name == 'match':
+                        Match.query.delete()
+                    elif table_name == 'player_match_stats':
+                        if db.inspect(db.engine).has_table('player_match_stats'):
+                            PlayerMatchStats.query.delete()
+                    # Aggiungi altre tabelle se necessario
+                    
+                    db.session.commit()
+                    
+                    # Inserisci i nuovi dati
+                    migrated_count = 0
+                    for row in rows:
+                        row_dict = dict(row)
+                        
+                        if table_name == 'user':
+                            obj = User(**row_dict)
+                        elif table_name == 'team':
+                            obj = Team(**row_dict)
+                        elif table_name == 'player':
+                            obj = Player(**row_dict)
+                        elif table_name == 'match':
+                            obj = Match(**row_dict)
+                        elif table_name == 'player_match_stats':
+                            obj = PlayerMatchStats(**row_dict)
+                        else:
+                            continue
+                        
+                        db.session.add(obj)
+                        migrated_count += 1
+                    
+                    db.session.commit()
+                    results.append(f"✅ {table_name}: {migrated_count} record migrati")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    results.append(f"❌ {table_name}: Errore - {str(e)}")
+            
+            sqlite_conn.close()
+        
+        return f'''
+        <h2>🎉 Migrazione Completata!</h2>
+        <h3>Risultati:</h3>
+        <ul>
+        {''.join([f"<li>{result}</li>" for result in results])}
+        </ul>
+        
+        <p><a href="/">← Vai alla Home per vedere i dati</a></p>
+        '''
+        
+    except Exception as e:
+        db.session.rollback()
+        return f'''
+        <h2>❌ Errore durante la migrazione</h2>
+        <p><strong>Errore:</strong> {str(e)}</p>
+        <p><a href="/migrate_from_sqlite">← Riprova</a></p>
+        '''
+
 @app.route('/debug_mvp_awards')
 def debug_mvp_awards():
     """Debug: controlla la funzione get_best_player_awards."""
