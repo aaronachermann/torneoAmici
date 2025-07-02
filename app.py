@@ -4483,6 +4483,53 @@ def debug_mvp():
     return redirect(url_for('standings'))
 
 
+# Aggiungi questa route al tuo app.py per creare le tabelle
+
+@app.route('/force_create_tables')
+def force_create_tables():
+    """Forza la creazione di tutte le tabelle."""
+    try:
+        # Importa tutti i modelli per assicurarsi che siano caricati
+        from app import User, Team, Player, Match
+        
+        # Crea tutte le tabelle
+        db.create_all()
+        
+        # Verifica che siano state create
+        inspector = db.inspect(db.engine)
+        tables = inspector.get_table_names()
+        
+        # Crea utente admin di default
+        admin_user = User.query.filter_by(username='admin').first()
+        if not admin_user:
+            admin_user = User(username='admin', role='admin')
+            admin_user.set_password('admin123')
+            db.session.add(admin_user)
+            db.session.commit()
+        
+        return f"""
+        <h2>✅ Tabelle create con successo!</h2>
+        <p><strong>Tabelle create:</strong> {', '.join(tables)}</p>
+        <p><strong>User table exists:</strong> {'user' in tables}</p>
+        <p><strong>Admin user created:</strong> admin / admin123</p>
+        
+        <h3>Test Login:</h3>
+        <form method="post" action="/login">
+            <input type="text" name="username" value="admin" placeholder="Username">
+            <input type="password" name="password" value="admin123" placeholder="Password">
+            <button type="submit">Test Login</button>
+        </form>
+        
+        <p><a href="/">← Torna alla Home</a></p>
+        """
+        
+    except Exception as e:
+        return f"""
+        <h2>❌ Errore nella creazione tabelle</h2>
+        <p><strong>Errore:</strong> {str(e)}</p>
+        <p><a href="/">← Torna alla Home</a></p>
+        """
+
 @app.route('/debug_mvp_awards')
 def debug_mvp_awards():
     """Debug: controlla la funzione get_best_player_awards."""
