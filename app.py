@@ -22,18 +22,39 @@ from functools import wraps
 
 app = Flask(__name__)
 
-# Configurazione per Railway vs sviluppo locale
+# # Configurazione per Railway vs sviluppo locale
+# if os.environ.get('RAILWAY_ENVIRONMENT'):
+#     # In produzione su Railway
+#     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback-secret-key-change-this')
+#     app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///tournament.db')
+#     app.config['DEBUG'] = False
+# else:
+#     # In sviluppo locale
+#     app.config['SECRET_KEY'] = os.urandom(24)
+#     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
+#     app.config['DEBUG'] = True
+#app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
 if os.environ.get('RAILWAY_ENVIRONMENT'):
-    # In produzione su Railway
+    # In produzione su Railway con PostgreSQL
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'fallback-secret-key-change-this')
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///tournament.db')
+    database_url = os.environ.get('DATABASE_URL')
+    
+    # Fix per Railway PostgreSQL (sostituisce postgres:// con postgresql://)
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url or 'sqlite:///tournament.db'
     app.config['DEBUG'] = False
+    print(f"🐘 Usando PostgreSQL in produzione")
 else:
-    # In sviluppo locale
+    # In sviluppo locale con SQLite
     app.config['SECRET_KEY'] = os.urandom(24)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tournament.db'
     app.config['DEBUG'] = True
+    print(f"Usando SQLite in sviluppo")
 
+    
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -7192,18 +7213,40 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
     doc.build(story)
     return "classifiche_complete.pdf"
 
+# if __name__ == '__main__':
+# #PORT=5001 python3 app.py
+#     with app.app_context():
+#         try:
+#             db.create_all()
+#             # create_admin_user()
+#             print("Database inizializzato con successo")
+#         except Exception as e:
+#             print(f"Errore inizializzazione database: {e}")
+    
+
+#     # Configurazione per Railway
+#     port = int(os.environ.get('PORT', 5000))
+#     debug_mode = os.environ.get('FLASK_ENV') != 'production'
+#     app.run(host='0.0.0.0', port=port, debug=debug_mode)
 if __name__ == '__main__':
     with app.app_context():
         try:
             db.create_all()
-            # create_admin_user()
             print("Database inizializzato con successo")
+            
+            # In sviluppo, crea utente admin di default
+            if not os.environ.get('RAILWAY_ENVIRONMENT'):
+                admin_user = User.query.filter_by(username='admin').first()
+                if not admin_user:
+                    admin_user = User(username='admin', role='admin')
+                    admin_user.set_password('admin123')
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    print("Utente admin creato (username: admin, password: admin123)")
         except Exception as e:
             print(f"Errore inizializzazione database: {e}")
     
-
     # Configurazione per Railway
     port = int(os.environ.get('PORT', 5000))
     debug_mode = os.environ.get('FLASK_ENV') != 'production'
     app.run(host='0.0.0.0', port=port, debug=debug_mode)
-    
