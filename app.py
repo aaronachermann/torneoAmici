@@ -621,28 +621,26 @@ def calculate_team_penalty_minutes(team):
     """Calcola i minuti totali di penalità per una squadra."""
     try:
         if db.inspect(db.engine).has_table('player_match_stats'):
-            # Nuovo sistema: usa PlayerMatchStats
+            # Nuovo sistema: usa la durata totale delle penalità
             from sqlalchemy import func
             
-            total_penalties = db.session.query(
+            total_penalty_minutes = db.session.query(
                 func.sum(PlayerMatchStats.penalties)
             ).join(Player).filter(
                 Player.team_id == team.id
             ).scalar()
             
-            # Converti penalità in minuti (assumendo 2 minuti per penalità)
-            penalty_minutes = (total_penalties or 0) * 2
+            return total_penalty_minutes or 0
             
         else:
-            # Fallback al sistema vecchio
+            # Fallback al sistema vecchio (assumendo 2 minuti per penalità)
             total_penalties = sum(player.penalties for player in team.players)
-            penalty_minutes = total_penalties * 2
-        
-        return penalty_minutes
+            return total_penalties * 2
         
     except Exception as e:
         print(f"Errore calcolo penalità per {team.name}: {e}")
         return 0
+    
 
 def get_fair_play_ranking():
     """Calcola la classifica Fair Play."""
@@ -899,6 +897,7 @@ class PlayerMatchStats(db.Model):
     goals = db.Column(db.Integer, default=0)
     assists = db.Column(db.Integer, default=0)
     penalties = db.Column(db.Integer, default=0)
+    penalty_durations = db.Column(db.Text)
     
     # NUOVI CAMPI: Tempi per ogni azione
     goal_times = db.Column(db.Text)  # Es: "15,23,67" per gol al 15°, 23° e 67° minuto
@@ -956,6 +955,29 @@ class PlayerMatchStats(db.Model):
             self.penalty_times = ','.join(map(str, sorted(times_list)))
         else:
             self.penalty_times = None
+
+    def get_penalty_durations_list(self):
+        """Restituisce una lista delle durate delle penalità."""
+        if not self.penalty_durations:
+            return []
+        return [float(duration.strip()) for duration in self.penalty_durations.split(',') if duration.strip()]
+    
+    def set_penalty_durations_list(self, durations_list):
+        """Imposta le durate delle penalità da una lista."""
+        if durations_list:
+            self.penalty_durations = ','.join(str(duration) for duration in durations_list)
+        else:
+            self.penalty_durations = None
+    
+    def get_total_penalty_duration(self):
+        """Restituisce la durata totale delle penalità."""
+        durations = self.get_penalty_durations_list()
+        return sum(durations) if durations else 0
+    
+    def get_penalty_count(self):
+        """Restituisce il numero di penalità."""
+        durations = self.get_penalty_durations_list()
+        return len(durations)
     
     def get_formatted_times_display(self):
         """Restituisce una stringa formattata con tutti i tempi per il display."""
@@ -971,10 +993,16 @@ class PlayerMatchStats(db.Model):
             if assist_times:
                 display_parts.append(f"Assist: {', '.join(map(str, assist_times))}'")
         
-        if self.penalties > 0:
-            penalty_times = self.get_penalty_times_list()
-            if penalty_times:
-                display_parts.append(f"Penalità: {', '.join(map(str, penalty_times))}'")
+        # NUOVA LOGICA per penalità con durate
+        penalty_times = self.get_penalty_times_list()
+        penalty_durations = self.get_penalty_durations_list()
+        
+        if penalty_times and penalty_durations:
+            penalty_info = []
+            for i, (time, duration) in enumerate(zip(penalty_times, penalty_durations)):
+                penalty_info.append(f"{time}' ({duration}min)")
+            
+            display_parts.append(f"Penalità: {', '.join(penalty_info)}")
         
         return " | ".join(display_parts) if display_parts else "-"
 
@@ -1916,8 +1944,36 @@ def debug_finals_mapping():
     return redirect(url_for('schedule'))
 
 
-# Aggiungi questa route alla tua app.py per eseguire la migrazione
-
+@app.route('/migrate_penalty_durations')
+def migrate_penalty_durations():
+    """Migrazione per aggiungere il campo penalty_durations."""
+    try:
+        # Verifica se la tabella PlayerMatchStats esiste
+        if not db.inspect(db.engine).has_table('player_match_stats'):
+            flash('❌ La tabella PlayerMatchStats non esiste.', 'danger')
+            return redirect(url_for('index'))
+        
+        # Ottieni le colonne esistenti
+        inspector = db.inspect(db.engine)
+        existing_columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
+        
+        # Aggiungi la nuova colonna se non esiste
+        if 'penalty_durations' not in existing_columns:
+            try:
+                with db.engine.connect() as conn:
+                    conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN penalty_durations TEXT'))
+                    conn.commit()
+                flash('✅ Colonna penalty_durations aggiunta con successo!', 'success')
+            except Exception as e:
+                flash(f'❌ Errore nell\'aggiungere la colonna penalty_durations: {str(e)}', 'danger')
+                return redirect(url_for('index'))
+        else:
+            flash('ℹ️ La colonna penalty_durations è già presente.', 'info')
+        
+    except Exception as e:
+        flash(f'❌ Errore durante la migrazione: {str(e)}', 'danger')
+    
+    return redirect(url_for('index'))
 @app.route('/migrate_player_stats_schema', methods=['GET', 'POST'])
 def migrate_player_stats_schema():
     """Migra il database per aggiungere i nuovi campi alle statistiche giocatori."""
@@ -3591,75 +3647,128 @@ def match_detail(match_id):
         # 2. SALVA STATISTICHE GIOCATORI + MIGLIORI GIOCATORI
         try:
             # Assicurati che la tabella PlayerMatchStats esista
-            if db.inspect(db.engine).has_table('player_match_stats'):
+            if not db.inspect(db.engine).has_table('player_match_stats'):
+                flash('Errore: Sistema statistiche per partita non disponibile', 'danger')
+                return redirect(url_for('match_detail', match_id=match_id))
+            
+            # Ottieni tutti i giocatori di entrambe le squadre
+            all_players = []
+            team1_players = []
+            team2_players = []
+            
+            if match.team1:
+                team1_players = list(match.team1.players)
+                all_players.extend(team1_players)
+            if match.team2:
+                team2_players = list(match.team2.players)
+                all_players.extend(team2_players)
+            
+            # Ottieni i migliori giocatori selezionati
+            best_player_team1_id = request.form.get('best_player_team1')
+            best_player_team2_id = request.form.get('best_player_team2')
+            
+            # Aggiorna le statistiche per tutti i giocatori
+            for player in all_players:
+                # Leggi i valori base dal form
+                goals = int(request.form.get(f'player_{player.id}_goals', 0))
+                assists = int(request.form.get(f'player_{player.id}_assists', 0))
                 
-                # Ottieni tutti i giocatori di entrambe le squadre
-                all_players = []
-                team1_players = []
-                team2_players = []
+                # NUOVO: Leggi il numero di maglia
+                jersey_number = request.form.get(f'player_{player.id}_jersey_number')
+                jersey_number = int(jersey_number) if jersey_number and jersey_number.strip() else None
                 
-                if match.team1:
-                    team1_players = list(match.team1.players)
-                    all_players.extend(team1_players)
-                if match.team2:
-                    team2_players = list(match.team2.players)
-                    all_players.extend(team2_players)
+                # NUOVO: Leggi i tempi delle azioni
+                goal_times_str = request.form.get(f'player_{player.id}_goal_times', '').strip()
+                assist_times_str = request.form.get(f'player_{player.id}_assist_times', '').strip()
                 
-                # Ottieni i migliori giocatori selezionati
-                best_player_team1_id = request.form.get('best_player_team1')
-                best_player_team2_id = request.form.get('best_player_team2')
+                # === NUOVA GESTIONE PENALITÀ CON DURATA ===
+                penalty_times_str = request.form.get(f'player_{player.id}_penalty_times', '').strip()
+                penalty_durations_str = request.form.get(f'player_{player.id}_penalty_durations', '').strip()
+                total_penalty_duration = float(request.form.get(f'player_{player.id}_penalties', 0) or 0)
                 
-                # Aggiorna le statistiche per tutti i giocatori
-                for player in all_players:
-                    # Leggi i valori dal form
-                    goals = int(request.form.get(f'player_{player.id}_goals', 0))
-                    assists = int(request.form.get(f'player_{player.id}_assists', 0))
-                    penalties = int(request.form.get(f'player_{player.id}_penalties', 0))
-                    jersey_number = request.form.get(f'player_{player.id}_jersey')
-                    goal_times = request.form.get(f'player_{player.id}_goal_times', '')
-                    assist_times = request.form.get(f'player_{player.id}_assist_times', '')
-                    penalty_times = request.form.get(f'player_{player.id}_penalty_times', '')
-                    
-                    # Determina se è il miglior giocatore della sua squadra
-                    is_best_team1 = (str(player.id) == best_player_team1_id and player in team1_players)
-                    is_best_team2 = (str(player.id) == best_player_team2_id and player in team2_players)
-                    
-                    # Trova o crea le statistiche per questo giocatore in questa partita
-                    stats = PlayerMatchStats.query.filter_by(
+                # Converte i tempi e le durate in liste
+                penalty_times = []
+                if penalty_times_str:
+                    try:
+                        penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
+                    except:
+                        penalty_times = []
+                
+                penalty_durations = []
+                if penalty_durations_str:
+                    try:
+                        penalty_durations = [float(d.strip()) for d in penalty_durations_str.split(',') if d.strip()]
+                    except:
+                        penalty_durations = []
+                
+                # Validazione: tempi e durate devono essere dello stesso numero
+                if len(penalty_times) != len(penalty_durations) and (penalty_times or penalty_durations):
+                    flash(f'Errore: {player.name} ha {len(penalty_times)} tempi penalità ma {len(penalty_durations)} durate', 'danger')
+                    continue
+                
+                # Converte altri tempi in liste di interi
+                goal_times = []
+                if goal_times_str:
+                    try:
+                        goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
+                    except:
+                        goal_times = []
+                
+                assist_times = []
+                if assist_times_str:
+                    try:
+                        assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
+                    except:
+                        assist_times = []
+                
+                # Validazioni esistenti per gol e assist
+                if len(goal_times) != goals and goals > 0:
+                    flash(f'Attenzione: {player.name} ha {goals} gol ma solo {len(goal_times)} tempi specificati', 'warning')
+                if len(assist_times) != assists and assists > 0:
+                    flash(f'Attenzione: {player.name} ha {assists} assist ma solo {len(assist_times)} tempi specificati', 'warning')
+                
+                # Determina se è il miglior giocatore
+                is_best_team1 = str(player.id) == best_player_team1_id
+                is_best_team2 = str(player.id) == best_player_team2_id
+                
+                # Trova o crea le statistiche per questo giocatore in questa partita
+                stats = PlayerMatchStats.query.filter_by(
+                    player_id=player.id,
+                    match_id=match_id
+                ).first()
+                
+                if not stats:
+                    # Crea nuove statistiche per questa partita
+                    stats = PlayerMatchStats(
                         player_id=player.id,
-                        match_id=match_id
-                    ).first()
-                    
-                    if not stats:
-                        # Crea nuove statistiche per questa partita
-                        stats = PlayerMatchStats(
-                            player_id=player.id,
-                            match_id=match_id,
-                            goals=goals,
-                            assists=assists,
-                            penalties=penalties,
-                            jersey_number=jersey_number if jersey_number else None,
-                            goal_times=goal_times if goal_times else None,
-                            assist_times=assist_times if assist_times else None,
-                            penalty_times=penalty_times if penalty_times else None,
-                            is_best_player_team1=is_best_team1,
-                            is_best_player_team2=is_best_team2,
-                            is_removed=False  # NUOVO: Assicurati che non sia rimosso di default
-                        )
-                        db.session.add(stats)
-                    else:
-                        # Aggiorna le statistiche esistenti per questa partita
-                        stats.goals = goals
-                        stats.assists = assists
-                        stats.penalties = penalties
-                        stats.jersey_number = jersey_number if jersey_number else None
-                        stats.goal_times = goal_times if goal_times else None
-                        stats.assist_times = assist_times if assist_times else None
-                        stats.penalty_times = penalty_times if penalty_times else None
-                        stats.is_best_player_team1 = is_best_team1
-                        stats.is_best_player_team2 = is_best_team2
-                        # IMPORTANTE: Non modificare is_removed qui, mantieni il valore esistente
-                
+                        match_id=match_id,
+                        goals=goals,
+                        assists=assists,
+                        penalties=total_penalty_duration,  # ORA CONTIENE LA DURATA TOTALE
+                        jersey_number=jersey_number,
+                        goal_times=','.join(map(str, goal_times)) if goal_times else None,
+                        assist_times=','.join(map(str, assist_times)) if assist_times else None,
+                        penalty_times=','.join(map(str, penalty_times)) if penalty_times else None,
+                        penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,  # NUOVO CAMPO
+                        is_best_player_team1=is_best_team1,
+                        is_best_player_team2=is_best_team2,
+                        is_removed=False
+                    )
+                    db.session.add(stats)
+                else:
+                    # Aggiorna le statistiche esistenti per questa partita
+                    stats.goals = goals
+                    stats.assists = assists
+                    stats.penalties = total_penalty_duration  # ORA CONTIENE LA DURATA TOTALE
+                    stats.jersey_number = jersey_number if jersey_number else None
+                    stats.goal_times = ','.join(map(str, goal_times)) if goal_times else None
+                    stats.assist_times = ','.join(map(str, assist_times)) if assist_times else None
+                    stats.penalty_times = ','.join(map(str, penalty_times)) if penalty_times else None
+                    stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None  # NUOVO CAMPO
+                    stats.is_best_player_team1 = is_best_team1
+                    stats.is_best_player_team2 = is_best_team2
+                    # IMPORTANTE: Non modificare is_removed qui, mantieni il valore esistente
+        
         except Exception as e:
             db.session.rollback()
             flash(f'Errore nel salvataggio statistiche: {str(e)}', 'danger')
@@ -3675,11 +3784,11 @@ def match_detail(match_id):
         else:
             return redirect(url_for('match_detail', match_id=match_id))
     
-    # GET: Carica i dati per visualizzazione
+    # GET: Carica i dati per visualizzazione (aggiungi gestione per le nuove durate)
     team1_players = match.team1.players if match.team1 else []
     team2_players = match.team2.players if match.team2 else []
     
-    # Crea un dizionario per le statistiche di questa partita con i NUOVI CAMPI incluso is_removed
+    # Crea un dizionario per le statistiche di questa partita con i NUOVI CAMPI
     match_stats = {}
     best_player_team1 = None
     best_player_team2 = None
@@ -3696,21 +3805,20 @@ def match_detail(match_id):
                 match_stats[player.id] = {
                     'goals': stats.goals,
                     'assists': stats.assists,
-                    'penalties': stats.penalties,
+                    'penalties': stats.penalties,  # Ora contiene la durata totale
                     'jersey_number': stats.jersey_number,
                     'goal_times': stats.goal_times,
                     'assist_times': stats.assist_times,
                     'penalty_times': stats.penalty_times,
+                    'penalty_durations': stats.penalty_durations,  # NUOVO CAMPO
                     'is_best_player_team1': stats.is_best_player_team1,
                     'is_best_player_team2': stats.is_best_player_team2,
-                    'is_removed': getattr(stats, 'is_removed', False),  # NUOVO: Gestisci is_removed
-                    'formatted_times': stats.get_formatted_times_display() if hasattr(stats, 'get_formatted_times_display') else '-'
+                    'is_removed': stats.is_removed
                 }
                 
-                # Trova i migliori giocatori (solo se NON rimossi)
-                if stats.is_best_player_team1 and not getattr(stats, 'is_removed', False):
+                if stats.is_best_player_team1:
                     best_player_team1 = player
-                elif stats.is_best_player_team2 and not getattr(stats, 'is_removed', False):
+                if stats.is_best_player_team2:
                     best_player_team2 = player
             else:
                 match_stats[player.id] = {
@@ -3721,14 +3829,13 @@ def match_detail(match_id):
                     'goal_times': None,
                     'assist_times': None,
                     'penalty_times': None,
+                    'penalty_durations': None,  # NUOVO CAMPO
                     'is_best_player_team1': False,
                     'is_best_player_team2': False,
-                    'is_removed': False,  # NUOVO: Default non rimosso
-                    'formatted_times': '-'
+                    'is_removed': False
                 }
-    except Exception as e:
-        print(f"Errore nel caricamento statistiche: {e}")
-        # Se la tabella non esiste o c'è un errore, usa valori vuoti
+    except:
+        # Fallback se la tabella non esiste
         for player in team1_players + team2_players:
             match_stats[player.id] = {
                 'goals': 0,
@@ -3738,10 +3845,10 @@ def match_detail(match_id):
                 'goal_times': None,
                 'assist_times': None,
                 'penalty_times': None,
+                'penalty_durations': None,  # NUOVO CAMPO
                 'is_best_player_team1': False,
                 'is_best_player_team2': False,
-                'is_removed': False,  # NUOVO: Default non rimosso
-                'formatted_times': '-'
+                'is_removed': False
             }
     
     return render_template('match_detail.html', 
