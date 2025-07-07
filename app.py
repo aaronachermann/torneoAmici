@@ -1949,6 +1949,18 @@ def debug_finals_mapping():
     flash(f'Debug Beer League Finals: {debug_info}', 'info')
     return redirect(url_for('schedule'))
 
+@app.teardown_appcontext
+def cleanup_db(error):
+    if error:
+        db.session.rollback()
+    db.session.remove()
+
+@app.errorhandler(500)
+def handle_database_error(e):
+    db.session.rollback()
+    flash('Errore del database. Riprova.', 'error')
+    return redirect(url_for('index'))
+
 
 @app.route('/migrate_penalty_durations')
 def migrate_penalty_durations():
