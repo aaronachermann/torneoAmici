@@ -236,3 +236,375 @@ footer {
         height: 40px;
     }
 }
+
+
+/* Custom styles for the hockey tournament app */
+
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f8f9fa;
+}
+
+.navbar {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-header {
+  font-weight: 600;
+}
+
+.jumbotron {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.table th {
+  font-weight: 600;
+}
+
+.btn {
+  border-radius: 4px;
+}
+
+footer {
+  margin-top: 2rem;
+}
+
+/* Team colors for groups */
+.group-a {
+  background-color: rgba(0, 123, 255, 0.1);
+}
+
+.group-b {
+  background-color: rgba(40, 167, 69, 0.1);
+}
+
+.group-c {
+  background-color: rgba(255, 193, 7, 0.1);
+}
+
+.group-d {
+  background-color: rgba(220, 53, 69, 0.1);
+}
+
+/* Match result styling */
+.match-result {
+  font-size: 1.2rem;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .container {
+    padding-left: 15px;
+    padding-right: 15px;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
+
+/* Allineamento tabelle playoff */
+.playoff-table {
+    margin-bottom: 2rem;
+}
+
+.playoff-table .table {
+    table-layout: fixed;
+    width: 100%;
+}
+
+.playoff-table .table th,
+.playoff-table .table td {
+    vertical-align: middle;
+    text-align: center;
+    padding: 12px 8px;
+}
+
+/* Larghezze colonne fisse per consistenza */
+.playoff-table .table th:nth-child(1),
+.playoff-table .table td:nth-child(1) { width: 80px; }   /* Partita N° */
+
+.playoff-table .table th:nth-child(2),
+.playoff-table .table td:nth-child(2) { width: 70px; }   /* Orario */
+
+.playoff-table .table th:nth-child(3),
+.playoff-table .table td:nth-child(3) { width: 200px; }  /* Squadra 1 */
+
+.playoff-table .table th:nth-child(4),
+.playoff-table .table td:nth-child(4) { width: 200px; }  /* Squadra 2 */
+
+.playoff-table .table th:nth-child(5),
+.playoff-table .table td:nth-child(5) { width: 120px; }  /* Risultato */
+
+.playoff-table .table th:nth-child(6),
+.playoff-table .table td:nth-child(6) { width: 90px; }   /* Azioni */
+
+/* Altezza minima uniforme per le righe */
+.playoff-table .table tbody tr {
+    height: 60px;
+}
+
+/* Sezioni semifinali con spacing uniforme */
+.semifinal-section {
+    margin-bottom: 1.5rem;
+}
+
+.semifinal-section h5 {
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+
+/* Header delle card uniformi */
+.playoff-card .card-header {
+    padding: 0.75rem 1.25rem;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+}
+
+.playoff-card .card-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.player-slot {
+    border: 2px dashed #ddd;
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.player-slot:hover {
+    border-color: #007bff;
+    background-color: #f8f9fa;
+}
+
+.player-slot.selected {
+    border-color: #28a745;
+    background-color: #d4edda;
+}
+
+.player-slot .fas {
+    font-size: 2rem;
+    color: #6c757d;
+    margin-bottom: 0.5rem;
+}
+
+.player-slot.selected .fas {
+    color: #28a745;
+}
+
+.player-slot small {
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+.player-slot.selected small {
+    color: #155724;
+}
+
+/* Stili per le animazioni delle penalità */
+.penalty-row {
+    transition: all 0.3s ease;
+}
+
+.penalty-row:hover {
+    background-color: #f8f9fa !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.penalty-row.new-penalty {
+    animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Stili per il modal delle penalità */
+.modal-penalty-time, .modal-penalty-duration {
+    transition: all 0.3s ease;
+}
+
+.modal-penalty-time:focus, .modal-penalty-duration:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    transform: translateY(-2px);
+}
+
+.text-transparent {
+    color: transparent !important;
+}
+
+.toast {
+    min-width: 250px;
+    animation: slideInFromRight 0.3s ease-out;
+}
+
+#modal-total-penalty-time {
+    font-size: 1.1rem;
+    min-width: 60px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.modal-lg {
+    max-width: 800px;
+}
+
+/* Stili per i bottoni del modal */
+.modal-footer .btn {
+    min-width: 120px;
+    font-weight: 600;
+}
+
+.modal-header {
+    border-bottom: 2px solid #dee2e6;
+}
+
+.modal-header .modal-title {
+    font-weight: 600;
+    color: #495057;
+}
+
+.modal-body .alert-info {
+    border-left: 4px solid #17a2b8;
+    background-color: #d1ecf1;
+}
+
+/* Stili per le penalità nel modal */
+.penalties-list .penalty-row {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+    position: relative;
+    overflow: hidden;
+}
+
+.penalties-list .penalty-row::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.penalties-list .penalty-row:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Responsive design per il modal */
+@media (max-width: 768px) {
+    .modal-lg {
+        max-width: 95%;
+        margin: 1rem auto;
+    }
+    
+    .modal-dialog {
+        margin: 1rem;
+    }
+    
+    .modal-body .row.g-3 {
+        --bs-gutter-x: 0.5rem;
+    }
+    
+    .modal-body .col-md-4,
+    .modal-body .col-md-6,
+    .modal-body .col-md-2 {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Stili per l'indicatore di caricamento */
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Stili per evidenziare i campi obbligatori */
+.form-control:invalid,
+.form-select:invalid {
+    border-color: #dc3545;
+}
+
+.form-control:valid,
+.form-select:valid {
+    border-color: #28a745;
+}
+
+/* Stili per i tooltip */
+.tooltip-inner {
+    max-width: 300px;
+    text-align: left;
+}
+
+/* Stili per le animazioni dei pulsanti */
+.btn {
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+/* Stili per la sezione penalità compatta */
+.penalty-summary {
+    font-size: 0.875rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+}
+
+.penalty-summary .penalty-total {
+    font-weight: 600;
+    color: #dc3545;
+}
+
+.penalty-summary:empty {
+    display: none;
+}

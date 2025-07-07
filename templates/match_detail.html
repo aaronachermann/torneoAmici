@@ -5,13 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dettagli Partita - Gestione Torneo degli Amici</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
+        /* Larghezze specifiche per le colonne */
+        .stats-table th:nth-child(1), .stats-table td:nth-child(1) { width: 140px; } /* Giocatore */
+        .stats-table th:nth-child(2), .stats-table td:nth-child(2) { width: 60px; }  /* Nr. */
+        .stats-table th:nth-child(3), .stats-table td:nth-child(3) { width: 70px; }  /* Gol */
+        .stats-table th:nth-child(4), .stats-table td:nth-child(4) { width: 80px; }  /* Assist */
+        .stats-table th:nth-child(5), .stats-table td:nth-child(5) { width: 280px; } /* Penalità */
+        .stats-table th:nth-child(6), .stats-table td:nth-child(6) { width: 150px; } /* Tempi */
+
+        /* Stili per le penalità */
         .penalty-section {
             background: #f8f9fa;
             border-radius: 8px;
             padding: 8px;
             border: 1px solid #dee2e6;
+            min-width: 280px;
         }
 
         .penalty-row {
@@ -30,22 +41,28 @@
             font-size: 12px;
             text-align: center;
             border: 1px solid #bee5eb;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .penalties-list {
-            max-height: 300px;
-            overflow-y: auto;
+        .penalty-info {
+            font-size: 0.875rem;
         }
 
-        /* Stili per i bottoni più grandi e visibili */
-        .add-penalty, .remove-penalty {
+        /* Stili per i bottoni */
+        .add-penalty {
+            white-space: nowrap;
+            font-size: 11px;
+            padding: 3px 8px !important;
             border-radius: 4px;
             font-weight: 600;
             transition: all 0.2s ease;
         }
 
         .add-penalty:hover {
-            background-color: #28a745;
+            background-color: #0d6efd;
             color: white;
             transform: scale(1.05);
         }
@@ -56,65 +73,30 @@
             transform: scale(1.05);
         }
 
-        /* Migliora la leggibilità dei form piccoli */
-        .penalty-row .form-control-sm, 
-        .penalty-row .form-select-sm {
-            font-size: 12px;
-            height: 28px;
+        /* Stili per il modal */
+        .modal-penalty-time, .modal-penalty-duration {
+            transition: all 0.3s ease;
         }
 
-        .penalty-row .form-label {
-            font-weight: 600;
-            color: #495057;
+        .modal-penalty-time:focus, .modal-penalty-duration:focus {
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
         }
 
-        /* Animazione per nuove penalità */
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        .text-transparent {
+            color: transparent !important;
         }
 
-        .penalty-row.new-penalty {
-            animation: slideIn 0.3s ease-out;
+        .toast {
+            min-width: 250px;
         }
 
-        /* Responsive per schermi piccoli */
-        @media (max-width: 768px) {
-            .penalty-section {
-                min-width: 250px;
-            }
-            
-            .penalty-row .col-4,
-            .penalty-row .col-6,
-            .penalty-row .col-2 {
-                margin-bottom: 8px;
-            }
-        }
-        .best-player-selector {
-            background-color: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .best-player-highlight {
-            background-color: #d1ecf1 !important;
-            border-left: 4px solid #0dcaf0;
-        }
-        .award-badge {
-            background: linear-gradient(45deg, #ffd700, #ffed4e);
-            color: #333;
-            font-weight: bold;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        #modal-total-penalty-time {
+            font-size: 1.1rem;
+            min-width: 60px;
         }
 
-
+        /* Stili per giocatori rimossi */
         .player-removed {
             color: #6c757d !important;
             text-decoration: line-through;
@@ -158,6 +140,34 @@
         .restore-player-btn:hover {
             background: #218838;
         }
+
+        /* Stili per MVP */
+        .award-badge {
+            background: linear-gradient(45deg, #ffd700, #ffed4e);
+            color: #333;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container-fluid {
+                padding-left: 15px;
+                padding-right: 15px;
+            }
+            
+            .penalty-section {
+                min-width: 250px;
+            }
+            
+            .penalty-info {
+                font-size: 0.8rem;
+            }
+            
+            .stats-table {
+                font-size: 0.875rem;
+            }
+        }
     </style>
 </head>
 <body class="d-flex flex-column min-vh-100">
@@ -189,7 +199,7 @@
         </div>
     </nav>
 
-    <div class="container mt-4">
+    <div class="container-fluid mt-4" style="max-width: 1800px;">
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
@@ -287,84 +297,13 @@
             </div>
         </div>
 
-        <!-- Inserimento Risultato -->
-        <!-- {% if not match.is_completed and match.team1 and match.team2 %}
-            <div class="row mt-4">
-                <div class="col-md-8 mx-auto">
-                    <div class="card">
-                        <div class="card-header bg-success text-white">
-                            <h4 class="mb-0">Inserisci Risultato</h4>
-                        </div>
-                        <div class="card-body">
-                            <form method="post">
-                                {% if return_anchor %}
-                                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
-                                {% endif %}
-                                
-                                <div class="row">
-                                    <div class="col-6">
-                                        <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
-                                        <input type="number" class="form-control" id="team1_score" name="team1_score" min="0" required>
-                                    </div>
-                                    <div class="col-6">
-                                        <label for="team2_score" class="form-label">{{ match.team2.name }}</label>
-                                        <input type="number" class="form-control" id="team2_score" name="team2_score" min="0" required>
-                                    </div>
-                                </div>
-                                
-                                {% if match.phase == 'group' %}
-                                    <div class="alert alert-info mt-3">
-                                        <strong>Sistema Punti:</strong><br>
-                                        • <strong>3 punti</strong>: vittoria nei tempi regolamentari<br>
-                                        • <strong>2 punti</strong>: vittoria overtime/rigori<br>
-                                        • <strong>1 punto</strong>: sconfitta overtime/rigori<br>
-                                        • <strong>0 punti</strong>: sconfitta nei tempi regolamentari
-                                    </div>
-                                    
-                                    <div class="row mt-3">
-                                        <div class="col-12">
-                                            <label class="form-label"><strong>Modalità di conclusione:</strong></label>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="radio" name="conclusion_type" id="regulation" value="regulation" checked>
-                                                <label class="form-check-label" for="regulation">
-                                                    Tempi regolamentari
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="overtime" name="overtime">
-                                                <label class="form-check-label" for="overtime">
-                                                   Overtime (tempi supplementari)
-                                                </label>
-                                            </div>
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" id="shootout" name="shootout">
-                                                <label class="form-check-label" for="shootout">
-                                                    🥅 Rigori (shootout)
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div id="tie-warning" class="alert alert-warning mt-3" style="display: none;">
-                                        <strong>⚠️ Attenzione:</strong> Nelle qualificazioni non sono ammessi pareggi! 
-                                        Se il punteggio è pari, seleziona Overtime o Rigori per indicare come è stata decisa la partita.
-                                    </div>
-                                {% endif %}
-                           
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% endif %} -->
-
-        <!-- Modifica Risultato -->
+        <!-- Modifica Risultato Rapida -->
         {% if match.is_completed and match.team1 and match.team2 %}
             <div class="row mt-4">
                 <div class="col-md-8 mx-auto">
                     <div class="card">
                         <div class="card-header bg-warning text-dark">
-                            <h4 class="mb-0">Modifica Risultato</h4>
+                            <h4 class="mb-0">Modifica Risultato Rapida</h4>
                         </div>
                         <div class="card-body">
                             <form method="post">
@@ -418,7 +357,7 @@
                                     </div>
                                 {% endif %}
                                 
-                                 <div class="row mt-4">
+                                <div class="row mt-4">
                                     <div class="col-md-6">
                                         <button type="submit" class="btn btn-primary w-100">
                                             <i class="fas fa-save"></i> Aggiorna Risultato
@@ -432,6 +371,7 @@
                                             <i class="fas fa-undo"></i> Reset Partita
                                         </button>
                                     </div>
+                                </div>
                             </form>
                         </div>
                     </div>
@@ -439,7 +379,7 @@
             </div>
         {% endif %}
 
-       <!-- Statistiche Giocatori - FORM UNICO CON MIGLIORI GIOCATORI -->
+        <!-- Statistiche Giocatori - FORM UNICO CON MIGLIORI GIOCATORI -->
         {% if match.team1 and match.team2 %}
         <div class="row mt-4">
             <div class="col-12">
@@ -460,14 +400,14 @@
                                     <h5 class="text-primary mb-3">🏒 Risultato Partita</h5>
                                     <div class="row">
                                         <div class="col-md-4">
-                                            <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
-                                            <input type="number" class="form-control" id="team1_score" name="team1_score" 
+                                            <label for="team1_score_main" class="form-label">{{ match.team1.name }}</label>
+                                            <input type="number" class="form-control" id="team1_score_main" name="team1_score" 
                                                 value="{{ match.team1_score if match.team1_score is not none else '' }}" 
                                                 min="0" placeholder="Gol">
                                         </div>
                                         <div class="col-md-4">
-                                            <label for="team2_score" class="form-label">{{ match.team2.name }}</label>
-                                            <input type="number" class="form-control" id="team2_score" name="team2_score" 
+                                            <label for="team2_score_main" class="form-label">{{ match.team2.name }}</label>
+                                            <input type="number" class="form-control" id="team2_score_main" name="team2_score" 
                                                 value="{{ match.team2_score if match.team2_score is not none else '' }}" 
                                                 min="0" placeholder="Gol">
                                         </div>
@@ -475,14 +415,14 @@
                                             {% if match.phase == 'group' %}
                                                 <label class="form-label">Modalità</label><br>
                                                 <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="overtime" name="overtime" 
+                                                    <input class="form-check-input" type="checkbox" id="overtime_main" name="overtime" 
                                                         {% if match.overtime %}checked{% endif %}>
-                                                    <label class="form-check-label" for="overtime">⏰ OT</label>
+                                                    <label class="form-check-label" for="overtime_main">⏰ OT</label>
                                                 </div>
                                                 <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="shootout" name="shootout" 
+                                                    <input class="form-check-input" type="checkbox" id="shootout_main" name="shootout" 
                                                         {% if match.shootout %}checked{% endif %}>
-                                                    <label class="form-check-label" for="shootout">🥅 Rigori</label>
+                                                    <label class="form-check-label" for="shootout_main">🥅 Rigori</label>
                                                 </div>
                                             {% endif %}
                                         </div>
@@ -542,7 +482,7 @@
                                     <h6 class="text-primary">{{ match.team1.name }}</h6>
                                     {% if team1_players %}
                                         <div class="table-responsive">
-                                            <table class="table table-sm table-striped">
+                                            <table class="table table-bordered stats-table" style="min-width: 800px;">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>Giocatore</th>
@@ -599,13 +539,32 @@
                                                                     min="0" max="10" style="width: 60px;"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
-                                                            <!-- <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_penalties" 
-                                                                    value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;"
-                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
-                                                            </td> -->
+                                                            <td>
+                                                                <!-- Container principale per penalità -->
+                                                                <div class="penalty-section">
+                                                                    <!-- Sezione delle penalità con modal -->
+                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                        <small class="text-muted fw-bold">Penalità</small>
+                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty" 
+                                                                                data-player-id="{{ player.id }}" 
+                                                                                data-player-name="{{ player.name }}"
+                                                                                {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
+                                                                            <i class="fas fa-plus me-1"></i>Aggiungi
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <!-- Container per mostrare le penalità esistenti -->
+                                                                    <div id="penalties-container-{{ player.id }}" class="penalties-list">
+                                                                        <!-- Le penalità saranno mostrate qui in forma compatta -->
+                                                                    </div>
+
+                                                                    <!-- Totale penalità -->
+                                                                    <div class="penalty-summary mt-2 p-2 text-center border rounded bg-light">
+                                                                        <small class="text-muted">Totale: </small>
+                                                                        <span class="penalty-total fw-bold text-danger">0 min</span>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
                                                             <td>
                                                                 <div class="d-flex flex-column gap-1">
                                                                     <input type="text" class="form-control form-control-sm" 
@@ -624,65 +583,6 @@
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                 </div>
                                                             </td>
-                                                            <td>
-                                                                <!-- Container principale per penalità -->
-                                                                <div class="penalty-section" style="min-width: 280px;">
-                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                        <small class="text-muted fw-bold">Penalità</small>
-                                                                        <button type="button" class="btn btn-outline-success btn-sm add-penalty" 
-                                                                                data-player-id="{{ player.id }}" style="padding: 2px 8px;">
-                                                                            <i class="fas fa-plus"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Container dinamico per le penalità -->
-                                                                    <div id="penalties-container-{{ player.id }}" class="penalties-list">
-                                                                        <!-- Prima penalità sempre presente -->
-                                                                        <div class="penalty-row mb-2 p-2 border rounded bg-light">
-                                                                            <div class="row g-2 align-items-center">
-                                                                                <div class="col-4">
-                                                                                    <label class="form-label mb-1" style="font-size: 11px;">Tempo</label>
-                                                                                    <input type="number" class="form-control form-control-sm penalty-time" 
-                                                                                        placeholder="25" min="1" max="60" step="1">
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label mb-1" style="font-size: 11px;">Durata</label>
-                                                                                    <select class="form-select form-select-sm penalty-duration">
-                                                                                        <option value="">Seleziona</option>
-                                                                                        <option value="1">1 min</option>
-                                                                                        <option value="2">2 min</option>
-                                                                                        <option value="2.5">2.5 min</option>
-                                                                                        <option value="5">5 min</option>
-                                                                                        <option value="10">10 min</option>
-                                                                                    </select>
-                                                                                </div>
-                                                                                <div class="col-2 text-center">
-                                                                                    <button type="button" class="btn btn-outline-danger btn-sm remove-penalty mt-3" 
-                                                                                            style="padding: 2px 6px; font-size: 12px;">
-                                                                                        <i class="fas fa-times"></i>
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Riepilogo durata totale -->
-                                                                    <div class="penalty-summary mt-2 p-2 bg-info bg-opacity-10 rounded">
-                                                                        <small class="text-muted">
-                                                                            <strong>Totale:</strong> 
-                                                                            <span class="penalty-total-display" id="penalty-total-display-{{ player.id }}">0</span> min
-                                                                        </small>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Campi nascosti per invio dati -->
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalty_times" 
-                                                                        id="penalty_times_{{ player.id }}">
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalty_durations" 
-                                                                        id="penalty_durations_{{ player.id }}">
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalties" 
-                                                                        id="total_penalties_{{ player.id }}">
-                                                                </div>
-                                                            </td>
                                                         </tr>
                                                     {% endfor %}
                                                 </tbody>
@@ -698,7 +598,7 @@
                                     <h6 class="text-success">{{ match.team2.name }}</h6>
                                     {% if team2_players %}
                                         <div class="table-responsive">
-                                            <table class="table table-sm table-striped">
+                                            <table class="table table-bordered stats-table" style="min-width: 800px;">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>Giocatore</th>
@@ -756,11 +656,30 @@
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <!-- <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_penalties" 
-                                                                    value="{{ match_stats[player.id].penalties if player.id in match_stats else 0 }}" 
-                                                                    min="0" max="10" style="width: 60px;"
-                                                                    {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}> -->
+                                                                <!-- Container principale per penalità -->
+                                                                <div class="penalty-section">
+                                                                    <!-- Sezione delle penalità con modal -->
+                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                        <small class="text-muted fw-bold">Penalità</small>
+                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty" 
+                                                                                data-player-id="{{ player.id }}" 
+                                                                                data-player-name="{{ player.name }}"
+                                                                                {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
+                                                                            <i class="fas fa-plus me-1"></i>Aggiungi
+                                                                        </button>
+                                                                    </div>
+
+                                                                    <!-- Container per mostrare le penalità esistenti -->
+                                                                    <div id="penalties-container-{{ player.id }}" class="penalties-list">
+                                                                        <!-- Le penalità saranno mostrate qui in forma compatta -->
+                                                                    </div>
+
+                                                                    <!-- Totale penalità -->
+                                                                    <div class="penalty-summary mt-2 p-2 text-center border rounded bg-light">
+                                                                        <small class="text-muted">Totale: </small>
+                                                                        <span class="penalty-total fw-bold text-danger">0 min</span>
+                                                                    </div>
+                                                                </div>
                                                             </td>
                                                             <td>
                                                                 <div class="d-flex flex-column gap-1">
@@ -778,72 +697,6 @@
                                                                         style="font-size: 11px; width: 120px;"
                                                                         title="Tempi degli assist separati da virgola (es: 10,25)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
-                                                                    <!-- <input type="text" class="form-control form-control-sm" 
-                                                                        name="player_{{ player.id }}_penalty_times" 
-                                                                        value="{{ match_stats[player.id].penalty_times if match_stats[player.id].penalty_times else '' }}" 
-                                                                        placeholder="Penalità: 35" 
-                                                                        style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi delle penalità separati da virgola (es: 35)"
-                                                                        {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}> -->
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <!-- Container principale per penalità -->
-                                                                <div class="penalty-section" style="min-width: 280px;">
-                                                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                                                        <small class="text-muted fw-bold">Penalità</small>
-                                                                        <button type="button" class="btn btn-outline-success btn-sm add-penalty" 
-                                                                                data-player-id="{{ player.id }}" style="padding: 2px 8px;">
-                                                                            <i class="fas fa-plus"></i>
-                                                                        </button>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Container dinamico per le penalità -->
-                                                                    <div id="penalties-container-{{ player.id }}" class="penalties-list">
-                                                                        <!-- Prima penalità sempre presente -->
-                                                                        <div class="penalty-row mb-2 p-2 border rounded bg-light">
-                                                                            <div class="row g-2 align-items-center">
-                                                                                <div class="col-4">
-                                                                                    <label class="form-label mb-1" style="font-size: 11px;">Tempo</label>
-                                                                                    <input type="number" class="form-control form-control-sm penalty-time" 
-                                                                                        placeholder="25" min="1" max="60" step="1">
-                                                                                </div>
-                                                                                <div class="col-6">
-                                                                                    <label class="form-label mb-1" style="font-size: 11px;">Durata</label>
-                                                                                    <select class="form-select form-select-sm penalty-duration">
-                                                                                        <option value="">Seleziona</option>
-                                                                                        <option value="1">1 min</option>
-                                                                                        <option value="2">2 min</option>
-                                                                                        <option value="2.5">2.5 min</option>
-                                                                                        <option value="5">5 min</option>
-                                                                                        <option value="10">10 min</option>
-                                                                                    </select>
-                                                                                </div>
-                                                                                <div class="col-2 text-center">
-                                                                                    <button type="button" class="btn btn-outline-danger btn-sm remove-penalty mt-3" 
-                                                                                            style="padding: 2px 6px; font-size: 12px;">
-                                                                                        <i class="fas fa-times"></i>
-                                                                                    </button>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Riepilogo durata totale -->
-                                                                    <div class="penalty-summary mt-2 p-2 bg-info bg-opacity-10 rounded">
-                                                                        <small class="text-muted">
-                                                                            <strong>Totale:</strong> 
-                                                                            <span class="penalty-total-display" id="penalty-total-display-{{ player.id }}">0</span> min
-                                                                        </small>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Campi nascosti per invio dati -->
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalty_times" 
-                                                                        id="penalty_times_{{ player.id }}">
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalty_durations" 
-                                                                        id="penalty_durations_{{ player.id }}">
-                                                                    <input type="hidden" name="player_{{ player.id }}_penalties" 
-                                                                        id="total_penalties_{{ player.id }}">
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -863,7 +716,7 @@
                                 <ul class="mb-0">
                                     <li><strong>Risultato:</strong> Inserisci i gol delle due squadre. Per le qualificazioni, spunta OT o Rigori se il pareggio è stato risolto</li>
                                     <li><strong>Nr.:</strong> Numero di maglia per questa partita (opzionale)</li>
-                                    <li><strong>Durata Penalità:</strong> Inserisci la durata totale delle penalità in minuti (es: 1.0,2, 2.5, ecc.)</li>
+                                    <li><strong>Penalità:</strong> Usa il bottone "Aggiungi" per aprire il popup e inserire tempo e durata delle penalità</li>
                                     <li><strong>Tempi:</strong> Inserisci i minuti separati da virgola (es: "15,30,45" per gol al 15°, 30° e 45° minuto)</li>
                                     <li><strong>MVP:</strong> Seleziona il miglior giocatore di ogni squadra</li>
                                     <li><strong>X Rossa:</strong> Rimuovi un giocatore dalla partita (non conterà nelle statistiche)</li>
@@ -882,6 +735,8 @@
             </div>
         </div>
         {% endif %}
+
+        <!-- Statistiche Complete della Partita -->
         <div class="card mt-4">
             <div class="card-header">
                 <h5>Statistiche Complete della Partita</h5>
@@ -1086,51 +941,98 @@
             </div>
         {% endif %}
     </div>
+
+    <!-- Modal Reset Partita -->
     <div class="modal fade" id="resetMatchModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-danger text-white">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle"></i> Reset Partita
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="alert alert-warning">
-                    <h6><i class="fas fa-warning"></i> Attenzione!</h6>
-                    <p class="mb-2">Questa azione cancellerà <strong>TUTTI</strong> i dati della partita:</p>
-                    <ul class="mb-2">
-                        <li>Risultato finale</li>
-                        <li>Gol, assist e penalità di tutti i giocatori</li>
-                        <li>Overtime/Rigori</li>
-                        <li>Migliori giocatori selezionati</li>
-                        <li>Le statistiche delle squadre verranno aggiornate</li>
-                    </ul>
-                    <p class="mb-0"><strong>La partita tornerà come "non ancora giocata".</strong></p>
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exclamation-triangle"></i> Reset Partita
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                
-                <p>Partita: <strong>{{ match.get_team1_display_name() }} vs {{ match.get_team2_display_name() }}</strong></p>
-                <p>Data: <strong>{{ match.date.strftime('%d/%m/%Y') }} {{ match.time.strftime('%H:%M') }}</strong></p>
-                
-                <p class="text-danger"><strong>Questa azione NON può essere annullata!</strong></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="fas fa-times"></i> Annulla
-                </button>
-                
-                <!-- QUESTO È IL FORM CHE CHIAMA LA FUNZIONE reset_match -->
-                <form method="POST" action="{{ url_for('reset_match', match_id=match.id) }}" style="display: inline;">
-                    <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
-                    <button type="submit" class="btn btn-danger" 
-                            onclick="return confirm('Sei ASSOLUTAMENTE sicuro? Questa azione cancellerà tutti i dati della partita!')">
-                        <i class="fas fa-undo"></i> RESET PARTITA
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <h6><i class="fas fa-warning"></i> Attenzione!</h6>
+                        <p class="mb-2">Questa azione cancellerà <strong>TUTTI</strong> i dati della partita:</p>
+                        <ul class="mb-2">
+                            <li>Risultato finale</li>
+                            <li>Gol, assist e penalità di tutti i giocatori</li>
+                            <li>Overtime/Rigori</li>
+                            <li>Migliori giocatori selezionati</li>
+                            <li>Le statistiche delle squadre verranno aggiornate</li>
+                        </ul>
+                        <p class="mb-0"><strong>La partita tornerà come "non ancora giocata".</strong></p>
+                    </div>
+                    
+                    <p>Partita: <strong>{{ match.get_team1_display_name() }} vs {{ match.get_team2_display_name() }}</strong></p>
+                    <p>Data: <strong>{{ match.date.strftime('%d/%m/%Y') }} {{ match.time.strftime('%H:%M') }}</strong></p>
+                    
+                    <p class="text-danger"><strong>Questa azione NON può essere annullata!</strong></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i> Annulla
                     </button>
-                </form>
+                    
+                    <!-- Form per il reset della partita -->
+                    <form method="POST" action="{{ url_for('reset_match', match_id=match.id) }}" style="display: inline;">
+                        <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+                        <button type="submit" class="btn btn-danger" 
+                                onclick="return confirm('Sei ASSOLUTAMENTE sicuro? Questa azione cancellerà tutti i dati della partita!')">
+                            <i class="fas fa-undo"></i> RESET PARTITA
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
-</div>
+
+    <!-- Modal per aggiungere penalità -->
+    <div class="modal fade" id="penaltyModal" tabindex="-1" aria-labelledby="penaltyModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="penaltyModalLabel">
+                        <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                        Aggiungi Penalità - <span id="modal-player-name"></span>
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info" role="alert">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Istruzioni:</strong> Inserisci il tempo (minuto) e la durata di ogni penalità. 
+                        Puoi aggiungere più penalità per lo stesso giocatore.
+                    </div>
+                    
+                    <!-- Container per le penalità nel modal -->
+                    <div id="modal-penalties-container" class="penalties-list">
+                        <!-- Le penalità verranno aggiunte qui dinamicamente -->
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button type="button" class="btn btn-outline-primary" id="add-penalty-in-modal">
+                            <i class="fas fa-plus me-2"></i>Aggiungi Penalità
+                        </button>
+                        <div class="text-end">
+                            <small class="text-muted">Tempo totale penalità:</small>
+                            <div class="fw-bold text-danger" id="modal-total-penalty-time">0 min</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="fas fa-times me-2"></i>Annulla
+                    </button>
+                    <button type="button" class="btn btn-success" id="save-penalties">
+                        <i class="fas fa-save me-2"></i>Salva Penalità
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <footer class="bg-dark text-white py-3 mt-auto">
         <div class="container text-center">
@@ -1139,250 +1041,373 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // ========== GESTIONE MIGLIORI GIOCATORI ==========
-    const bestPlayerTeam1Select = document.getElementById('best_player_team1');
-    const bestPlayerTeam2Select = document.getElementById('best_player_team2');
-    
-    if (bestPlayerTeam1Select) {
-        bestPlayerTeam1Select.addEventListener('change', function() {
-            updateBestPlayerHighlight('team1', this.value);
-        });
-    }
-    
-    if (bestPlayerTeam2Select) {
-        bestPlayerTeam2Select.addEventListener('change', function() {
-            updateBestPlayerHighlight('team2', this.value);
-        });
-    }
-    
-    function updateBestPlayerHighlight(team, playerId) {
-        // Rimuovi evidenziazioni precedenti per il team specifico
-        document.querySelectorAll('[id^="player_"][id$="_row"]').forEach(row => {
-            const isTeam1 = row.closest('.col-md-6') && row.closest('.col-md-6').querySelector('h5.text-primary');
-            const isTeam2 = row.closest('.col-md-6') && row.closest('.col-md-6').querySelector('h5.text-success');
-            
-            if ((team === 'team1' && isTeam1) || (team === 'team2' && isTeam2)) {
-                row.classList.remove('best-player-highlight');
-                
-                // Rimuovi badge MVP esistenti
-                const existingBadge = row.querySelector('.award-badge');
-                if (existingBadge) {
-                    existingBadge.remove();
-                }
-            }
-        });
+    document.addEventListener('DOMContentLoaded', function() {
+        let currentPlayerId = null;
+        const penaltyModalElement = document.getElementById('penaltyModal');
+        const penaltyModal = penaltyModalElement ? new bootstrap.Modal(penaltyModalElement) : null;
         
-        // Aggiungi evidenziazione al nuovo giocatore selezionato
-        if (playerId) {
-            const playerRow = document.getElementById('player_' + playerId + '_row');
-            if (playerRow) {
-                playerRow.classList.add('best-player-highlight');
+        // Controllo per verificare che il pareggio abbia OT o Rigori (solo per qualificazioni)
+        function checkForTie() {
+            const team1ScoreInput = document.getElementById('team1_score_main');
+            const team2ScoreInput = document.getElementById('team2_score_main');
+            const overtimeCheckbox = document.getElementById('overtime_main');
+            const shootoutCheckbox = document.getElementById('shootout_main');
+            
+            if (team1ScoreInput && team2ScoreInput) {
+                const score1 = parseInt(team1ScoreInput.value) || 0;
+                const score2 = parseInt(team2ScoreInput.value) || 0;
+                const isOvertimeOrShootout = (overtimeCheckbox && overtimeCheckbox.checked) || (shootoutCheckbox && shootoutCheckbox.checked);
                 
-                // Aggiungi badge MVP
-                const playerNameCell = playerRow.querySelector('td:first-child');
-                if (playerNameCell && !playerNameCell.querySelector('.award-badge')) {
-                    const badge = document.createElement('span');
-                    badge.className = 'badge award-badge ms-1';
-                    badge.textContent = '⭐ MVP';
-                    playerNameCell.appendChild(badge);
+                // Mostra/nasconde avviso per pareggi non risolti nelle qualificazioni
+                let tieWarning = document.getElementById('tie-warning');
+                if (!tieWarning && score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
+                    tieWarning = document.createElement('div');
+                    tieWarning.id = 'tie-warning';
+                    tieWarning.className = 'alert alert-warning mt-2';
+                    tieWarning.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Attenzione: pareggio nelle qualificazioni! Seleziona OT o Rigori.';
+                    team2ScoreInput.parentElement.appendChild(tieWarning);
+                } else if (tieWarning && (score1 !== score2 || score1 === 0 || isOvertimeOrShootout)) {
+                    tieWarning.remove();
                 }
             }
         }
-    }
-
-    // ========== GESTIONE PAREGGI E RISULTATI ==========
-    const team1ScoreInput = document.getElementById('team1_score');
-    const team2ScoreInput = document.getElementById('team2_score');
-    const overtimeCheckbox = document.getElementById('overtime');
-    const shootoutCheckbox = document.getElementById('shootout');
-    const tieWarning = document.getElementById('tie-warning');
-    
-    function checkForTie() {
-        if (team1ScoreInput && team2ScoreInput && tieWarning) {
-            const score1 = parseInt(team1ScoreInput.value) || 0;
-            const score2 = parseInt(team2ScoreInput.value) || 0;
-            const isOvertimeOrShootout = (overtimeCheckbox && overtimeCheckbox.checked) || (shootoutCheckbox && shootoutCheckbox.checked);
+        
+        // Aggiungi listener per il controllo pareggi
+        const team1ScoreInput = document.getElementById('team1_score_main');
+        const team2ScoreInput = document.getElementById('team2_score_main');
+        const overtimeCheckbox = document.getElementById('overtime_main');
+        const shootoutCheckbox = document.getElementById('shootout_main');
+        
+        if (team1ScoreInput) team1ScoreInput.addEventListener('input', checkForTie);
+        if (team2ScoreInput) team2ScoreInput.addEventListener('input', checkForTie);
+        if (overtimeCheckbox) overtimeCheckbox.addEventListener('change', checkForTie);
+        if (shootoutCheckbox) shootoutCheckbox.addEventListener('change', checkForTie);
+        
+        // Assicurati che overtime e shootout non siano selezionati insieme
+        if (overtimeCheckbox && shootoutCheckbox) {
+            overtimeCheckbox.addEventListener('change', function() {
+                if (this.checked) shootoutCheckbox.checked = false;
+            });
             
-            if (score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
-                tieWarning.style.display = 'block';
-            } else {
-                tieWarning.style.display = 'none';
-            }
+            shootoutCheckbox.addEventListener('change', function() {
+                if (this.checked) overtimeCheckbox.checked = false;
+            });
         }
-    }
-    
-    // Aggiungi listener per controllare pareggi
-    if (team1ScoreInput) team1ScoreInput.addEventListener('input', checkForTie);
-    if (team2ScoreInput) team2ScoreInput.addEventListener('input', checkForTie);
-    if (overtimeCheckbox) overtimeCheckbox.addEventListener('change', checkForTie);
-    if (shootoutCheckbox) shootoutCheckbox.addEventListener('change', checkForTie);
-    
-    // Assicurati che overtime e shootout non siano selezionati insieme
-    if (overtimeCheckbox && shootoutCheckbox) {
-        overtimeCheckbox.addEventListener('change', function() {
-            if (this.checked) shootoutCheckbox.checked = false;
-            checkForTie();
-        });
-        
-        shootoutCheckbox.addEventListener('change', function() {
-            if (this.checked) overtimeCheckbox.checked = false;
-            checkForTie();
-        });
-    }
 
-    // ========== GESTIONE PENALITÀ CON DURATA MIGLIORATA ==========
-    
-    // Funzione migliorata per aggiornare i campi delle penalità
-    function updatePenaltyFields(playerId) {
-        const container = document.getElementById(`penalties-container-${playerId}`);
-        if (!container) return;
+        // ========== GESTIONE MODAL PENALITÀ ==========
         
-        const penaltyRows = container.querySelectorAll('.penalty-row');
-        
-        const times = [];
-        const durations = [];
-        let totalDuration = 0;
-        
-        penaltyRows.forEach(row => {
-            const timeInput = row.querySelector('.penalty-time');
-            const durationSelect = row.querySelector('.penalty-duration');
+        // Funzione per aprire il modal delle penalità
+        function openPenaltyModal(playerId, playerName) {
+            if (!penaltyModal) return;
             
-            if (timeInput && durationSelect && timeInput.value && durationSelect.value) {
-                times.push(timeInput.value);
-                durations.push(durationSelect.value);
-                totalDuration += parseFloat(durationSelect.value);
+            currentPlayerId = playerId;
+            const modalPlayerName = document.getElementById('modal-player-name');
+            if (modalPlayerName) modalPlayerName.textContent = playerName;
+            
+            // Pulisci il container delle penalità nel modal
+            const modalContainer = document.getElementById('modal-penalties-container');
+            if (modalContainer) modalContainer.innerHTML = '';
+            
+            // Copia le penalità esistenti dal form principale al modal
+            const existingPenalties = document.querySelectorAll(`#penalties-container-${playerId} .penalty-row`);
+            existingPenalties.forEach(penalty => {
+                const timeValue = penalty.querySelector('.penalty-time')?.value || '';
+                const durationValue = penalty.querySelector('.penalty-duration')?.value || '';
+                addPenaltyToModal(timeValue, durationValue);
+            });
+            
+            // Se non ci sono penalità esistenti, aggiungi una riga vuota
+            if (existingPenalties.length === 0) {
+                addPenaltyToModal('', '');
             }
-        });
-        
-        // Aggiorna campi nascosti
-        const penaltyTimesField = document.getElementById(`penalty_times_${playerId}`);
-        const penaltyDurationsField = document.getElementById(`penalty_durations_${playerId}`);
-        const totalPenaltiesField = document.getElementById(`total_penalties_${playerId}`);
-        const totalDisplay = document.getElementById(`penalty-total-display-${playerId}`);
-        
-        if (penaltyTimesField) penaltyTimesField.value = times.join(',');
-        if (penaltyDurationsField) penaltyDurationsField.value = durations.join(',');
-        if (totalPenaltiesField) totalPenaltiesField.value = totalDuration;
-        
-        // Aggiorna display totale
-        if (totalDisplay) {
-            totalDisplay.textContent = totalDuration.toFixed(1);
-            totalDisplay.parentElement.style.fontWeight = totalDuration > 0 ? 'bold' : 'normal';
-            totalDisplay.parentElement.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
+            
+            updateModalPenaltyTotal();
+            penaltyModal.show();
         }
         
-        // Debug: mostra i valori nella console (rimuovi in produzione)
-        console.log(`Player ${playerId}: Times=[${times.join(',')}], Durations=[${durations.join(',')}], Total=${totalDuration}`);
-    }
-    
-    // Funzione migliorata per aggiungere penalità
-    function addPenaltyRow(playerId) {
-        const container = document.getElementById(`penalties-container-${playerId}`);
-        if (!container) return;
-        
-        const newPenalty = document.createElement('div');
-        newPenalty.className = 'penalty-row mb-2 p-2 border rounded bg-light new-penalty';
-        newPenalty.innerHTML = `
-            <div class="row g-2 align-items-center">
-                <div class="col-4">
-                    <label class="form-label mb-1" style="font-size: 11px;">Tempo</label>
-                    <input type="number" class="form-control form-control-sm penalty-time" 
-                           placeholder="25" min="1" max="60" step="1">
-                </div>
-                <div class="col-6">
-                    <label class="form-label mb-1" style="font-size: 11px;">Durata</label>
-                    <select class="form-select form-select-sm penalty-duration">
-                        <option value="">Seleziona</option>
-                        <option value="1">1 min</option>
-                        <option value="2">2 min</option>
-                        <option value="2.5">2.5 min</option>
-                        <option value="5">5 min</option>
-                        <option value="10">10 min</option>
-                    </select>
-                </div>
-                <div class="col-2 text-center">
-                    <button type="button" class="btn btn-outline-danger btn-sm remove-penalty mt-3" 
-                            style="padding: 2px 6px; font-size: 12px;">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-        `;
-        
-        container.appendChild(newPenalty);
-        
-        // Rimuovi la classe di animazione dopo l'animazione
-        setTimeout(() => {
-            newPenalty.classList.remove('new-penalty');
-        }, 300);
-        
-        updatePenaltyFields(playerId);
-    }
-    
-    // Gestione aggiunta penalità
-    document.querySelectorAll('.add-penalty').forEach(button => {
-        button.addEventListener('click', function() {
-            const playerId = this.dataset.playerId;
-            addPenaltyRow(playerId);
-        });
-    });
-    
-    // Gestione rimozione penalità (usando delegazione eventi)
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('remove-penalty') || 
-            e.target.closest('.remove-penalty')) {
-            const penaltyRow = e.target.closest('.penalty-row');
-            const container = penaltyRow.closest('[id*="penalties-container"]');
+        // Funzione per aggiungere una penalità al modal
+        function addPenaltyToModal(timeValue = '', durationValue = '') {
+            const modalContainer = document.getElementById('modal-penalties-container');
+            if (!modalContainer) return;
             
-            if (container) {
-                const playerId = container.id.split('-')[2];
-                const penaltyRows = container.querySelectorAll('.penalty-row');
-                
-                if (penaltyRows.length === 1) {
-                    // Reset dei valori invece di rimuovere se è l'ultima
-                    const timeInput = penaltyRow.querySelector('.penalty-time');
-                    const durationSelect = penaltyRow.querySelector('.penalty-duration');
-                    if (timeInput) timeInput.value = '';
-                    if (durationSelect) durationSelect.value = '';
-                } else {
-                    // Animazione di uscita
-                    penaltyRow.style.transition = 'all 0.3s ease-out';
-                    penaltyRow.style.opacity = '0';
-                    penaltyRow.style.transform = 'translateX(-100%)';
-                    
-                    setTimeout(() => {
+            const penaltyRow = document.createElement('div');
+            penaltyRow.className = 'penalty-row mb-3 p-3 border rounded bg-light';
+            penaltyRow.innerHTML = `
+                <div class="row g-3 align-items-center">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-clock me-1"></i>Tempo (minuto)
+                        </label>
+                        <input type="number" class="form-control modal-penalty-time" 
+                               placeholder="es. 25" min="1" max="60" step="1" value="${timeValue}">
+                        <div class="form-text">Inserisci il minuto della penalità</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-hourglass-half me-1"></i>Durata
+                        </label>
+                        <select class="form-select modal-penalty-duration">
+                            <option value="">Seleziona durata...</option>
+                            <option value="1" ${durationValue === '1' ? 'selected' : ''}>1 minuto</option>
+                            <option value="2" ${durationValue === '2' ? 'selected' : ''}>2 minuti</option>
+                            <option value="2.5" ${durationValue === '2.5' ? 'selected' : ''}>2.5 minuti</option>
+                            <option value="5" ${durationValue === '5' ? 'selected' : ''}>5 minuti</option>
+                            <option value="10" ${durationValue === '10' ? 'selected' : ''}>10 minuti</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <label class="form-label fw-bold text-transparent">Azioni</label>
+                        <button type="button" class="btn btn-outline-danger btn-sm remove-modal-penalty d-block w-100">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modalContainer.appendChild(penaltyRow);
+            
+            // Aggiungi listener per aggiornare il totale
+            const timeInput = penaltyRow.querySelector('.modal-penalty-time');
+            const durationSelect = penaltyRow.querySelector('.modal-penalty-duration');
+            
+            if (timeInput) timeInput.addEventListener('input', updateModalPenaltyTotal);
+            if (durationSelect) durationSelect.addEventListener('change', updateModalPenaltyTotal);
+            
+            // Aggiungi listener per rimuovere la penalità
+            const removeBtn = penaltyRow.querySelector('.remove-modal-penalty');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function() {
+                    const penaltyRows = modalContainer.querySelectorAll('.penalty-row');
+                    if (penaltyRows.length > 1) {
                         penaltyRow.remove();
-                        updatePenaltyFields(playerId);
-                    }, 300);
-                    return; // Evita di chiamare updatePenaltyFields subito
+                        updateModalPenaltyTotal();
+                    } else {
+                        // Reset dei valori invece di rimuovere se è l'ultima
+                        if (timeInput) timeInput.value = '';
+                        if (durationSelect) durationSelect.value = '';
+                        updateModalPenaltyTotal();
+                    }
+                });
+            }
+        }
+        
+        // Funzione per aggiornare il totale delle penalità nel modal
+        function updateModalPenaltyTotal() {
+            const modalContainer = document.getElementById('modal-penalties-container');
+            const totalDisplay = document.getElementById('modal-total-penalty-time');
+            
+            if (!modalContainer || !totalDisplay) return;
+            
+            const durations = [];
+            
+            modalContainer.querySelectorAll('.penalty-row').forEach(row => {
+                const timeInput = row.querySelector('.modal-penalty-time');
+                const durationSelect = row.querySelector('.modal-penalty-duration');
+                
+                if (timeInput && durationSelect && timeInput.value && durationSelect.value) {
+                    durations.push(parseFloat(durationSelect.value));
+                }
+            });
+            
+            const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
+            totalDisplay.textContent = `${totalDuration} min`;
+            totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
+        }
+        
+        // Event listener per aggiungere penalità nel modal
+        const addPenaltyBtn = document.getElementById('add-penalty-in-modal');
+        if (addPenaltyBtn) {
+            addPenaltyBtn.addEventListener('click', function() {
+                addPenaltyToModal();
+            });
+        }
+        
+        // Event listener per salvare le penalità
+        const savePenaltiesBtn = document.getElementById('save-penalties');
+        if (savePenaltiesBtn) {
+            savePenaltiesBtn.addEventListener('click', function() {
+                if (!currentPlayerId) return;
+                
+                // Ottieni le penalità dal modal
+                const modalContainer = document.getElementById('modal-penalties-container');
+                if (!modalContainer) return;
+                
+                const modalPenalties = modalContainer.querySelectorAll('.penalty-row');
+                
+                // Trova il container delle penalità nella pagina principale
+                const mainContainer = document.getElementById(`penalties-container-${currentPlayerId}`);
+                if (!mainContainer) return;
+                
+                // Pulisci il container principale
+                mainContainer.innerHTML = '';
+                
+                let totalDuration = 0;
+                let penaltyCount = 0;
+                const penaltyTimes = [];
+                const penaltyDurations = [];
+                
+                // Copia le penalità dal modal al form principale
+                modalPenalties.forEach(modalPenalty => {
+                    const timeValue = modalPenalty.querySelector('.modal-penalty-time')?.value;
+                    const durationValue = modalPenalty.querySelector('.modal-penalty-duration')?.value;
+                    
+                    if (timeValue && durationValue) {
+                        penaltyCount++;
+                        totalDuration += parseFloat(durationValue);
+                        penaltyTimes.push(timeValue);
+                        penaltyDurations.push(durationValue);
+                        
+                        // Crea una nuova riga nel form principale (formato compatto)
+                        const mainPenaltyRow = document.createElement('div');
+                        mainPenaltyRow.className = 'penalty-row mb-1 p-2 border rounded bg-white';
+                        mainPenaltyRow.innerHTML = `
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="penalty-info">
+                                    <small class="text-muted">Minuto:</small> 
+                                    <span class="fw-bold">${timeValue}'</span>
+                                    <small class="text-muted ms-2">Durata:</small> 
+                                    <span class="text-danger fw-bold">${durationValue} min</span>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-penalty" 
+                                        style="padding: 2px 6px; font-size: 10px;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                            <!-- Hidden inputs for form submission -->
+                            <input type="hidden" class="penalty-time" value="${timeValue}">
+                            <input type="hidden" class="penalty-duration" value="${durationValue}">
+                        `;
+                        
+                        mainContainer.appendChild(mainPenaltyRow);
+                    }
+                });
+                
+                // Aggiungi input nascosti per l'invio del form
+                const penaltyTimesInput = document.createElement('input');
+                penaltyTimesInput.type = 'hidden';
+                penaltyTimesInput.name = `player_${currentPlayerId}_penalty_times`;
+                penaltyTimesInput.value = penaltyTimes.join(',');
+                mainContainer.appendChild(penaltyTimesInput);
+                
+                const penaltyDurationsInput = document.createElement('input');
+                penaltyDurationsInput.type = 'hidden';
+                penaltyDurationsInput.name = `player_${currentPlayerId}_penalty_durations`;
+                penaltyDurationsInput.value = penaltyDurations.join(',');
+                mainContainer.appendChild(penaltyDurationsInput);
+                
+                const totalPenaltiesInput = document.createElement('input');
+                totalPenaltiesInput.type = 'hidden';
+                totalPenaltiesInput.name = `player_${currentPlayerId}_penalties`;
+                totalPenaltiesInput.value = totalDuration;
+                mainContainer.appendChild(totalPenaltiesInput);
+                
+                // Aggiorna il totale nella pagina principale
+                const totalDisplay = mainContainer.parentElement.querySelector('.penalty-total');
+                if (totalDisplay) {
+                    totalDisplay.textContent = `${totalDuration} min`;
+                    totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
                 }
                 
-                updatePenaltyFields(playerId);
-            }
+                // Chiudi il modal
+                if (penaltyModal) penaltyModal.hide();
+                
+                // Mostra messaggio di successo
+                showSuccessMessage('Penalità salvate con successo!');
+            });
         }
-    });
-    
-    // Aggiorna campi quando cambiano i valori (usando delegazione eventi)
-    document.addEventListener('change', function(e) {
-        if (e.target.classList.contains('penalty-time') || 
-            e.target.classList.contains('penalty-duration')) {
-            const container = e.target.closest('[id*="penalties-container"]');
-            if (container) {
-                const playerId = container.id.split('-')[2];
-                updatePenaltyFields(playerId);
-            }
+        
+        // Funzione per mostrare messaggio di successo
+        function showSuccessMessage(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast align-items-center text-white bg-success border-0 position-fixed';
+            toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999;';
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas fa-check-circle me-2"></i>${message}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            
+            // Rimuovi il toast dopo che è stato nascosto
+            toast.addEventListener('hidden.bs.toast', function() {
+                toast.remove();
+            });
         }
+        
+        // ========== GESTIONE BOTTONI PENALITÀ ==========
+        
+        // Modifica i bottoni "Aggiungi Penalità" per aprire il modal
+        document.querySelectorAll('.add-penalty').forEach(button => {
+            button.addEventListener('click', function() {
+                const playerId = this.dataset.playerId;
+                const playerName = this.dataset.playerName || 'Giocatore';
+                openPenaltyModal(playerId, playerName);
+            });
+        });
+        
+        // Gestione rimozione penalità dalla vista compatta
+        document.addEventListener('click', function(e) {
+            if (e.target.classList.contains('remove-penalty') || 
+                e.target.closest('.remove-penalty')) {
+                const penaltyRow = e.target.closest('.penalty-row');
+                const container = penaltyRow.closest('[id*="penalties-container"]');
+                
+                if (container) {
+                    const playerId = container.id.split('-')[2];
+                    
+                    // Rimuovi la penalità
+                    penaltyRow.remove();
+                    
+                    // Ricalcola il totale e aggiorna gli input nascosti
+                    const remainingPenalties = container.querySelectorAll('.penalty-row');
+                    let totalDuration = 0;
+                    const times = [];
+                    const durations = [];
+                    
+                    remainingPenalties.forEach(row => {
+                        const timeInput = row.querySelector('.penalty-time');
+                        const durationInput = row.querySelector('.penalty-duration');
+                        if (timeInput && durationInput && timeInput.value && durationInput.value) {
+                            times.push(timeInput.value);
+                            durations.push(durationInput.value);
+                            totalDuration += parseFloat(durationInput.value);
+                        }
+                    });
+                    
+                    // Aggiorna gli input nascosti
+                    let timesInput = container.querySelector(`input[name="player_${playerId}_penalty_times"]`);
+                    let durationsInput = container.querySelector(`input[name="player_${playerId}_penalty_durations"]`);
+                    let totalInput = container.querySelector(`input[name="player_${playerId}_penalties"]`);
+                    
+                    if (timesInput) timesInput.value = times.join(',');
+                    if (durationsInput) durationsInput.value = durations.join(',');
+                    if (totalInput) totalInput.value = totalDuration;
+                    
+                    // Aggiorna il display del totale
+                    const totalDisplay = container.parentElement.querySelector('.penalty-total');
+                    if (totalDisplay) {
+                        totalDisplay.textContent = `${totalDuration} min`;
+                        totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
+                    }
+                }
+            }
+        });
+        
+        // Inizializzazione: carica le penalità esistenti se presenti
+        document.querySelectorAll('[id*="penalties-container"]').forEach(container => {
+            const playerId = container.id.split('-')[2];
+            // Qui potresti caricare penalità esistenti dal server se necessario
+        });
     });
-    
-    // Inizializza i campi delle penalità al caricamento della pagina
-    document.querySelectorAll('[id*="penalties-container"]').forEach(container => {
-        const playerId = container.id.split('-')[2];
-        updatePenaltyFields(playerId);
-    });
-});
-</script>
+    </script>
 </body>
 </html>

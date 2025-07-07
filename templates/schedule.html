@@ -24,7 +24,15 @@
             text-align: center;
             padding: 12px 8px;
         }
+        .pdf-download-btn {
+            margin-left: 1rem; /* Mobile */
+        }
 
+        @media (min-width: 768px) {
+            .pdf-download-btn {
+                margin-left: 2.5rem; /* Desktop */
+            }
+        }
         /* Larghezze colonne fisse per consistenza */
         .playoff-table .table th:nth-child(1),
         .playoff-table .table td:nth-child(1) { width: 80px; }   /* Partita N° */
@@ -220,6 +228,12 @@
                                 {{ date }}
                             {% endif %}
                         </h4>
+                        <a href="{{ url_for('download_daily_results_pdf', date=date) }}" 
+                        class="btn btn-light btn-sm pdf-download-btn ms-4"
+                        title="Scarica risultati del {{ date }} in PDF">
+                            <i class="fas fa-file-pdf text-danger me-1"></i>
+                            PDF
+                        </a>
                     </div>
                     <div class="card-body">
                         <div class="table-responsive qualification-table">
@@ -278,6 +292,12 @@
                                 - Semifinali
                             {% endif %}
                         </h4>
+                        <a href="{{ url_for('download_daily_results_pdf', date=date) }}" 
+                        class="btn btn-light btn-sm pdf-download-btn ms-4"
+                        title="Scarica risultati del {{ date }} in PDF">
+                            <i class="fas fa-file-pdf text-danger me-1"></i>
+                            PDF
+                        </a>
                     </div>
                     <div class="card-body">
                         {% if major_matches[0].phase == 'semifinal' %}
@@ -418,6 +438,12 @@
                                 - Semifinali
                             {% endif %}
                         </h4>
+                        <a href="{{ url_for('download_daily_results_pdf', date=date) }}" 
+                        class="btn btn-light btn-sm pdf-download-btn ms-4"
+                        title="Scarica risultati del {{ date }} in PDF">
+                            <i class="fas fa-file-pdf text-danger me-1"></i>
+                            PDF
+                        </a>
                     </div>
                     <div class="card-body">
                         {% if beer_matches[0].phase == 'semifinal' %}
@@ -550,9 +576,17 @@
                 <div class="card mt-4 playoff-card" id="finali-{{ date }}">
                     <div class="card-header bg-dark text-white">
                         <h4 class="mb-0">
-                            🏆 Finali {{ date }} - Piazzamenti
+                            🏆 Finali {{ date }} - Piazzamenti  
                         </h4>
+                    <a href="{{ url_for('download_daily_results_pdf', date=date) }}" 
+                    class="btn btn-light btn-sm pdf-download-btn ms-4"
+                    title="Scarica risultati del {{ date }} in PDF">
+                        <i class="fas fa-file-pdf text-danger me-1"></i>
+                        PDF
+                    </a>
                     </div>
+                           <!-- Bottone PDF per le finali -->
+
                     <div class="card-body">
                         <div class="mb-3">
                             <span class="badge bg-success me-2">■ Major League</span>

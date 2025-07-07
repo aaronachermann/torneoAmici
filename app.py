@@ -4,8 +4,11 @@ from datetime import datetime, time, timedelta
 from itertools import combinations
 import os
 import random
-from datetime import datetime, time, timedelta
 import calendar
+
+
+import io
+import pandas as pd
 
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
@@ -15,6 +18,9 @@ from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, 
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 import tempfile
+
+from reportlab.lib.units import inch
+
 # Aggiungi queste importazioni all'inizio del tuo app.py
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -8116,6 +8122,278 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
 #     port = int(os.environ.get('PORT', 5000))
 #     debug_mode = os.environ.get('FLASK_ENV') != 'production'
 #     app.run(host='0.0.0.0', port=port, debug=debug_mode)
+
+
+# Aggiungi questo codice al file app.py
+
+
+
+@app.route('/download_daily_results_pdf/<date>')
+def download_daily_results_pdf(date):
+    """Genera e scarica un PDF con tutti i risultati di una giornata specifica."""
+    try:
+        # Converte la stringa della data in oggetto datetime
+        date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+        
+        # Ottieni tutte le partite della giornata
+        matches = Match.query.filter_by(date=date_obj).order_by(Match.time).all()
+        
+        if not matches:
+            flash(f'Nessuna partita trovata per il {date}', 'warning')
+            return redirect(url_for('schedule'))
+        
+        # Crea il PDF in memoria
+        buffer = io.BytesIO()
+        
+        # Configurazione del documento PDF
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=landscape(A4),
+            rightMargin=0.5*inch,
+            leftMargin=0.5*inch,
+            topMargin=0.75*inch,
+            bottomMargin=0.5*inch
+        )
+        
+        # Elementi del documento
+        elements = []
+        
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=30,
+            textColor=colors.HexColor('#0d6efd'),
+            alignment=1  # Centro
+        )
+        
+        # Titolo del documento
+        date_formatted = date_obj.strftime('%d/%m/%Y')
+        day_name = get_italian_day_name(date_obj.weekday())
+        
+        title = f"Torneo degli Amici - Risultati del {day_name} {date_formatted}"
+        elements.append(Paragraph(title, title_style))
+        elements.append(Spacer(1, 20))
+        
+        # Determina il tipo di giornata
+        phase_counts = {}
+        for match in matches:
+            phase = match.phase
+            if phase not in phase_counts:
+                phase_counts[phase] = 0
+            phase_counts[phase] += 1
+        
+        # Crea sezioni separate per ogni fase
+        for phase in ['group', 'quarterfinal', 'semifinal', 'final']:
+            phase_matches = [m for m in matches if m.phase == phase]
+            if not phase_matches:
+                continue
+                
+            # Titolo della sezione
+            phase_names = {
+                'group': 'QUALIFICAZIONI',
+                'quarterfinal': 'QUARTI DI FINALE', 
+                'semifinal': 'SEMIFINALI',
+                'final': 'FINALI'
+            }
+            
+            section_style = ParagraphStyle(
+                'SectionTitle',
+                parent=styles['Heading2'],
+                fontSize=14,
+                spaceAfter=15,
+                textColor=colors.HexColor('#dc3545'),
+                alignment=1
+            )
+            
+            elements.append(Paragraph(phase_names[phase], section_style))
+            
+            # Dati della tabella
+            if phase == 'final':
+                # Per le finali, includi la lega e il piazzamento
+                table_data = [
+                    ['N°', 'Orario', 'Lega', 'Squadra 1', 'Squadra 2', 'Risultato', 'Piazzamento', 'Note']
+                ]
+                
+                for match in phase_matches:
+                    result = get_match_result_display(match)
+                    placement = get_final_placement(match)
+                    notes = get_match_notes(match)
+                    
+                    table_data.append([
+                        str(match.get_match_number()),
+                        match.time.strftime('%H:%M'),
+                        match.league or 'N/A',
+                        match.get_team1_display_name(),
+                        match.get_team2_display_name(),
+                        result,
+                        placement,
+                        notes
+                    ])
+            else:
+                # Per altre fasi
+                table_data = [
+                    ['N°', 'Orario', 'Squadra 1', 'Squadra 2', 'Risultato', 'Note']
+                ]
+                
+                for match in phase_matches:
+                    result = get_match_result_display(match)
+                    notes = get_match_notes(match)
+                    
+                    table_data.append([
+                        str(match.get_match_number()),
+                        match.time.strftime('%H:%M'),
+                        match.get_team1_display_name(),
+                        match.get_team2_display_name(),
+                        result,
+                        notes
+                    ])
+            
+            # Crea la tabella
+            if phase == 'final':
+                col_widths = [0.7*inch, 0.8*inch, 0.8*inch, 1.8*inch, 1.8*inch, 1.2*inch, 1.2*inch, 1.5*inch]
+            else:
+                col_widths = [0.7*inch, 0.8*inch, 2.2*inch, 2.2*inch, 1.5*inch, 2.0*inch]
+            
+            table = Table(table_data, colWidths=col_widths)
+            
+            # Stile della tabella
+            table_style = TableStyle([
+                # Header
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0d6efd')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                
+                # Body
+                ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+                ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 1), (-1, -1), 9),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')])
+            ])
+            
+            table.setStyle(table_style)
+            elements.append(table)
+            elements.append(Spacer(1, 20))
+        
+        # Footer con statistiche
+        stats_data = generate_daily_stats(matches)
+        if stats_data:
+            footer_style = ParagraphStyle(
+                'Footer',
+                parent=styles['Normal'],
+                fontSize=9,
+                textColor=colors.gray,
+                alignment=1
+            )
+            elements.append(Spacer(1, 20))
+            elements.append(Paragraph(stats_data, footer_style))
+        
+        # Genera il PDF
+        doc.build(elements)
+        buffer.seek(0)
+        
+        # Nome del file
+        filename = f"risultati_{date}_{day_name.lower()}.pdf"
+        
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+        
+    except Exception as e:
+        flash(f'Errore nella generazione del PDF: {str(e)}', 'error')
+        return redirect(url_for('schedule'))
+
+def get_italian_day_name(weekday):
+    """Restituisce il nome del giorno in italiano."""
+    days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
+    return days[weekday]
+
+def get_match_result_display(match):
+    """Restituisce il risultato della partita formattato per il PDF."""
+    if not match.is_completed:
+        return "Non giocata"
+    
+    result = f"{match.team1_score} - {match.team2_score}"
+    
+    # Aggiungi indicatori per overtime/rigori
+    if match.overtime:
+        result += " (OT)"
+    elif match.shootout:
+        result += " (Rig)"
+    
+    return result
+
+def get_final_placement(match):
+    """Restituisce il piazzamento per le partite finali."""
+    if not match.is_completed:
+        return "TBD"
+    
+    if match.league == 'Champions League':
+        if 'Finale' in match.get_playoff_description().get('description', ''):
+            return "1° vs 2°"
+        else:
+            return "3° vs 4°"
+    elif match.league == 'Beer League':
+        if 'Finale' in match.get_playoff_description().get('description', ''):
+            return "5° vs 6°"
+        else:
+            return "7° vs 8°"
+    
+    return "N/A"
+
+def get_match_notes(match):
+    """Restituisce note aggiuntive per la partita."""
+    notes = []
+    
+    if match.winner:
+        notes.append(f"Vince: {match.winner.name}")
+    
+    # Aggiungi informazioni sui migliori giocatori se disponibili
+    if hasattr(match, 'best_player_team1') and match.best_player_team1:
+        notes.append(f"MVP {match.team1.name}: {match.best_player_team1.name}")
+    if hasattr(match, 'best_player_team2') and match.best_player_team2:
+        notes.append(f"MVP {match.team2.name}: {match.best_player_team2.name}")
+    
+    return " | ".join(notes) if notes else "-"
+
+def generate_daily_stats(matches):
+    """Genera statistiche riepilogative della giornata."""
+    if not matches:
+        return ""
+    
+    total_matches = len(matches)
+    completed_matches = len([m for m in matches if m.is_completed])
+    total_goals = sum((m.team1_score or 0) + (m.team2_score or 0) for m in matches if m.is_completed)
+    
+    overtime_matches = len([m for m in matches if m.overtime])
+    shootout_matches = len([m for m in matches if m.shootout])
+    
+    stats = f"Partite totali: {total_matches} | Completate: {completed_matches} | "
+    stats += f"Gol totali: {total_goals}"
+    
+    if overtime_matches > 0:
+        stats += f" | Overtime: {overtime_matches}"
+    if shootout_matches > 0:
+        stats += f" | Rigori: {shootout_matches}"
+    
+    date_obj = matches[0].date
+    stats += f" | Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}"
+    
+    return stats
+
+
+
 if __name__ == '__main__':
     with app.app_context():
         try:
