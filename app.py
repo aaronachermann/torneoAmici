@@ -3637,7 +3637,7 @@ def reset_match(match_id):
 def match_detail(match_id):
     match = Match.query.get_or_404(match_id)
     return_anchor = request.args.get('return_anchor', '')
-    
+   
     if request.method == 'POST':
         # SALVA TUTTO IN UN COLPO SOLO: RISULTATO + STATISTICHE + MIGLIORI GIOCATORI
         
@@ -3687,6 +3687,7 @@ def match_detail(match_id):
             
             # Aggiorna le statistiche per tutti i giocatori
             for player in all_players:
+                print(f"🔄 Aggiornamento statistiche per giocatore {player.name} (ID: {player.id})")
                 # Leggi i valori base dal form
                 goals = int(request.form.get(f'player_{player.id}_goals', 0))
                 assists = int(request.form.get(f'player_{player.id}_assists', 0))
@@ -3770,7 +3771,7 @@ def match_detail(match_id):
                         penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,  # NUOVO CAMPO
                         is_best_player_team1=is_best_team1,
                         is_best_player_team2=is_best_team2,
-                        is_removed=False
+                        is_removed= player.is_removed if hasattr(player, 'is_removed') else False
                     )
                     db.session.add(stats)
                 else:
@@ -3884,6 +3885,7 @@ def toggle_player_in_match(match_id, player_id):
     """Rimuove o ripristina un giocatore da una partita specifica."""
     match = Match.query.get_or_404(match_id)
     player = Player.query.get_or_404(player_id)
+    print(f"🔄 Toggling player {player.name} (ID: {player_id}) in match {match_id}")
     
     try:
         # Verifica che la tabella PlayerMatchStats esista
@@ -3916,16 +3918,19 @@ def toggle_player_in_match(match_id, player_id):
             
             # Se viene rimosso, azzera anche i best player flags
             if stats.is_removed:
-                stats.is_best_player_team1 = False
-                stats.is_best_player_team2 = False
-        
+                if stats.is_best_player_team1:
+                    stats.is_best_player_team1 = False
+
+                if stats.is_best_player_team2:
+                    stats.is_best_player_team2 = False
+       
         db.session.commit()
         flash(f'{player.name} è stato {action} partita.', 'success')
         
     except Exception as e:
         db.session.rollback()
         flash(f'Errore nel toggle del giocatore: {str(e)}', 'danger')
-    
+
     return redirect(url_for('match_detail', match_id=match_id))
 
 
@@ -7581,18 +7586,35 @@ def export_standings_pdf():
                 
                 print("📊 Caricamento marcatori...")
                 # Marcatori con nuova logica
+                # top_scorers_query = db.session.query(
+                #     Player,
+                #     func.sum(PlayerMatchStats.goals).label('total_goals'),
+                #     func.count(PlayerMatchStats.match_id).label('total_matches'),
+                #     func.sum(PlayerMatchStats.assists).label('total_assists')
+                # ).join(PlayerMatchStats).group_by(Player.id).having(
+                #     func.sum(PlayerMatchStats.goals) > 0
+                # ).order_by(
+                #     func.sum(PlayerMatchStats.goals).desc(),
+                #     func.count(PlayerMatchStats.match_id).asc(),
+                #     func.sum(PlayerMatchStats.assists).desc()
+                # )
+
+
                 top_scorers_query = db.session.query(
                     Player,
                     func.sum(PlayerMatchStats.goals).label('total_goals'),
                     func.count(PlayerMatchStats.match_id).label('total_matches'),
                     func.sum(PlayerMatchStats.assists).label('total_assists')
-                ).join(PlayerMatchStats).group_by(Player.id).having(
+                ).join(PlayerMatchStats).filter(
+                    PlayerMatchStats.is_removed != True  # <- AGGIUNTO: filtra solo giocatori non rimossi
+                ).group_by(Player.id).having(
                     func.sum(PlayerMatchStats.goals) > 0
                 ).order_by(
                     func.sum(PlayerMatchStats.goals).desc(),
                     func.count(PlayerMatchStats.match_id).asc(),
                     func.sum(PlayerMatchStats.assists).desc()
-                ).limit(15)
+                ).limit(15)          
+
                 
                 for player, total_goals, total_matches, total_assists in top_scorers_query:
                     player.display_goals = total_goals
@@ -7604,18 +7626,20 @@ def export_standings_pdf():
                 print("📊 Caricamento assist...")
                 # Assist con nuova logica
                 top_assists_query = db.session.query(
-                    Player,
-                    func.sum(PlayerMatchStats.assists).label('total_assists'),
-                    func.count(PlayerMatchStats.match_id).label('total_matches'),
-                    func.sum(PlayerMatchStats.goals).label('total_goals')
-                ).join(PlayerMatchStats).group_by(Player.id).having(
-                    func.sum(PlayerMatchStats.assists) > 0
-                ).order_by(
-                    func.sum(PlayerMatchStats.assists).desc(),
-                    func.count(PlayerMatchStats.match_id).asc(),
-                    func.sum(PlayerMatchStats.goals).desc()
-                ).limit(15)
-                
+                        Player,
+                        func.sum(PlayerMatchStats.assists).label('total_assists'),
+                        func.count(PlayerMatchStats.match_id).label('total_matches'),
+                        func.sum(PlayerMatchStats.goals).label('total_goals')
+                    ).join(PlayerMatchStats).filter(
+                        PlayerMatchStats.is_removed != True  # <- AGGIUNTO: filtra solo giocatori non rimossi
+                    ).group_by(Player.id).having(
+                        func.sum(PlayerMatchStats.assists) > 0
+                    ).order_by(
+                        func.sum(PlayerMatchStats.assists).desc(),
+                        func.count(PlayerMatchStats.match_id).asc(),
+                        func.sum(PlayerMatchStats.goals).desc()
+                    ).limit(15)
+                            
                 for player, total_assists, total_matches, total_goals in top_assists_query:
                     player.display_assists = total_assists
                     player.display_matches = total_matches

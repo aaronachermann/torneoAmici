@@ -16,6 +16,18 @@
         .stats-table th:nth-child(5), .stats-table td:nth-child(5) { width: 280px; } /* Penalità */
         .stats-table th:nth-child(6), .stats-table td:nth-child(6) { width: 150px; } /* Tempi */
 
+
+                /* Forza gli stili per giocatori rimossi */
+        tr.player-removed td strong,
+        tr.player-removed td strong.player-removed {
+            color: #6c757d !important;
+            text-decoration: line-through !important;
+            opacity: 0.6 !important;
+        }
+
+        tr.player-removed {
+            background-color: #f8f9fa !important;
+        }
         /* Stili per le penalità */
         .penalty-section {
             background: #f8f9fa;
@@ -502,20 +514,28 @@
                                                                 </strong>
                                                                 
                                                                 <!-- Bottone X per rimuovere/ripristinare giocatore -->
-                                                                <form method="POST" action="{{ url_for('toggle_player_in_match', match_id=match.id, player_id=player.id) }}" style="display: inline;">
-                                                                    {% if match_stats[player.id]['is_removed'] %}
-                                                                        <!-- Bottone verde per ripristinare -->
-                                                                        <button type="submit" class="restore-player-btn" title="Ripristina giocatore nella partita">
-                                                                            ↻
-                                                                        </button>
-                                                                    {% else %}
-                                                                        <!-- Bottone rosso X per rimuovere -->
-                                                                        <button type="submit" class="remove-player-btn" title="Rimuovi giocatore dalla partita" 
-                                                                                onclick="return confirm('Sei sicuro di voler rimuovere {{ player.name }} da questa partita?')">
-                                                                            ×
-                                                                        </button>
-                                                                    {% endif %}
-                                                                </form>
+                                                                <!-- Bottone X senza form nested - usa JavaScript invece -->
+                                                               {% if match_stats[player.id]['is_removed'] %}
+                                                                    <button type="button" class="restore-player-btn" 
+                                                                            data-match-id="{{ match.id }}"
+                                                                            data-player-id="{{ player.id }}"
+                                                                            data-player-name="{{ player.name }}"
+                                                                            data-action="restore"
+                                                                            onclick="togglePlayerSafe(this)"
+                                                                            title="Ripristina giocatore nella partita">
+                                                                        ↻
+                                                                    </button>
+                                                                {% else %}
+                                                                    <button type="button" class="remove-player-btn" 
+                                                                            data-match-id="{{ match.id }}"
+                                                                            data-player-id="{{ player.id }}"
+                                                                            data-player-name="{{ player.name }}"
+                                                                            data-action="remove"
+                                                                            onclick="togglePlayerSafe(this)"
+                                                                            title="Rimuovi giocatore dalla partita">
+                                                                        ×
+                                                                    </button>
+                                                                {% endif %}
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
@@ -611,27 +631,35 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for player in team2_players %}
-                                                        <tr {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
+                                                       <tr {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                             <td>
                                                                 <strong {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                                     {{ player.name }}
                                                                 </strong>
                                                                 
                                                                 <!-- Bottone X per rimuovere/ripristinare giocatore -->
-                                                                <form method="POST" action="{{ url_for('toggle_player_in_match', match_id=match.id, player_id=player.id) }}" style="display: inline;">
-                                                                    {% if match_stats[player.id]['is_removed'] %}
-                                                                        <!-- Bottone verde per ripristinare -->
-                                                                        <button type="submit" class="restore-player-btn" title="Ripristina giocatore nella partita">
-                                                                            ↻
-                                                                        </button>
-                                                                    {% else %}
-                                                                        <!-- Bottone rosso X per rimuovere -->
-                                                                        <button type="submit" class="remove-player-btn" title="Rimuovi giocatore dalla partita" 
-                                                                                onclick="return confirm('Sei sicuro di voler rimuovere {{ player.name }} da questa partita?')">
-                                                                            ×
-                                                                        </button>
-                                                                    {% endif %}
-                                                                </form>
+                                                                <!-- Bottone X senza form nested - usa JavaScript invece -->
+                                                                {% if match_stats[player.id]['is_removed'] %}
+                                                                    <button type="button" class="restore-player-btn" 
+                                                                            data-match-id="{{ match.id }}"
+                                                                            data-player-id="{{ player.id }}"
+                                                                            data-player-name="{{ player.name }}"
+                                                                            data-action="restore"
+                                                                            onclick="togglePlayerSafe(this)"
+                                                                            title="Ripristina giocatore nella partita">
+                                                                        ↻
+                                                                    </button>
+                                                                {% else %}
+                                                                    <button type="button" class="remove-player-btn" 
+                                                                            data-match-id="{{ match.id }}"
+                                                                            data-player-id="{{ player.id }}"
+                                                                            data-player-name="{{ player.name }}"
+                                                                            data-action="remove"
+                                                                            onclick="togglePlayerSafe(this)"
+                                                                            title="Rimuovi giocatore dalla partita">
+                                                                        ×
+                                                                    </button>
+                                                                {% endif %}
                                                             </td>
                                                             <td>
                                                                 <input type="number" class="form-control form-control-sm" 
@@ -1408,6 +1436,31 @@
             // Qui potresti caricare penalità esistenti dal server se necessario
         });
     });
+
+
+    function togglePlayerSafe(button) {
+        const matchId = button.dataset.matchId;
+        const playerId = button.dataset.playerId;
+        const playerName = button.dataset.playerName;
+        const action = button.dataset.action;
+        
+        let confirmMessage;
+        if (action === 'remove') {
+            confirmMessage = `Sei sicuro di voler rimuovere ${playerName} da questa partita?`;
+        } else {
+            confirmMessage = `Sei sicuro di voler ripristinare ${playerName} nella partita?`;
+        }
+        
+        if (confirm(confirmMessage)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/match/${matchId}/toggle_player/${playerId}`;
+            form.style.display = 'none';
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
     </script>
 </body>
 </html>
