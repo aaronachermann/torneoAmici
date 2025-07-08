@@ -110,7 +110,7 @@ def login():
         
         if user and user.check_password(password):
             login_user(user)
-            flash('Login effettuato con successo!', 'success')
+            #flash('Login effettuato con successo!', 'success')
             
             # Redirect alla pagina richiesta o alla home
             next_page = request.args.get('next')
@@ -5150,8 +5150,9 @@ def get_player_total_stats():
 #             except Exception as e:
 #                 print(f"❌ Errore aggiornamento finali {league}: {e}")
 
+
 def update_team_stats(match, old_team1_score=None, old_team2_score=None, old_overtime=None, old_shootout=None):
-    """Aggiorna le statistiche delle squadre usando il sistema punti hockey."""
+    """Aggiorna le statistiche delle squadre usando il sistema punti hockey E controlla aggiornamenti playoff automatici."""
     
     team1 = match.team1
     team2 = match.team2
@@ -5221,12 +5222,47 @@ def update_team_stats(match, old_team1_score=None, old_team2_score=None, old_ove
     print(f"   Overtime: {match.overtime}, Rigori: {match.shootout}")
     print(f"   Punti: {team1.name}={team1_points}, {team2.name}={team2_points}")
 
+    # *** AGGIORNAMENTI AUTOMATICI PLAYOFF ***
+    print(f"🔍 Controllo aggiornamenti automatici per partita fase: {match.phase}")
+    
+    # 1. QUALIFICAZIONI COMPLETATE → AGGIORNA QUARTI
+    if match.phase == 'group' and all_group_matches_completed():
+        print("🎯 Tutte le qualificazioni completate! Aggiornamento quarti automatico...")
+        try:
+            update_playoff_brackets()
+            print("✅ Quarti aggiornati automaticamente!")
+        except Exception as e:
+            print(f"❌ Errore aggiornamento quarti: {e}")
+    
+    # 2. QUARTI COMPLETATI PER UNA LEGA → AGGIORNA SEMIFINALI DI QUELLA LEGA
+    if match.phase == 'quarterfinal':
+        league = match.league
+        if league and all_phase_matches_completed('quarterfinal', league):
+            print(f"🎯 Quarti {league} completati! Aggiornamento semifinali automatico...")
+            try:
+                update_semifinals(league)
+                print(f"✅ Semifinali {league} aggiornate automaticamente!")
+            except Exception as e:
+                print(f"❌ Errore aggiornamento semifinali {league}: {e}")
+    
+    # 3. SEMIFINALI COMPLETATE PER UNA LEGA → AGGIORNA FINALI DI QUELLA LEGA
+    if match.phase == 'semifinal':
+        league = match.league
+        if league and all_phase_matches_completed('semifinal', league):
+            print(f"🎯 Semifinali {league} completate! Aggiornamento finali automatico...")
+            try:
+                update_finals(league)
+                print(f"✅ Finali {league} aggiornate automaticamente!")
+            except Exception as e:
+                print(f"❌ Errore aggiornamento finali {league}: {e}")  
 
+
+@app.route('/check_incomplete_matches', methods=['POST'])
 def all_group_matches_completed():
     incomplete_matches = Match.query.filter_by(phase='group').filter(
         Match.team1_score.is_(None) | Match.team2_score.is_(None)
     ).count()
-    
+    print(f"🔍 Controllo partite gironi incomplete: {incomplete_matches} trovate ")
     return incomplete_matches == 0
     
 
@@ -5339,73 +5375,133 @@ def all_quarterfinals_completed(league):
     
     return incomplete_matches == 0
 
+
 def update_semifinals(league):
-    """Aggiorna le semifinali con vincitori e perdenti dei quarti di finale per una specifica lega."""
+    """Aggiorna le semifinali di una lega specifica con i vincitori/perdenti dei quarti."""
+    print(f"🔄 Aggiornamento semifinali {league}...")
     
-    # Ottieni i quarti di finale completati per questa lega
+    # Ottieni i quarti di finale della lega completati
     quarterfinals = Match.query.filter_by(
-        phase='quarterfinal', league=league
+        phase='quarterfinal', 
+        league=league
     ).order_by(Match.time).all()
     
-    # Ottieni le semifinali per questa lega
-    semifinals = Match.query.filter_by(
-        phase='semifinal', league=league
-    ).order_by(Match.time).all()
-    
-    print(f"\n=== DEBUG update_semifinals for {league} ===")
-    print(f"Quarti trovati: {len(quarterfinals)}")
-    print(f"Semifinali trovate: {len(semifinals)}")
+    if len(quarterfinals) != 4:
+        print(f"❌ Errore: {league} dovrebbe avere 4 quarti, trovati {len(quarterfinals)}")
+        return False
     
     # Verifica che tutti i quarti siano completati
-    if len(quarterfinals) < 4:
-        print(f"Errore: Trovati solo {len(quarterfinals)} quarti invece di 4")
-        return
+    for quarter in quarterfinals:
+        if not quarter.is_completed:
+            print(f"❌ Quarto {quarter.id} non completato")
+            return False
     
-    for i, qf in enumerate(quarterfinals):
-        if not qf.is_completed:
-            print(f"Errore: Quarto {qf.team1.name} vs {qf.team2.name} non completato")
-            return
-        print(f"Quarto {i+1}: {qf.team1.name} {qf.team1_score}-{qf.team2_score} {qf.team2.name}, Vincitore: {qf.winner.name if qf.winner else 'Nessuno'}")
+    # Ottieni vincitori e perdenti
+    winners = []
+    losers = []
+    for quarter in quarterfinals:
+        winner = quarter.winner
+        loser = quarter.team1 if winner == quarter.team2 else quarter.team2
+        winners.append(winner)
+        losers.append(loser)
     
-    if len(semifinals) >= 4:
-        # Le prime 2 semifinali sono per i perdenti (5°-8° posto)
-        # Le ultime 2 semifinali sono per i vincitori (1°-4° posto)
-        
-        # SEMIFINALI PERDENTI (5°-8° posto)
-        loser_qf3 = quarterfinals[2].team1 if quarterfinals[2].winner == quarterfinals[2].team2 else quarterfinals[2].team2
-        loser_qf4 = quarterfinals[3].team1 if quarterfinals[3].winner == quarterfinals[3].team2 else quarterfinals[3].team2
-        
-        semifinals[0].team1_id = loser_qf3.id
-        semifinals[0].team2_id = loser_qf4.id
-        print(f"Semifinale 0 (perdenti): {loser_qf3.name} vs {loser_qf4.name}")
-        
-        loser_qf1 = quarterfinals[0].team1 if quarterfinals[0].winner == quarterfinals[0].team2 else quarterfinals[0].team2
-        loser_qf2 = quarterfinals[1].team1 if quarterfinals[1].winner == quarterfinals[1].team2 else quarterfinals[1].team2
-        
-        semifinals[1].team1_id = loser_qf1.id
-        semifinals[1].team2_id = loser_qf2.id
-        print(f"Semifinale 1 (perdenti): {loser_qf1.name} vs {loser_qf2.name}")
-        
-        # SEMIFINALI VINCITORI (1°-4° posto)
-        winner_qf3 = quarterfinals[2].winner
-        winner_qf4 = quarterfinals[3].winner
-        
-        semifinals[2].team1_id = winner_qf3.id
-        semifinals[2].team2_id = winner_qf4.id
-        print(f"Semifinale 2 (vincitori): {winner_qf3.name} vs {winner_qf4.name}")
-        
-        winner_qf1 = quarterfinals[0].winner
-        winner_qf2 = quarterfinals[1].winner
-        
-        semifinals[3].team1_id = winner_qf1.id
-        semifinals[3].team2_id = winner_qf2.id
-        print(f"Semifinale 3 (vincitori): {winner_qf1.name} vs {winner_qf2.name}")
-        
-        print(f"Semifinali {league} aggiornate con successo!")
-    else:
-        print(f"Errore: Trovate solo {len(semifinals)} semifinali invece di 4")
+    print(f"🏆 Vincenti: {[w.name for w in winners]}")
+    print(f"💔 Perdenti: {[l.name for l in losers]}")
+    
+    # Ottieni le semifinali della lega
+    semifinals = Match.query.filter_by(
+        phase='semifinal',
+        league=league
+    ).order_by(Match.time).all()
+    
+    if len(semifinals) != 4:
+        print(f"❌ Errore: {league} dovrebbe avere 4 semifinali, trovate {len(semifinals)}")
+        return False
+    
+    # Aggiorna le semifinali
+    # Semifinali perdenti (prime due partite)
+    semifinals[0].team1_id = losers[2].id  # Perdente Q1
+    semifinals[0].team2_id = losers[3].id  # Perdente Q2
+    semifinals[1].team1_id = losers[0].id  # Perdente Q3  
+    semifinals[1].team2_id = losers[1].id  # Perdente Q4
+    
+    # Semifinali vincenti (ultime due partite)
+    semifinals[2].team1_id = winners[2].id  # Vincente Q1
+    semifinals[2].team2_id = winners[3].id  # Vincente Q2
+    semifinals[3].team1_id = winners[0].id  # Vincente Q3
+    semifinals[3].team2_id = winners[1].id  # Vincente Q4
     
     db.session.commit()
+    print(f"✅ Semifinali {league} aggiornate")
+    return True
+
+
+def update_finals(league):
+    """Aggiorna le finali di una lega specifica con i vincitori/perdenti delle semifinali."""
+    print(f"🔄 Aggiornamento finali {league}...")
+    
+    # Ottieni le semifinali della lega completate
+    semifinals = Match.query.filter_by(
+        phase='semifinal',
+        league=league
+    ).order_by(Match.time).all()
+    
+    if len(semifinals) != 4:
+        print(f"❌ Errore: {league} dovrebbe avere 4 semifinali, trovate {len(semifinals)}")
+        return False
+    
+    # Verifica che tutte le semifinali siano completate
+    for semi in semifinals:
+        if not semi.is_completed:
+            print(f"❌ Semifinale {semi.id} non completata")
+            return False
+    
+    # Ottieni vincitori e perdenti delle semifinali
+    # Prime due semifinali = perdenti quarti, ultime due = vincenti quarti
+    losers_bracket_winners = [semifinals[0].winner, semifinals[1].winner]
+    winners_bracket_winners = [semifinals[2].winner, semifinals[3].winner]
+    losers_bracket_losers = [
+        semifinals[0].team1 if semifinals[0].winner == semifinals[0].team2 else semifinals[0].team2,
+        semifinals[1].team1 if semifinals[1].winner == semifinals[1].team2 else semifinals[1].team2
+    ]
+    winners_bracket_losers = [
+        semifinals[2].team1 if semifinals[2].winner == semifinals[2].team2 else semifinals[2].team2,
+        semifinals[3].team1 if semifinals[3].winner == semifinals[3].team2 else semifinals[3].team2
+    ]
+    
+    print(f"🏆 Vincenti bracket perdenti: {[w.name for w in losers_bracket_winners]}")
+    print(f"🏆 Vincenti bracket vincenti: {[w.name for w in winners_bracket_winners]}")
+    
+    # Ottieni le finali della lega
+    finals = Match.query.filter_by(
+        phase='final',
+        league=league
+    ).order_by(Match.time).all()
+    
+    if len(finals) != 4:
+        print(f"❌ Errore: {league} dovrebbe avere 4 finali, trovate {len(finals)}")
+        return False
+    
+    # Aggiorna le finali
+    # Finale 7°/8° posto
+    finals[0].team1_id = losers_bracket_losers[0].id
+    finals[0].team2_id = losers_bracket_losers[1].id
+    
+    # Finale 5°/6° posto  
+    finals[1].team1_id = losers_bracket_winners[0].id
+    finals[1].team2_id = losers_bracket_winners[1].id
+    
+    # Finale 3°/4° posto
+    finals[2].team1_id = winners_bracket_losers[0].id
+    finals[2].team2_id = winners_bracket_losers[1].id
+    
+    # Finale 1°/2° posto
+    finals[3].team1_id = winners_bracket_winners[0].id
+    finals[3].team2_id = winners_bracket_winners[1].id
+    
+    db.session.commit()
+    print(f"✅ Finali {league} aggiornate")
+    return True
 
 
 def all_semifinals_completed(league):
@@ -5416,76 +5512,6 @@ def all_semifinals_completed(league):
     ).count()
     
     return incomplete_matches == 0
-
-
-def update_finals(league):
-    """Aggiorna le finali con vincitori e perdenti delle semifinali per una specifica lega."""
-    
-    # Ottieni le semifinali completate per questa lega
-    semifinals = Match.query.filter_by(
-        phase='semifinal', league=league
-    ).order_by(Match.time).all()
-    
-    # Ottieni le finali per questa lega
-    finals = Match.query.filter_by(
-        phase='final', league=league
-    ).order_by(Match.time).all()
-    
-    print(f"\n=== DEBUG update_finals for {league} ===")
-    print(f"Semifinali trovate: {len(semifinals)}")
-    print(f"Finali trovate: {len(finals)}")
-    
-    # Verifica che tutte le semifinali siano completate
-    if len(semifinals) < 4:
-        print(f"Errore: Trovate solo {len(semifinals)} semifinali invece di 4")
-        return
-    
-    for i, sf in enumerate(semifinals):
-        if not sf.is_completed:
-            print(f"Semifinale {i+1}: {sf.team1.name} vs {sf.team2.name} - NON COMPLETATA")
-            return
-        print(f"Semifinale {i+1}: {sf.team1.name} {sf.team1_score}-{sf.team2_score} {sf.team2.name}, Vincitore: {sf.winner.name}")
-    
-    if len(finals) >= 4:
-        # Finali nell'ordine: 7°/8°, 5°/6°, 3°/4°, 1°/2°
-        
-        # FINALE 7°/8° posto: Perdenti delle semifinali perdenti
-        loser_sf_losers_1 = semifinals[0].team1 if semifinals[0].winner == semifinals[0].team2 else semifinals[0].team2
-        loser_sf_losers_2 = semifinals[1].team1 if semifinals[1].winner == semifinals[1].team2 else semifinals[1].team2
-        
-        finals[0].team1_id = loser_sf_losers_1.id
-        finals[0].team2_id = loser_sf_losers_2.id
-        print(f"Finale 7°/8°: {loser_sf_losers_1.name} vs {loser_sf_losers_2.name}")
-        
-        # FINALE 5°/6° posto: Vincitori delle semifinali perdenti
-        winner_sf_losers_1 = semifinals[0].winner
-        winner_sf_losers_2 = semifinals[1].winner
-        
-        finals[1].team1_id = winner_sf_losers_1.id
-        finals[1].team2_id = winner_sf_losers_2.id
-        print(f"Finale 5°/6°: {winner_sf_losers_1.name} vs {winner_sf_losers_2.name}")
-        
-        # FINALE 3°/4° posto: Perdenti delle semifinali vincitori
-        loser_sf_winners_1 = semifinals[2].team1 if semifinals[2].winner == semifinals[2].team2 else semifinals[2].team2
-        loser_sf_winners_2 = semifinals[3].team1 if semifinals[3].winner == semifinals[3].team2 else semifinals[3].team2
-        
-        finals[2].team1_id = loser_sf_winners_1.id
-        finals[2].team2_id = loser_sf_winners_2.id
-        print(f"Finale 3°/4°: {loser_sf_winners_1.name} vs {loser_sf_winners_2.name}")
-        
-        # FINALE 1°/2° posto: Vincitori delle semifinali vincitori
-        winner_sf_winners_1 = semifinals[2].winner
-        winner_sf_winners_2 = semifinals[3].winner
-        
-        finals[3].team1_id = winner_sf_winners_1.id
-        finals[3].team2_id = winner_sf_winners_2.id
-        print(f"Finale 1°/2°: {winner_sf_winners_1.name} vs {winner_sf_winners_2.name}")
-        
-        print(f"Finali {league} aggiornate con successo!")
-    else:
-        print(f"Errore: Trovate solo {len(finals)} finali invece di 4")
-    
-    db.session.commit()
 
 
 
@@ -6255,10 +6281,10 @@ def generate_quarterfinals():
     
     # Major League Quarterfinals
     ml_matchups = [
-        (standings['C'][0], standings['D'][1]),  # 1C vs 2D
-        (standings['B'][0], standings['C'][1]),  # 1B vs 2C  
-        (standings['D'][0], standings['A'][1]),  # 1D vs 2A
+        (standings['D'][0], standings['C'][1]),  # 1D vs 2C
         (standings['A'][0], standings['B'][1]),  # 1A vs 2B
+        (standings['C'][0], standings['A'][1]),  # 1C vs 2A
+        (standings['B'][0], standings['D'][1]),  # 1B vs 2D
     ]
     
     for i, (team1, team2) in enumerate(ml_matchups):
@@ -6274,10 +6300,10 @@ def generate_quarterfinals():
     
     # Beer League Quarterfinals  
     bl_matchups = [
-        (standings['B'][2], standings['C'][3]),  # 3B vs 4C
-        (standings['D'][2], standings['A'][3]),  # 3D vs 4A
-        (standings['A'][2], standings['B'][3]),  # 3A vs 4B
-        (standings['C'][2], standings['D'][3]),  # 3C vs 4D
+        (standings['B'][2], standings['A'][3]),  # 3B vs 4A
+        (standings['D'][2], standings['C'][3]),  # 3D vs 4C
+        (standings['A'][2], standings['D'][3]),  # 3A vs 4D
+        (standings['C'][2], standings['B'][3]),  # 3C vs 4B
     ]
     
     for i, (team1, team2) in enumerate(bl_matchups):
@@ -6452,8 +6478,8 @@ def generate_finals():
         return False
     
     final_times = {
-        'Major League': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)],
-        'Beer League': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)]
+        'Major League': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)],
+        'Beer League': [time(10, 0), time(12, 0), time(14, 0), time(16, 0)]
     }
     
     # Major League Finals
@@ -8403,6 +8429,621 @@ def generate_daily_stats(matches):
     stats += f" | Generato il {datetime.now().strftime('%d/%m/%Y alle %H:%M')}"
     
     return stats
+
+
+@app.route('/debug_group_matches')
+def debug_group_matches():
+    """Debug: verifica lo stato delle partite di gruppo."""
+    
+    # Conta tutte le partite di gruppo
+    total_group_matches = Match.query.filter_by(phase='group').count()
+    
+    # Conta le partite completate (con punteggi)
+    completed_matches = Match.query.filter_by(phase='group').filter(
+        Match.team1_score.isnot(None),
+        Match.team2_score.isnot(None)
+    ).count()
+    
+    # Conta le partite incomplete (senza punteggi)
+    incomplete_matches = Match.query.filter_by(phase='group').filter(
+        Match.team1_score.is_(None) | Match.team2_score.is_(None)
+    ).count()
+    
+    # Verifica la funzione principale
+    all_completed = all_group_matches_completed()
+    
+    # Ottieni lista delle partite incomplete
+    incomplete_list = Match.query.filter_by(phase='group').filter(
+        Match.team1_score.is_(None) | Match.team2_score.is_(None)
+    ).all()
+    
+    debug_info = {
+        'total_group_matches': total_group_matches,
+        'completed_matches': completed_matches,
+        'incomplete_matches': incomplete_matches,
+        'all_completed_result': all_completed,
+        'incomplete_details': [
+            f"Partita {m.id}: {m.team1.name if m.team1 else 'N/A'} vs {m.team2.name if m.team2 else 'N/A'} - {m.date}"
+            for m in incomplete_list[:10]  # Mostra solo le prime 10
+        ]
+    }
+    
+    flash(f'🔍 Debug partite di gruppo: {debug_info}', 'info')
+    return redirect(url_for('schedule'))
+
+
+@app.route('/debug_group_standings')
+def debug_group_standings():
+    """Debug: mostra le classifiche dei gironi."""
+    
+    standings = {}
+    for group in ['A', 'B', 'C', 'D']:
+        teams = Team.query.filter_by(group=group).order_by(
+            Team.points.desc(), 
+            (Team.goals_for - Team.goals_against).desc(),
+            Team.goals_for.desc()
+        ).all()
+        
+        standings[group] = []
+        for i, team in enumerate(teams):
+            standings[group].append({
+                'position': i+1,
+                'name': team.name,
+                'points': team.points,
+                'gf': team.goals_for,
+                'ga': team.goals_against,
+                'diff': team.goals_for - team.goals_against
+            })
+    
+    flash(f'📊 Classifiche gironi: {standings}', 'info')
+    return redirect(url_for('schedule'))
+
+@app.route('/test_update_playoffs_detailed')
+def test_update_playoffs_detailed():
+    """Test dettagliato dell'aggiornamento playoff."""
+    try:
+        print("🧪 INIZIO TEST AGGIORNAMENTO PLAYOFF")
+        
+        # 1. Verifica qualificazioni
+        if not all_group_matches_completed():
+            flash("❌ Qualificazioni non completate", 'danger')
+            return redirect(url_for('schedule'))
+        
+        print("✅ Qualificazioni completate")
+        
+        # 2. Ottieni classifiche
+        standings = {}
+        for group in ['A', 'B', 'C', 'D']:
+            teams = Team.query.filter_by(group=group).order_by(
+                Team.points.desc(), 
+                (Team.goals_for - Team.goals_against).desc(),
+                Team.goals_for.desc()
+            ).all()
+            standings[group] = teams
+            print(f"📊 Girone {group}: {[t.name for t in teams]}")
+        
+        # 3. Verifica che ogni girone abbia 4 squadre
+        for group in ['A', 'B', 'C', 'D']:
+            if len(standings[group]) < 4:
+                flash(f"❌ Girone {group} ha solo {len(standings[group])} squadre!", 'danger')
+                return redirect(url_for('schedule'))
+        
+        print("✅ Tutti i gironi hanno 4 squadre")
+        
+        # 4. Aggiorna i quarti di finale Major League
+        ml_quarters = Match.query.filter_by(phase='quarterfinal', league='Major League').order_by(Match.time).all()
+        
+        # Accoppiamenti Major League: 1C vs 2D, 1B vs 2C, 1D vs 2A, 1A vs 2B
+        ml_matchups = [
+            (standings['D'][0], standings['C'][1]),  # 1D vs 2C
+            (standings['A'][0], standings['B'][1]),  # 1A vs 2B
+            (standings['C'][0], standings['A'][1]),  # 1C vs 2A
+            (standings['B'][0], standings['D'][1]),  # 1B vs 2D
+        ]
+        
+        print("🔄 Aggiornamento Major League:")
+        for i, (team1, team2) in enumerate(ml_matchups):
+            if i < len(ml_quarters):
+                ml_quarters[i].team1_id = team1.id
+                ml_quarters[i].team2_id = team2.id
+                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
+        
+        # 5. Aggiorna i quarti di finale Beer League
+        bl_quarters = Match.query.filter_by(phase='quarterfinal', league='Beer League').order_by(Match.time).all()
+        
+        # Accoppiamenti Beer League: 3B vs 4C, 3D vs 4A, 3A vs 4B, 3C vs 4D
+        bl_matchups = [
+            (standings['B'][2], standings['A'][3]),  # 3B vs 4A
+            (standings['D'][2], standings['C'][3]),  # 3D vs 4C
+            (standings['A'][2], standings['D'][3]),  # 3A vs 4D
+            (standings['C'][2], standings['B'][3]),  # 3C vs 4B
+        ]
+        
+        print("🔄 Aggiornamento Beer League:")
+        for i, (team1, team2) in enumerate(bl_matchups):
+            if i < len(bl_quarters):
+                bl_quarters[i].team1_id = team1.id
+                bl_quarters[i].team2_id = team2.id
+                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
+        
+        # 6. Salva nel database
+        db.session.commit()
+        
+        flash('🎯 Playoff aggiornati con successo! Le squadre sono state assegnate ai quarti di finale.', 'success')
+        print("✅ AGGIORNAMENTO COMPLETATO")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante l\'aggiornamento: {str(e)}', 'danger')
+        print(f"❌ ERRORE: {e}")
+    
+    return redirect(url_for('schedule'))
+
+
+
+@app.route('/debug_quarterfinals_status')
+def debug_quarterfinals_status():
+    """Debug: verifica lo stato dei quarti di finale."""
+    
+    # Conta i quarti di finale esistenti
+    total_quarters = Match.query.filter_by(phase='quarterfinal').count()
+    
+    # Quarti con squadre assegnate
+    quarters_with_teams = Match.query.filter_by(phase='quarterfinal').filter(
+        Match.team1_id.isnot(None),
+        Match.team2_id.isnot(None)
+    ).count()
+    
+    # Quarti con squadre NULL
+    quarters_with_nulls = Match.query.filter_by(phase='quarterfinal').filter(
+        Match.team1_id.is_(None) | Match.team2_id.is_(None)
+    ).count()
+    
+    # Dettagli delle partite
+    quarters_details = []
+    quarters = Match.query.filter_by(phase='quarterfinal').order_by(Match.league, Match.time).all()
+    
+    for match in quarters:
+        quarters_details.append({
+            'id': match.id,
+            'league': match.league,
+            'date': match.date,
+            'time': match.time,
+            'team1': match.team1.name if match.team1 else 'NULL',
+            'team2': match.team2.name if match.team2 else 'NULL',
+            'team1_id': match.team1_id,
+            'team2_id': match.team2_id
+        })
+    
+    debug_info = {
+        'total_quarters': total_quarters,
+        'quarters_with_teams': quarters_with_teams,
+        'quarters_with_nulls': quarters_with_nulls,
+        'quarters_details': quarters_details
+    }
+    
+    flash(f'🏆 Debug quarti di finale: {debug_info}', 'info')
+    return redirect(url_for('schedule'))
+
+@app.route('/step_by_step_check')
+def step_by_step_check():
+    """Controllo passo-passo della funzione all_group_matches_completed."""
+    
+    print("🔍 INIZIO DEBUG all_group_matches_completed()")
+    
+    # Passo 1: Ottieni tutte le partite di gruppo
+    group_matches = Match.query.filter_by(phase='group').all()
+    print(f"📋 Trovate {len(group_matches)} partite di gruppo")
+    
+    # Passo 2: Controlla ogni partita
+    incomplete_count = 0
+    for i, match in enumerate(group_matches):
+        has_score1 = match.team1_score is not None
+        has_score2 = match.team2_score is not None
+        is_complete = has_score1 and has_score2
+        
+        if not is_complete:
+            incomplete_count += 1
+            print(f"❌ Partita {i+1} incompleta: {match.team1.name if match.team1 else 'N/A'} ({match.team1_score}) vs {match.team2.name if match.team2 else 'N/A'} ({match.team2_score})")
+        else:
+            print(f"✅ Partita {i+1} completa: {match.team1.name} ({match.team1_score}) vs {match.team2.name} ({match.team2_score})")
+    
+    # Passo 3: Risultato della funzione
+    function_result = all_group_matches_completed()
+    manual_result = incomplete_count == 0
+    
+    print(f"🧮 Conteggio manuale partite incomplete: {incomplete_count}")
+    print(f"🔧 Risultato funzione all_group_matches_completed(): {function_result}")
+    print(f"👆 Risultato atteso (manual): {manual_result}")
+    print(f"🎯 Match: {function_result == manual_result}")
+    
+    flash(f"Debug completato - Vedi console per dettagli. Incomplete: {incomplete_count}, Funzione: {function_result}", 'info')
+    return redirect(url_for('schedule'))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+@app.route('/insert_test_scores', methods=['POST','GET'])
+def insert_test_scores():
+    """Inserisce punteggi casuali realistici nelle partite di qualificazione per test."""
+    try:
+        import random
+        
+        # Ottieni tutte le partite di qualificazione non completate
+        qualification_matches = Match.query.filter_by(phase='group').filter(
+            Match.team1_score.is_(None) | Match.team2_score.is_(None)
+        ).all()
+        
+        if not qualification_matches:
+            flash('Tutte le partite di qualificazione sono già state completate!', 'info')
+            return redirect(url_for('schedule'))
+        
+        matches_updated = 0
+        total_goals = 0
+        overtime_matches = 0
+        
+        for match in qualification_matches:
+            # Genera punteggi casuali realistici per l'hockey
+            # Distribuzione realistica: 0-7 gol per squadra, più probabili 1-4
+            weights = [5, 15, 25, 25, 15, 10, 3, 2]  # Pesi per 0-7 gol
+            
+            team1_score = random.choices(range(8), weights=weights)[0]
+            team2_score = random.choices(range(8), weights=weights)[0]
+            
+            # Se finisce in pareggio, decidi se va ai supplementari (30% probabilità)
+            overtime = False
+            shootout = False
+            
+            if team1_score == team2_score and random.random() < 0.3:
+                # Vai ai supplementari
+                overtime = True
+                
+                # 60% probabilità che finisca in overtime, 40% ai rigori
+                if random.random() < 0.6:
+                    # Finisce in overtime - uno segna
+                    if random.random() < 0.5:
+                        team1_score += 1
+                    else:
+                        team2_score += 1
+                else:
+                    # Va ai rigori
+                    shootout = True
+                    overtime = False  # Se va ai rigori, non è tecnicamente overtime
+                    if random.random() < 0.5:
+                        team1_score += 1
+                    else:
+                        team2_score += 1
+                
+                overtime_matches += 1
+            
+            # Salva i vecchi punteggi per update_team_stats
+            old_team1_score = match.team1_score
+            old_team2_score = match.team2_score
+            old_overtime = getattr(match, 'overtime', False)
+            old_shootout = getattr(match, 'shootout', False)
+            
+            # Aggiorna la partita
+            match.team1_score = team1_score
+            match.team2_score = team2_score
+            
+            # Aggiorna overtime/shootout se il modello li supporta
+            if hasattr(match, 'overtime'):
+                match.overtime = overtime
+            if hasattr(match, 'shootout'):
+                match.shootout = shootout
+            
+            # Aggiorna le statistiche delle squadre
+            update_team_stats(match, old_team1_score, old_team2_score, old_overtime, old_shootout)
+            
+            # Genera statistiche casuali per i giocatori
+            generate_random_player_stats(match, team1_score, team2_score)
+            
+            matches_updated += 1
+            total_goals += team1_score + team2_score
+        
+        db.session.commit()
+        
+        # Messaggio di successo con statistiche
+        avg_goals = round(total_goals / matches_updated, 1) if matches_updated > 0 else 0
+        message = f'🎲 Inseriti punteggi casuali in {matches_updated} partite! '
+        message += f'Media gol: {avg_goals}, Supplementari/Rigori: {overtime_matches}'
+        
+        flash(message, 'success')
+        
+        # Se tutte le qualificazioni sono completate, offri di aggiornare i playoff
+        if all_group_matches_completed():
+            flash('✅ Tutte le qualificazioni completate! I playoff verranno aggiornati automaticamente.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante l\'inserimento punteggi casuali: {str(e)}', 'danger')
+        import traceback
+        print(f"Errore dettagliato: {traceback.format_exc()}")
+    
+    return redirect(url_for('schedule'))
+
+
+def generate_random_player_stats(match, team1_score, team2_score):
+    """Genera statistiche casuali realistiche per i giocatori di una partita."""
+    try:
+        # Verifica che esista la tabella PlayerMatchStats
+        if not db.inspect(db.engine).has_table('player_match_stats'):
+            return
+        
+        # Ottieni i giocatori di entrambe le squadre
+        team1_players = list(match.team1.players) if match.team1 else []
+        team2_players = list(match.team2.players) if match.team2 else []
+        
+        if not team1_players or not team2_players:
+            return
+        
+        # Distribuisci i gol di team1
+        distribute_goals_randomly(team1_players, team1_score, match.id)
+        
+        # Distribuisci i gol di team2  
+        distribute_goals_randomly(team2_players, team2_score, match.id)
+        
+        # Aggiungi assist e penalità per tutti i giocatori
+        add_random_assists_and_penalties(team1_players + team2_players, match.id, team1_score + team2_score)
+        
+        # Seleziona MVP casuali
+        select_random_mvps(team1_players, team2_players, match.id)
+        
+    except Exception as e:
+        print(f"Errore nella generazione statistiche giocatori: {e}")
+
+
+def distribute_goals_randomly(players, total_goals, match_id):
+    """Distribuisce i gol casualmente tra i giocatori di una squadra."""
+    import random
+    
+    if total_goals == 0 or not players:
+        # Crea record vuoti anche se non ci sono gol
+        for player in players:
+            create_empty_player_stats(player.id, match_id)
+        return
+    
+    # Lista dei giocatori che possono ancora segnare (max 3 gol a testa)
+    available_players = players.copy()
+    goals_per_player = {player.id: 0 for player in players}
+    
+    # Distribuisci i gol uno per uno
+    for _ in range(total_goals):
+        if not available_players:
+            break
+            
+        # Scegli un marcatore casuale
+        scorer = random.choice(available_players)
+        goals_per_player[scorer.id] += 1
+        
+        # Se ha raggiunto il massimo (3 gol), rimuovilo dalla lista
+        if goals_per_player[scorer.id] >= 3:
+            available_players.remove(scorer)
+    
+    # Crea/aggiorna le statistiche per tutti i giocatori
+    for player in players:
+        goals = goals_per_player[player.id]
+        update_or_create_player_match_stats(
+            player.id, match_id, 
+            goals=goals, assists=0, penalties=0
+        )
+
+
+def add_random_assists_and_penalties(all_players, match_id, total_goals):
+    """Aggiunge assist e penalità casuali a tutti i giocatori."""
+    import random
+    
+    for player in all_players:
+        # Ottieni gol attuali del giocatore
+        existing_stats = get_existing_player_stats(player.id, match_id)
+        current_goals = existing_stats.get('goals', 0) if existing_stats else 0
+        
+        # Calcola assist (più probabili per chi non ha segnato)
+        assists = 0
+        if current_goals == 0:
+            # Giocatori senza gol: 25% probabilità di 1-2 assist
+            if random.random() < 0.25:
+                assists = random.randint(1, 2)
+        else:
+            # Giocatori con gol: 15% probabilità di 1 assist
+            if random.random() < 0.15:
+                assists = 1
+        
+        # Calcola penalità (rare: 8% probabilità)
+        penalty_duration = 0
+        if random.random() < 0.08:
+            # Tipo di penalità più comuni in minuti
+            penalty_types = [2, 2, 2, 2, 5, 10]  # Più probabili le minori
+            penalty_duration = random.choice(penalty_types)
+        
+        # Aggiorna le statistiche
+        update_or_create_player_match_stats(
+            player.id, match_id,
+            goals=current_goals, assists=assists, penalties=penalty_duration
+        )
+
+
+def select_random_mvps(team1_players, team2_players, match_id):
+    """Seleziona MVP casuali per entrambe le squadre."""
+    import random
+    
+    # Preferisci giocatori con statistiche migliori per MVP
+    def get_player_score(player_id):
+        stats = get_existing_player_stats(player_id, match_id)
+        if not stats:
+            return 0
+        return (stats.get('goals', 0) * 3) + (stats.get('assists', 0) * 2) - (stats.get('penalties', 0) * 0.5)
+    
+    # MVP Team 1
+    if team1_players:
+        # 70% probabilità di scegliere il migliore, 30% casuale
+        if random.random() < 0.7:
+            mvp1 = max(team1_players, key=lambda p: get_player_score(p.id))
+        else:
+            mvp1 = random.choice(team1_players)
+        
+        update_mvp_status(mvp1.id, match_id, is_team1=True)
+    
+    # MVP Team 2
+    if team2_players:
+        if random.random() < 0.7:
+            mvp2 = max(team2_players, key=lambda p: get_player_score(p.id))
+        else:
+            mvp2 = random.choice(team2_players)
+        
+        update_mvp_status(mvp2.id, match_id, is_team2=True)
+
+
+def create_empty_player_stats(player_id, match_id):
+    """Crea statistiche vuote per un giocatore."""
+    update_or_create_player_match_stats(player_id, match_id, goals=0, assists=0, penalties=0)
+
+
+def update_or_create_player_match_stats(player_id, match_id, goals=0, assists=0, penalties=0):
+    """Crea o aggiorna le statistiche di un giocatore per una partita."""
+    try:
+        existing_stats = PlayerMatchStats.query.filter_by(
+            player_id=player_id, match_id=match_id
+        ).first()
+        
+        if existing_stats:
+            existing_stats.goals = goals
+            existing_stats.assists = assists
+            existing_stats.penalties = penalties
+        else:
+            new_stats = PlayerMatchStats(
+                player_id=player_id,
+                match_id=match_id,
+                goals=goals,
+                assists=assists,
+                penalties=penalties,
+                is_best_player_team1=False,
+                is_best_player_team2=False
+            )
+            db.session.add(new_stats)
+    except Exception as e:
+        print(f"Errore aggiornamento statistiche giocatore {player_id}: {e}")
+
+
+def get_existing_player_stats(player_id, match_id):
+    """Ottieni le statistiche esistenti di un giocatore per una partita."""
+    try:
+        stats = PlayerMatchStats.query.filter_by(
+            player_id=player_id, match_id=match_id
+        ).first()
+        
+        if stats:
+            return {
+                'goals': stats.goals,
+                'assists': stats.assists,
+                'penalties': stats.penalties
+            }
+    except Exception as e:
+        print(f"Errore recupero statistiche giocatore {player_id}: {e}")
+    
+    return None
+
+
+def update_mvp_status(player_id, match_id, is_team1=False, is_team2=False):
+    """Aggiorna lo status MVP di un giocatore."""
+    try:
+        stats = PlayerMatchStats.query.filter_by(
+            player_id=player_id, match_id=match_id
+        ).first()
+        
+        if stats:
+            if is_team1:
+                stats.is_best_player_team1 = True
+            if is_team2:
+                stats.is_best_player_team2 = True
+    except Exception as e:
+        print(f"Errore aggiornamento MVP per giocatore {player_id}: {e}")
+
+
+# Route per resettare solo i punteggi (mantenendo il calendario)
+@app.route('/reset_scores_only', methods=['POST'])
+def reset_scores_only():
+    """Resetta solo i punteggi delle qualificazioni, mantenendo il calendario."""
+    try:
+        # Reset punteggi partite di gruppo
+        group_matches = Match.query.filter_by(phase='group').all()
+        matches_reset = 0
+        
+        for match in group_matches:
+            if match.is_completed:
+                match.team1_score = None
+                match.team2_score = None
+                if hasattr(match, 'overtime'):
+                    match.overtime = False
+                if hasattr(match, 'shootout'):
+                    match.shootout = False
+                matches_reset += 1
+        
+        # Reset statistiche squadre
+        teams = Team.query.all()
+        for team in teams:
+            team.wins = 0
+            team.losses = 0
+            team.draws = 0
+            team.goals_for = 0
+            team.goals_against = 0
+            team.points = 0
+        
+        # Reset statistiche giocatori per partita
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            PlayerMatchStats.query.filter(
+                PlayerMatchStats.match_id.in_([m.id for m in group_matches])
+            ).delete(synchronize_session=False)
+        
+        # Reset playoff teams a NULL
+        playoff_matches = Match.query.filter(Match.phase != 'group').all()
+        for match in playoff_matches:
+            match.team1_id = None
+            match.team2_id = None
+            match.team1_score = None
+            match.team2_score = None
+            if hasattr(match, 'overtime'):
+                match.overtime = False
+            if hasattr(match, 'shootout'):
+                match.shootout = False
+        
+        db.session.commit()
+        
+        flash(f'🔄 Resettati i punteggi di {matches_reset} partite di qualificazione!', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore durante il reset: {str(e)}', 'danger')
+    
+    return redirect(url_for('schedule'))
+
+
+
+
+
+
+
+
 
 
 
