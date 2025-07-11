@@ -4469,9 +4469,9 @@ def get_team_group_stats(team_id):
         losses_reg = group_stats.losses_regulation or 0
         goals_for = group_stats.goals_for or 0
         goals_against = group_stats.goals_against or 0
-        
-        # Sistema punti hockey: 2-2-1-0
-        points = (wins_reg * 2) + (wins_ot * 2) + (losses_ot * 1) + (losses_reg * 0)
+
+        # Sistema punti hockey: 3-2-1-0
+        points = (wins_reg * 3) + (wins_ot * 2) + (losses_ot * 1) + (losses_reg * 0)
         
         return {
             'games_played': group_stats.games_played or 0,
@@ -8002,8 +8002,8 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
         story.append(Paragraph(f"Girone {group}", styles['Heading3']))
         
         # Tabella girone
-        data = [['Pos', 'Squadra', 'PG', 'V', 'P', 'S', 'GF', 'GS', 'DR', 'Punti']]
-        
+        data = [['Pos', 'Squadra', 'PG', 'W', 'WOT', 'LOT', 'L', 'GF', 'GS', 'DR', 'Punti']]
+
         for i, team in enumerate(teams, 1):
             data.append([
                 str(i),
@@ -8016,6 +8016,22 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
                 str(team.goals_against),
                 str(team.goal_difference),
                 str(team.points)
+            ])
+
+
+            # CORRETTO nel PDF:
+            data.append([
+                str(i),
+                team.name,
+                str(team.group_games_played),      # ✅ Solo 3 partite qualificazione
+                str(team.group_wins),   
+                str(team.group_wins_overtime),   # ✅ Sconfitte overtime (1 punto)
+                str(team.group_losses_overtime),   # ✅ Sconfitte overtime (1 punto)
+                str(team.group_losses),            # ✅ Solo sconfitte qualificazione
+                str(team.group_goals_for),         # ✅ Solo gol qualificazione
+                str(team.group_goals_against),     # ✅ Solo gol qualificazione
+                str(team.group_goal_difference),   # ✅ Solo diff qualificazione
+                str(team.group_points)             # ✅ Solo punti qualificazione
             ])
         
         table = Table(data, colWidths=[1*cm, 4*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1*cm, 1.5*cm])
