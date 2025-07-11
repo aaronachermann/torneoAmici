@@ -311,9 +311,10 @@
                                                     <th>Pos</th>
                                                     <th>Squadra</th>
                                                     <th>PG</th>
-                                                    <th>V</th>
-                                                    <th>P</th>
-                                                    <th>S</th>
+                                                    <th>W</th>
+                                                    <th>WOT</th>
+                                                    <th>LOT</th>
+                                                    <th>L</th>
                                                     <th>GF</th>
                                                     <th>GS</th>
                                                     <th>DR</th>
@@ -325,14 +326,15 @@
                                                     <tr>
                                                         <td>{{ loop.index }}</td>
                                                         <td>{{ team.name }}</td>
-                                                        <td>{{ team.group_games_played }}</td> 
-                                                        <td>{{ team.wins }}</td>
-                                                        <td>{{ team.draws }}</td>
-                                                        <td>{{ team.losses }}</td>
-                                                        <td>{{ team.goals_for }}</td>
-                                                        <td>{{ team.goals_against }}</td>
-                                                        <td>{{ team.goal_difference }}</td>
-                                                        <td><strong>{{ team.points }}</strong></td>
+                                                        <td>{{ team.group_games_played }}</td>        <!-- ✅ Già corretto -->
+                                                        <td>{{ team.group_wins }}</td> 
+                                                        <td>{{ team.group_wins_overtime }}</td>                 <!-- ❌ Era: team.wins -->
+                                                        <td>{{ team.group_losses_overtime }}</td>     <!-- ❌ Era: team.draws (ma non esistono pareggi!) -->
+                                                        <td>{{ team.group_losses }}</td>              <!-- ❌ Era: team.losses -->
+                                                        <td>{{ team.group_goals_for }}</td>           <!-- ❌ Era: team.goals_for -->
+                                                        <td>{{ team.group_goals_against }}</td>       <!-- ❌ Era: team.goals_against -->
+                                                        <td>{{ team.group_goal_difference }}</td>     <!-- ❌ Era: team.goal_difference -->
+                                                        <td><strong>{{ team.group_points }}</strong></td>  <!-- ❌ Era: team.points -->
                                                     </tr>
                                                 {% endfor %}
                                             </tbody>
