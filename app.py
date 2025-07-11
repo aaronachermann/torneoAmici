@@ -4390,45 +4390,64 @@ def get_player_statistics_for_standings():
             (Player.goals > 0) | (Player.assists > 0) | (Player.penalties > 0)
         ).all()
 
-
-
 def get_team_group_stats(team_id):
-    """Calcola le statistiche di una squadra SOLO dalle partite di qualificazione (phase='group')."""
-    from sqlalchemy import func
+    """Calcola le statistiche di una squadra SOLO dalle partite di qualificazione (phase='group').
+    Sistema punti hockey: 2 punti vittoria regolamentare, 2 punti vittoria overtime/rigori, 
+    1 punto sconfitta overtime/rigori, 0 punti sconfitta regolamentare.
+    """
+    from sqlalchemy import func, case
     
     try:
         # Query per calcolare statistiche dalle partite di qualificazione
         group_stats = db.session.query(
             func.count(Match.id).label('games_played'),
+            # Vittorie regolamentari
             func.sum(
-                db.case([
-                    (db.and_(Match.team1_id == team_id, Match.team1_score > Match.team2_score), 1),
-                    (db.and_(Match.team2_id == team_id, Match.team2_score > Match.team1_score), 1)
-                ], else_=0)
-            ).label('wins'),
+                case(
+                    (db.and_(Match.team1_id == team_id, Match.team1_score > Match.team2_score, Match.overtime == False, Match.shootout == False), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score > Match.team1_score, Match.overtime == False, Match.shootout == False), 1),
+                    else_=0
+                )
+            ).label('wins_regulation'),
+            # Vittorie overtime/rigori
             func.sum(
-                db.case([
-                    (db.and_(Match.team1_id == team_id, Match.team1_score == Match.team2_score), 1),
-                    (db.and_(Match.team2_id == team_id, Match.team1_score == Match.team2_score), 1)
-                ], else_=0)
-            ).label('draws'),
+                case(
+                    (db.and_(Match.team1_id == team_id, Match.team1_score > Match.team2_score, db.or_(Match.overtime == True, Match.shootout == True)), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score > Match.team1_score, db.or_(Match.overtime == True, Match.shootout == True)), 1),
+                    else_=0
+                )
+            ).label('wins_overtime'),
+            # Sconfitte overtime/rigori
             func.sum(
-                db.case([
-                    (db.and_(Match.team1_id == team_id, Match.team1_score < Match.team2_score), 1),
-                    (db.and_(Match.team2_id == team_id, Match.team2_score < Match.team1_score), 1)
-                ], else_=0)
-            ).label('losses'),
+                case(
+                    (db.and_(Match.team1_id == team_id, Match.team1_score < Match.team2_score, db.or_(Match.overtime == True, Match.shootout == True)), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score < Match.team1_score, db.or_(Match.overtime == True, Match.shootout == True)), 1),
+                    else_=0
+                )
+            ).label('losses_overtime'),
+            # Sconfitte regolamentari
             func.sum(
-                db.case([
+                case(
+                    (db.and_(Match.team1_id == team_id, Match.team1_score < Match.team2_score, Match.overtime == False, Match.shootout == False), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score < Match.team1_score, Match.overtime == False, Match.shootout == False), 1),
+                    else_=0
+                )
+            ).label('losses_regulation'),
+            # Gol fatti
+            func.sum(
+                case(
                     (Match.team1_id == team_id, Match.team1_score),
-                    (Match.team2_id == team_id, Match.team2_score)
-                ], else_=0)
+                    (Match.team2_id == team_id, Match.team2_score),
+                    else_=0
+                )
             ).label('goals_for'),
+            # Gol subiti
             func.sum(
-                db.case([
+                case(
                     (Match.team1_id == team_id, Match.team2_score),
-                    (Match.team2_id == team_id, Match.team1_score)
-                ], else_=0)
+                    (Match.team2_id == team_id, Match.team1_score),
+                    else_=0
+                )
             ).label('goals_against')
         ).filter(
             Match.phase == 'group',  # SOLO partite di qualificazione
@@ -4439,31 +4458,37 @@ def get_team_group_stats(team_id):
         
         if not group_stats:
             return {
-                'games_played': 0, 'wins': 0, 'draws': 0, 'losses': 0,
+                'games_played': 0, 'wins': 0, 'wins_overtime': 0, 'losses_overtime': 0, 'losses': 0,
                 'goals_for': 0, 'goals_against': 0, 'goal_difference': 0, 'points': 0
             }
         
-        # Calcola punti (3 per vittoria, 1 per pareggio)
-        wins = group_stats.wins or 0
-        draws = group_stats.draws or 0
+        # Calcola statistiche
+        wins_reg = group_stats.wins_regulation or 0
+        wins_ot = group_stats.wins_overtime or 0
+        losses_ot = group_stats.losses_overtime or 0
+        losses_reg = group_stats.losses_regulation or 0
         goals_for = group_stats.goals_for or 0
         goals_against = group_stats.goals_against or 0
         
+        # Sistema punti hockey: 2-2-1-0
+        points = (wins_reg * 2) + (wins_ot * 2) + (losses_ot * 1) + (losses_reg * 0)
+        
         return {
             'games_played': group_stats.games_played or 0,
-            'wins': wins,
-            'draws': draws,
-            'losses': group_stats.losses or 0,
+            'wins': wins_reg + wins_ot,  # Vittorie totali
+            'wins_overtime': wins_ot,
+            'losses_overtime': losses_ot,
+            'losses': losses_ot + losses_reg,  # Sconfitte totali
             'goals_for': goals_for,
             'goals_against': goals_against,
             'goal_difference': goals_for - goals_against,
-            'points': (wins * 3) + (draws * 1)
+            'points': points
         }
         
     except Exception as e:
         print(f"Errore calcolo statistiche girone per team {team_id}: {e}")
         return {
-            'games_played': 0, 'wins': 0, 'draws': 0, 'losses': 0,
+            'games_played': 0, 'wins': 0, 'wins_overtime': 0, 'losses_overtime': 0, 'losses': 0,
             'goals_for': 0, 'goals_against': 0, 'goal_difference': 0, 'points': 0
         }
 
@@ -4483,7 +4508,8 @@ def get_group_standings():
             # Aggiungi le statistiche temporanee al team
             team.group_games_played = stats['games_played']
             team.group_wins = stats['wins']
-            team.group_draws = stats['draws']
+            team.group_wins_overtime = stats['wins_overtime']
+            team.group_losses_overtime = stats['losses_overtime']
             team.group_losses = stats['losses']
             team.group_goals_for = stats['goals_for']
             team.group_goals_against = stats['goals_against']
@@ -4503,9 +4529,6 @@ def get_group_standings():
         group_standings[group] = teams_with_stats
     
     return group_standings
-
-
-# Modifica la route standings per usare le nuove funzioni
 
 @app.route('/standings')
 @login_required
@@ -4569,7 +4592,7 @@ def standings():
                 top_assists.append(player)
                 
     except Exception as e:
-            print(f"Errore nel caricamento statistiche giocatori: {e}")
+        print(f"Errore nel caricamento statistiche giocatori: {e}")
     
     # MVP Awards, Fair Play, ecc. (come prima)
     best_player_awards = get_best_player_awards()
@@ -4582,8 +4605,6 @@ def standings():
                            most_penalties=most_penalties,
                            best_player_awards=best_player_awards,
                            fair_play_ranking=fair_play_ranking)
-
-
   
 
 @app.route('/migrate_all_star_team', methods=['POST'])
