@@ -7745,8 +7745,6 @@ def check_registration_points():
 
 
 # Route per esportare le classifiche in PDF
-
-
 @app.route('/export_standings_pdf')
 def export_standings_pdf():
     """Genera e scarica un PDF con tutte le classifiche del torneo."""
@@ -7754,15 +7752,7 @@ def export_standings_pdf():
         print("🔍 Inizio generazione PDF...")
         
         # Prepara i dati come nella funzione standings()
-        group_standings = {}
-        for group in ['A', 'B', 'C', 'D']:
-            teams = Team.query.filter_by(group=group).order_by(
-                Team.points.desc(), 
-                (Team.goals_for - Team.goals_against).desc(),
-                Team.goals_for.desc(),
-                Team.group_order
-            ).all()
-            group_standings[group] = teams
+        group_standings = get_group_standings()
         print(f"✅ Group standings caricati: {len(group_standings)} gironi")
         
         # Player statistics
