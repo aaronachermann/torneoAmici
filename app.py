@@ -8005,19 +8005,6 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
         data = [['Pos', 'Squadra', 'PG', 'W', 'WOT', 'LOT', 'L', 'GF', 'GS', 'DR', 'Punti']]
 
         for i, team in enumerate(teams, 1):
-            data.append([
-                str(i),
-                team.name,
-                str(team.games_played),
-                str(team.wins),
-                str(team.draws), 
-                str(team.losses),
-                str(team.goals_for),
-                str(team.goals_against),
-                str(team.goal_difference),
-                str(team.points)
-            ])
-
 
             # CORRETTO nel PDF:
             data.append([
@@ -8179,17 +8166,17 @@ def generate_standings_pdf(buffer, group_standings, top_scorers, top_assists,
         
         data = [['Pos', 'Squadra', 'Girone', 'Categoria', 'Premio']]
         for ranking in final_rankings:
-            pos_icon = "🥇" if ranking.final_position == 1 else "🥈" if ranking.final_position == 2 else "🥉" if ranking.final_position == 3 else str(ranking.final_position)
+            pos_icon = "1." if ranking.final_position == 1 else "2." if ranking.final_position == 2 else "3." if ranking.final_position == 3 else str(ranking.final_position)
             category = "Major League" if ranking.final_position <= 8 else "Beer League"
             
             if ranking.final_position == 1:
-                premio = "🏆 Campione"
+                premio = "Campione"
             elif ranking.final_position == 2:
-                premio = "🥈 Vicecampione"
+                premio = "Vicecampione"
             elif ranking.final_position == 3:
-                premio = "🥉 Terzo posto"
+                premio = " Terzo posto"
             elif ranking.final_position == 9:
-                premio = "🍺 Campione BL"
+                premio = "Campione BL"
             else:
                 premio = "-"
             
