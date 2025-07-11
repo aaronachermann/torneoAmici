@@ -4492,7 +4492,6 @@ def get_team_group_stats(team_id):
             'goals_for': 0, 'goals_against': 0, 'goal_difference': 0, 'points': 0
         }
 
-
 def get_group_standings():
     """Calcola le classifiche dei gironi SOLO dalle partite di qualificazione."""
     group_standings = {}
@@ -4529,6 +4528,8 @@ def get_group_standings():
         group_standings[group] = teams_with_stats
     
     return group_standings
+
+
 
 @app.route('/standings')
 @login_required
@@ -4598,15 +4599,67 @@ def standings():
     best_player_awards = get_best_player_awards()
     fair_play_ranking = get_fair_play_ranking()
     
+    # Final Rankings
+    has_final_rankings = False
+    final_rankings = None
+    try:
+        if db.inspect(db.engine).has_table('final_ranking'):
+            final_rankings = FinalRanking.get_complete_rankings()
+            has_final_rankings = final_rankings is not None and len(final_rankings) > 0
+    except Exception as e:
+        print(f"Errore nel caricamento classifiche finali: {e}")
+    
+    # All Star Team data
+    all_star_data = {
+        'Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        },
+        'Non Tesserati': {
+            'Portiere': None,
+            'Difensore_1': None,
+            'Difensore_2': None,
+            'Attaccante_1': None,
+            'Attaccante_2': None
+        }
+    }
+    
+    try:
+        if db.inspect(db.engine).has_table('all_star_team'):
+            selections = AllStarTeam.query.all()
+            for selection in selections:
+                category = selection.category  
+                position = selection.position
+                if position in all_star_data[category]:
+                    # Converti il Player in dizionario per la serializzazione JSON
+                    all_star_data[category][position] = {
+                        'id': selection.player.id,
+                        'name': selection.player.name,
+                        'team': {
+                            'id': selection.player.team.id,
+                            'name': selection.player.team.name
+                        }
+                    }
+    except Exception as e:
+        print(f"Errore nel caricamento All Star Team: {e}")
+    
+    # Teams per dropdown
+    teams = Team.query.order_by(Team.name).all()
+    
     return render_template('standings.html', 
                            group_standings=group_standings,
                            top_scorers=top_scorers,
                            top_assists=top_assists,
                            most_penalties=most_penalties,
                            best_player_awards=best_player_awards,
-                           fair_play_ranking=fair_play_ranking)
-  
-
+                           fair_play_ranking=fair_play_ranking,
+                           has_final_rankings=has_final_rankings,
+                           final_rankings=final_rankings,
+                           teams=teams,
+                           all_star_data=all_star_data)
 @app.route('/migrate_all_star_team', methods=['POST'])
 def migrate_all_star_team():
     """Migra il database per aggiungere la tabella all_star_team."""
