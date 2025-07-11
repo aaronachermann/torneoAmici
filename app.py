@@ -496,7 +496,7 @@ class Match(db.Model):
             }
         
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
-    
+  
     def get_allowed_overtime_rules(self):
         """Restituisce le regole di overtime/rigori permesse per questa fase."""
         if self.phase == 'quarterfinal':
@@ -512,24 +512,22 @@ class Match(db.Model):
                 'description': 'Overtime + rigori se necessario'
             }
         elif self.phase == 'final' or self.phase == 'placement':
-            # Distingui tra finali 1°-4° e 5°-8°
-            if self.league == 'Major League':
-                # Per Major League: le ultime 2 partite sono 1°-4° posto
-                all_finals = Match.query.filter_by(
-                    phase=self.phase, 
-                    league=self.league,
-                    date=self.date
-                ).order_by(Match.time).all()
-                
-                if len(all_finals) >= 2:
-                    # Le ultime 2 partite (3°-4° e 1°-2°) hanno overtime
-                    if self in all_finals[-2:]:
-                        return {
-                            'allow_overtime': True,
-                            'allow_shootout': True, 
-                            'description': 'Finale 1°-4°: Overtime + rigori se necessario'
-                        }
-                
+            # Distingui tra finali 1°-4° e 5°-8° per entrambe le leghe
+            all_finals = Match.query.filter_by(
+                phase=self.phase, 
+                league=self.league,
+                date=self.date
+            ).order_by(Match.time).all()
+            
+            if len(all_finals) >= 2:
+                # Le ultime 2 partite di ogni lega sono sempre 1°-4° posto (3°-4° e 1°-2°)
+                if self in all_finals[-2:]:
+                    return {
+                        'allow_overtime': True,
+                        'allow_shootout': True, 
+                        'description': 'Finale 1°-4°: Overtime + rigori se necessario'
+                    }
+            
             # Tutte le altre finali (5°-8° posto) solo rigori
             return {
                 'allow_overtime': False,
@@ -543,8 +541,6 @@ class Match(db.Model):
                 'allow_shootout': True,
                 'description': 'Overtime + rigori permessi'
             }
-
-
 
 class FinalRanking(db.Model):
     """Classifica finale del torneo (posizioni 1-16)."""
@@ -712,7 +708,7 @@ def calculate_team_penalty_minutes(team):
     except Exception as e:
         print(f"Errore calcolo penalità per {team.name}: {e}")
         return 0
-    
+
 def validate_match_overtime_rules(match):
     """Valida che overtime/shootout rispettino le regole della fase."""
     if not match.is_completed:
