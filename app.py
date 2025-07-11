@@ -776,7 +776,7 @@ def get_fair_play_ranking():
         # Ordina per Fair Play:
         # 1. Meno minuti di penalità (meglio)
         # 2. Migliore posizione finale (numero più basso = meglio)
-        fair_play_data.sort(key=lambda x: (x['penalty_minutes'], x['final_position']))
+        fair_play_data.sort(key=lambda x: (x['penalty_minutes'], -x['final_position']))
         
         return fair_play_data
         
