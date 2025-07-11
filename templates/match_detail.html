@@ -424,17 +424,32 @@
                                                 min="0" placeholder="Gol">
                                         </div>
                                         <div class="col-md-4">
-                                            {% if match.phase == 'group' %}
-                                                <label class="form-label">Modalità</label><br>
+                                            {% set overtime_rules = match.get_allowed_overtime_rules() %}
+                                            
+                                            <!-- Mostra le regole della fase -->
+                                            <small class="text-muted d-block mb-2">
+                                                <strong>Regole {{ match.phase }}:</strong> {{ overtime_rules.description }}
+                                            </small>
+                                            
+                                            {% if overtime_rules.allow_overtime %}
                                                 <div class="form-check form-check-inline">
                                                     <input class="form-check-input" type="checkbox" id="overtime_main" name="overtime" 
                                                         {% if match.overtime %}checked{% endif %}>
                                                     <label class="form-check-label" for="overtime_main">⏰ OT</label>
                                                 </div>
+                                            {% endif %}
+                                            
+                                            {% if overtime_rules.allow_shootout %}
                                                 <div class="form-check form-check-inline">
                                                     <input class="form-check-input" type="checkbox" id="shootout_main" name="shootout" 
                                                         {% if match.shootout %}checked{% endif %}>
                                                     <label class="form-check-label" for="shootout_main">🥅 Rigori</label>
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if not overtime_rules.allow_overtime and not overtime_rules.allow_shootout %}
+                                                <div class="alert alert-info">
+                                                    Questa fase non prevede overtime o rigori.
                                                 </div>
                                             {% endif %}
                                         </div>
@@ -1088,13 +1103,23 @@
                 const score2 = parseInt(team2ScoreInput.value) || 0;
                 const isOvertimeOrShootout = (overtimeCheckbox && overtimeCheckbox.checked) || (shootoutCheckbox && shootoutCheckbox.checked);
                 
-                // Mostra/nasconde avviso per pareggi non risolti nelle qualificazioni
+                // Per le fasi playoff, il pareggio deve essere risolto
+                const isPlayoff = window.location.href.includes('phase=quarterfinal') || 
+                                window.location.href.includes('phase=semifinal') || 
+                                window.location.href.includes('phase=final') ||
+                                window.location.href.includes('phase=placement');
+                
                 let tieWarning = document.getElementById('tie-warning');
+                
                 if (!tieWarning && score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
+                    const warningText = isPlayoff ? 
+                        'Pareggio nei playoff non permesso! Deve finire con overtime o rigori.' :
+                        'Attenzione: pareggio nelle qualificazioni! Seleziona OT o Rigori.';
+                        
                     tieWarning = document.createElement('div');
                     tieWarning.id = 'tie-warning';
-                    tieWarning.className = 'alert alert-warning mt-2';
-                    tieWarning.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Attenzione: pareggio nelle qualificazioni! Seleziona OT o Rigori.';
+                    tieWarning.className = isPlayoff ? 'alert alert-danger mt-2' : 'alert alert-warning mt-2';
+                    tieWarning.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${warningText}`;
                     team2ScoreInput.parentElement.appendChild(tieWarning);
                 } else if (tieWarning && (score1 !== score2 || score1 === 0 || isOvertimeOrShootout)) {
                     tieWarning.remove();

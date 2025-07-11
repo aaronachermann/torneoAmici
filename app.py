@@ -326,16 +326,35 @@ class Match(db.Model):
         """True se la partita è finita nei tempi regolamentari."""
         return not self.overtime and not self.shootout
     
+    # @property
+    # def winner(self):
+    #     if not self.is_completed:
+    #         return None
+    #     if self.team1_score > self.team2_score:
+    #         return self.team1
+    #     elif self.team2_score > self.team1_score:
+    #         return self.team2
+    #     return None  # Draw (solo per fasi che permettono pareggi)
+    
+
     @property
     def winner(self):
         if not self.is_completed:
             return None
+        
         if self.team1_score > self.team2_score:
             return self.team1
         elif self.team2_score > self.team1_score:
             return self.team2
-        return None  # Draw (solo per fasi che permettono pareggi)
-    
+        else:
+            # Pareggio: nelle fasi playoff deve essere risolto
+            if self.phase in ['quarterfinal', 'semifinal', 'final', 'placement']:
+                # Per i playoff, un pareggio senza overtime/rigori è un errore
+                if not (self.overtime or self.shootout):
+                    raise ValueError(f"Pareggio non risolto nella fase {self.phase}! Deve finire con overtime o rigori.")
+            return None  # Pareggio permesso solo nella fase di gruppo
+
+
     @property 
     def is_overtime_shootout(self):
         """True se la partita è finita overtime/rigori."""
@@ -477,6 +496,53 @@ class Match(db.Model):
             }
         
         return descriptions.get(match_number, {'team1': "TBD", 'team2': "TBD"})
+    
+    def get_allowed_overtime_rules(self):
+        """Restituisce le regole di overtime/rigori permesse per questa fase."""
+        if self.phase == 'quarterfinal':
+            return {
+                'allow_overtime': False,
+                'allow_shootout': True,
+                'description': 'Solo rigori (no overtime)'
+            }
+        elif self.phase == 'semifinal':
+            return {
+                'allow_overtime': True, 
+                'allow_shootout': True,
+                'description': 'Overtime + rigori se necessario'
+            }
+        elif self.phase == 'final' or self.phase == 'placement':
+            # Distingui tra finali 1°-4° e 5°-8°
+            if self.league == 'Major League':
+                # Per Major League: le ultime 2 partite sono 1°-4° posto
+                all_finals = Match.query.filter_by(
+                    phase=self.phase, 
+                    league=self.league,
+                    date=self.date
+                ).order_by(Match.time).all()
+                
+                if len(all_finals) >= 2:
+                    # Le ultime 2 partite (3°-4° e 1°-2°) hanno overtime
+                    if self in all_finals[-2:]:
+                        return {
+                            'allow_overtime': True,
+                            'allow_shootout': True, 
+                            'description': 'Finale 1°-4°: Overtime + rigori se necessario'
+                        }
+                
+            # Tutte le altre finali (5°-8° posto) solo rigori
+            return {
+                'allow_overtime': False,
+                'allow_shootout': True,
+                'description': 'Finale 5°-8°: Solo rigori (no overtime)'
+            }
+        else:
+            # Fase di gruppo: regole normali
+            return {
+                'allow_overtime': True,
+                'allow_shootout': True,
+                'description': 'Overtime + rigori permessi'
+            }
 
 
 
@@ -647,6 +713,30 @@ def calculate_team_penalty_minutes(team):
         print(f"Errore calcolo penalità per {team.name}: {e}")
         return 0
     
+def validate_match_overtime_rules(match):
+    """Valida che overtime/shootout rispettino le regole della fase."""
+    if not match.is_completed:
+        return True, ""
+    
+    rules = match.get_allowed_overtime_rules()
+    
+    # Se è in pareggio, deve essere risolto nei playoff
+    if (match.team1_score == match.team2_score and 
+        match.phase in ['quarterfinal', 'semifinal', 'final', 'placement']):
+        
+        if not (match.overtime or match.shootout):
+            return False, f"Pareggio non permesso in {match.phase}! Deve finire con overtime o rigori."
+    
+    # Controlla regole overtime
+    if match.overtime and not rules['allow_overtime']:
+        return False, f"Overtime non permesso in {match.phase}! {rules['description']}"
+    
+    # Controlla regole shootout
+    if match.shootout and not rules['allow_shootout']:
+        return False, f"Rigori non permessi in {match.phase}! {rules['description']}"
+    
+    return True, ""
+
 
 def get_fair_play_ranking():
     """Calcola la classifica Fair Play."""
@@ -3654,11 +3744,28 @@ def match_detail(match_id):
             match.team1_score = int(team1_score_str)
             match.team2_score = int(team2_score_str)
             
-            # Gestione overtime/shootout se disponibile
+            # Gestione overtime/shootout con validazione regole
+            rules = match.get_allowed_overtime_rules()
+            
             if hasattr(match, 'overtime'):
-                match.overtime = request.form.get('overtime') == 'on'
+                overtime_requested = request.form.get('overtime') == 'on'
+                if overtime_requested and not rules['allow_overtime']:
+                    flash(f'⚠️ Overtime non permesso in {match.phase}! {rules["description"]}', 'warning')
+                    overtime_requested = False
+                match.overtime = overtime_requested
+            
             if hasattr(match, 'shootout'):
-                match.shootout = request.form.get('shootout') == 'on'
+                shootout_requested = request.form.get('shootout') == 'on'
+                if shootout_requested and not rules['allow_shootout']:
+                    flash(f'⚠️ Rigori non permessi in {match.phase}! {rules["description"]}', 'warning')
+                    shootout_requested = False
+                match.shootout = shootout_requested
+            
+            # Validazione finale
+            is_valid, error_msg = validate_match_overtime_rules(match)
+            if not is_valid:
+                flash(f'❌ {error_msg}', 'error')
+                return redirect(url_for('match_detail', match_id=match_id))
             
             update_team_stats(match, old_team1_score, old_team2_score, old_overtime, old_shootout)
         
@@ -9066,12 +9173,8 @@ def reset_scores_only():
 
 
 
-
-
-
-
-
 if __name__ == '__main__':
+    #PORT=5001 python3 app.py
     with app.app_context():
         try:
             db.create_all()
