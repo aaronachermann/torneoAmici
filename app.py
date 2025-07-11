@@ -4475,10 +4475,10 @@ def get_team_group_stats(team_id):
         
         return {
             'games_played': group_stats.games_played or 0,
-            'wins': wins_reg + wins_ot,  # Vittorie totali
+            'wins': wins_reg,   # Vittorie totali
             'wins_overtime': wins_ot,
             'losses_overtime': losses_ot,
-            'losses': losses_ot + losses_reg,  # Sconfitte totali
+            'losses': losses_ot , # Sconfitte totali
             'goals_for': goals_for,
             'goals_against': goals_against,
             'goal_difference': goals_for - goals_against,
