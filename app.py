@@ -4391,176 +4391,199 @@ def get_player_statistics_for_standings():
         ).all()
 
 
+
+def get_team_group_stats(team_id):
+    """Calcola le statistiche di una squadra SOLO dalle partite di qualificazione (phase='group')."""
+    from sqlalchemy import func
+    
+    try:
+        # Query per calcolare statistiche dalle partite di qualificazione
+        group_stats = db.session.query(
+            func.count(Match.id).label('games_played'),
+            func.sum(
+                db.case([
+                    (db.and_(Match.team1_id == team_id, Match.team1_score > Match.team2_score), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score > Match.team1_score), 1)
+                ], else_=0)
+            ).label('wins'),
+            func.sum(
+                db.case([
+                    (db.and_(Match.team1_id == team_id, Match.team1_score == Match.team2_score), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team1_score == Match.team2_score), 1)
+                ], else_=0)
+            ).label('draws'),
+            func.sum(
+                db.case([
+                    (db.and_(Match.team1_id == team_id, Match.team1_score < Match.team2_score), 1),
+                    (db.and_(Match.team2_id == team_id, Match.team2_score < Match.team1_score), 1)
+                ], else_=0)
+            ).label('losses'),
+            func.sum(
+                db.case([
+                    (Match.team1_id == team_id, Match.team1_score),
+                    (Match.team2_id == team_id, Match.team2_score)
+                ], else_=0)
+            ).label('goals_for'),
+            func.sum(
+                db.case([
+                    (Match.team1_id == team_id, Match.team2_score),
+                    (Match.team2_id == team_id, Match.team1_score)
+                ], else_=0)
+            ).label('goals_against')
+        ).filter(
+            Match.phase == 'group',  # SOLO partite di qualificazione
+            Match.team1_score.isnot(None),  # SOLO partite completate
+            Match.team2_score.isnot(None),
+            db.or_(Match.team1_id == team_id, Match.team2_id == team_id)
+        ).first()
+        
+        if not group_stats:
+            return {
+                'games_played': 0, 'wins': 0, 'draws': 0, 'losses': 0,
+                'goals_for': 0, 'goals_against': 0, 'goal_difference': 0, 'points': 0
+            }
+        
+        # Calcola punti (3 per vittoria, 1 per pareggio)
+        wins = group_stats.wins or 0
+        draws = group_stats.draws or 0
+        goals_for = group_stats.goals_for or 0
+        goals_against = group_stats.goals_against or 0
+        
+        return {
+            'games_played': group_stats.games_played or 0,
+            'wins': wins,
+            'draws': draws,
+            'losses': group_stats.losses or 0,
+            'goals_for': goals_for,
+            'goals_against': goals_against,
+            'goal_difference': goals_for - goals_against,
+            'points': (wins * 3) + (draws * 1)
+        }
+        
+    except Exception as e:
+        print(f"Errore calcolo statistiche girone per team {team_id}: {e}")
+        return {
+            'games_played': 0, 'wins': 0, 'draws': 0, 'losses': 0,
+            'goals_for': 0, 'goals_against': 0, 'goal_difference': 0, 'points': 0
+        }
+
+
+def get_group_standings():
+    """Calcola le classifiche dei gironi SOLO dalle partite di qualificazione."""
+    group_standings = {}
+    
+    for group in ['A', 'B', 'C', 'D']:
+        teams = Team.query.filter_by(group=group).all()
+        teams_with_stats = []
+        
+        for team in teams:
+            # Ottieni statistiche solo dalle qualificazioni
+            stats = get_team_group_stats(team.id)
+            
+            # Aggiungi le statistiche temporanee al team
+            team.group_games_played = stats['games_played']
+            team.group_wins = stats['wins']
+            team.group_draws = stats['draws']
+            team.group_losses = stats['losses']
+            team.group_goals_for = stats['goals_for']
+            team.group_goals_against = stats['goals_against']
+            team.group_goal_difference = stats['goal_difference']
+            team.group_points = stats['points']
+            
+            teams_with_stats.append(team)
+        
+        # Ordina le squadre per classifica gironi
+        teams_with_stats.sort(key=lambda t: (
+            -t.group_points,  # Punti decrescenti
+            -t.group_goal_difference,  # Differenza reti decrescente
+            -t.group_goals_for,  # Gol fatti decrescenti
+            t.name  # Nome crescente (tiebreaker)
+        ))
+        
+        group_standings[group] = teams_with_stats
+    
+    return group_standings
+
+
+# Modifica la route standings per usare le nuove funzioni
+
 @app.route('/standings')
 @login_required
 def standings():
-    # Group stage standings - usa l'ordinamento per gironi
-    group_standings = {}
-    for group in ['A', 'B', 'C', 'D']:
-        teams = Team.query.filter_by(group=group).order_by(
-            Team.points.desc(), 
-            (Team.goals_for - Team.goals_against).desc(),
-            Team.goals_for.desc(),
-            Team.group_order
-        ).all()
-        group_standings[group] = teams
+    """Classifiche del torneo con distinzione tra gironi e classifiche generali."""
     
-    # Player statistics - usa il nuovo sistema
+    # Group stage standings - SOLO dalle qualificazioni
+    group_standings = get_group_standings()
+    
+    # Player statistics - dalle TUTTE le partite (come prima)
+    top_scorers = []
+    top_assists = []
+    most_penalties = []
+    
     try:
         if db.inspect(db.engine).has_table('player_match_stats'):
-            # Nuovo sistema: calcola totali dalle partite
             from sqlalchemy import func
             
-            # Query per i migliori marcatori
+            # Marcatori (TUTTE le partite)
             top_scorers_query = db.session.query(
                 Player,
                 func.sum(PlayerMatchStats.goals).label('total_goals'),
                 func.count(PlayerMatchStats.match_id).label('total_matches'),
                 func.sum(PlayerMatchStats.assists).label('total_assists')
             ).join(PlayerMatchStats).filter(
-                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
+                PlayerMatchStats.is_removed != True
             ).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.goals) > 0
             ).order_by(
-                func.sum(PlayerMatchStats.goals).desc(),        # 1° criterio: più gol
-                func.count(PlayerMatchStats.match_id).asc(),    # 2° criterio: meno partite
-                func.sum(PlayerMatchStats.assists).desc()       # 3° criterio: più assist
-            ).limit(10)
+                func.sum(PlayerMatchStats.goals).desc(),
+                func.count(PlayerMatchStats.match_id).asc(),
+                func.sum(PlayerMatchStats.assists).desc()
+            ).limit(15)
             
-            top_scorers = []
             for player, total_goals, total_matches, total_assists in top_scorers_query:
                 player.display_goals = total_goals
                 player.display_matches = total_matches
                 player.display_assists_for_ranking = total_assists
                 top_scorers.append(player)
             
-            # Query per i migliori assistman
+            # Assist (TUTTE le partite)
             top_assists_query = db.session.query(
                 Player,
                 func.sum(PlayerMatchStats.assists).label('total_assists'),
                 func.count(PlayerMatchStats.match_id).label('total_matches'),
                 func.sum(PlayerMatchStats.goals).label('total_goals')
             ).join(PlayerMatchStats).filter(
-                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
+                PlayerMatchStats.is_removed != True
             ).group_by(Player.id).having(
                 func.sum(PlayerMatchStats.assists) > 0
             ).order_by(
-                func.sum(PlayerMatchStats.assists).desc(),      # 1° criterio: più assist
-                func.count(PlayerMatchStats.match_id).asc(),    # 2° criterio: meno partite
-                func.sum(PlayerMatchStats.goals).desc()         # 3° criterio: più gol
-            ).limit(10)
-
-            top_assists = []
+                func.sum(PlayerMatchStats.assists).desc(),
+                func.count(PlayerMatchStats.match_id).asc(),
+                func.sum(PlayerMatchStats.goals).desc()
+            ).limit(15)
+            
             for player, total_assists, total_matches, total_goals in top_assists_query:
                 player.display_assists = total_assists
                 player.display_matches = total_matches
                 player.display_goals_for_ranking = total_goals
                 top_assists.append(player)
-            
-            # Query per le penalità
-            most_penalties_query = db.session.query(
-                Player,
-                func.sum(PlayerMatchStats.penalties).label('total_penalties')
-            ).join(PlayerMatchStats).filter(
-                PlayerMatchStats.is_removed == False  # NUOVA CONDIZIONE
-            ).group_by(Player.id).having(
-                func.sum(PlayerMatchStats.penalties) > 0
-            ).order_by(func.sum(PlayerMatchStats.penalties).desc()).limit(10)
-            
-            most_penalties = []
-            for player, total_penalties in most_penalties_query:
-                player.display_penalties = total_penalties
-                most_penalties.append(player)
-            
-            #  Migliori giocatori (più nomination)
-            best_player_awards = get_best_player_awards()
                 
-        else:
-            # Fallback al sistema vecchio
-            top_scorers = Player.query.filter(Player.goals > 0).order_by(Player.goals.desc()).limit(10).all()
-            top_assists = Player.query.filter(Player.assists > 0).order_by(Player.assists.desc()).limit(10).all()
-            most_penalties = Player.query.filter(Player.penalties > 0).order_by(Player.penalties.desc()).limit(10).all()
-            best_player_awards = []
-            
-            for player in top_scorers:
-                player.display_goals = player.goals
-            for player in top_assists:
-                player.display_assists = player.assists
-            for player in most_penalties:
-                player.display_penalties = player.penalties
-    
     except Exception as e:
-        print(f"Errore nelle statistiche: {e}")
-        # Fallback completo
-        top_scorers = []
-        top_assists = []
-        most_penalties = []
-        best_player_awards = []
+            print(f"Errore nel caricamento statistiche giocatori: {e}")
     
-    # Fair Play ranking
+    # MVP Awards, Fair Play, ecc. (come prima)
+    best_player_awards = get_best_player_awards()
     fair_play_ranking = get_fair_play_ranking()
     
-    # Verifica se esistono classifiche finali - CON GESTIONE ERRORE
-    has_final_rankings = False
-    try:
-        # Controlla se la tabella esiste prima di fare la query
-        if db.inspect(db.engine).has_table('final_ranking'):
-            has_final_rankings = FinalRanking.query.count() > 0
-        else:
-            print("⚠️ Tabella final_ranking non trovata")
-    except Exception as e:
-        print(f"❌ Errore nel controllo final_ranking: {e}")
-        has_final_rankings = False
-    final_rankings = FinalRanking.query.order_by(FinalRanking.final_position).all()
-    selections = AllStarTeam.query.all()
-    
-    # Organizza per categoria e posizione
-    all_star_data = {
-        'Tesserati': {
-            'Portiere': None,
-            'Difensore_1': None,
-            'Difensore_2': None,
-            'Attaccante_1': None,
-            'Attaccante_2': None
-        },
-        'Non Tesserati': {
-            'Portiere': None,
-            'Difensore_1': None,
-            'Difensore_2': None,
-            'Attaccante_1': None,
-            'Attaccante_2': None
-        }
-    }
-    
-    for selection in selections:
-        category = selection.category  
-        position = selection.position
-        if position in all_star_data[category]:
-            # Converti il Player in dizionario per la serializzazione JSON
-            all_star_data[category][position] = {
-                'id': selection.player.id,
-                'name': selection.player.name,
-                'team': {
-                    'id': selection.player.team.id,
-                    'name': selection.player.team.name
-                }
-            }
-    
-    teams = Team.query.order_by(Team.name).all()
     return render_template('standings.html', 
-                          group_standings=group_standings,
-                          top_scorers=top_scorers,
-                          top_assists=top_assists,
-                          most_penalties=most_penalties,
-                          best_player_awards=best_player_awards,
-                          fair_play_ranking=fair_play_ranking,
-                          has_final_rankings=has_final_rankings,
-                          final_rankings=final_rankings,
-                          teams=teams,
-                          all_star_data=all_star_data)
+                           group_standings=group_standings,
+                           top_scorers=top_scorers,
+                           top_assists=top_assists,
+                           most_penalties=most_penalties,
+                           best_player_awards=best_player_awards,
+                           fair_play_ranking=fair_play_ranking)
 
 
-  
   
 
 @app.route('/migrate_all_star_team', methods=['POST'])
@@ -5399,80 +5422,66 @@ def update_playoff_brackets():
         print("❌ Le qualificazioni non sono ancora completate")
         return False
     
-    # Get team standings by group
-    standings = {}
-    for group in ['A', 'B', 'C', 'D']:
-        teams = Team.query.filter_by(group=group).order_by(
-            Team.points.desc(), 
-            (Team.goals_for - Team.goals_against).desc(),
-            Team.goals_for.desc()
-        ).all()
-        standings[group] = teams
-        print(f"📊 Girone {group}: {[f'{t.name}({t.points}pts)' for t in teams]}")
+    # USAR LE NUOVE FUNZIONI per ottenere le classifiche corrette
+    group_standings = get_group_standings()
+    
+    # Debug: mostra le classifiche
+    for group, teams in group_standings.items():
+        print(f"📊 Girone {group}: {[f'{t.name}({t.group_points}pts)' for t in teams]}")
     
     # Verifica che ogni girone abbia almeno 4 squadre
     for group in ['A', 'B', 'C', 'D']:
-        if len(standings[group]) < 4:
-            print(f"❌ Girone {group} ha solo {len(standings[group])} squadre!")
+        if len(group_standings[group]) < 4:
+            print(f"❌ Girone {group} ha solo {len(group_standings[group])} squadre!")
             return False
     
-    # Update Major League quarterfinals
-    major_quarterfinals = Match.query.filter_by(
-        phase='quarterfinal', league='Major League'
-    ).order_by(Match.time).all()
-
-    print(f"🏆 Trovati {len(major_quarterfinals)} quarti ML da aggiornare")
-    
-    if len(major_quarterfinals) >= 4:
-        # Accoppiamenti Major League (primi 2 di ogni girone)
-        matchups = [
-            (standings['D'][0], standings['C'][1]),  # 1°D vs 2°C
-            (standings['A'][0], standings['B'][1]),  # 1°A vs 2°B
-            (standings['C'][0], standings['A'][1]),  # 1°C vs 2°A
-            (standings['B'][0], standings['D'][1])   # 1°B vs 2°D
+    try:
+        # Aggiorna i quarti di finale Major League
+        ml_quarters = Match.query.filter_by(phase='quarterfinal', league='Major League').order_by(Match.time).all()
+        
+        # Accoppiamenti Major League: 1D vs 2C, 1A vs 2B, 1C vs 2A, 1B vs 2D
+        ml_matchups = [
+            (group_standings['D'][0], group_standings['C'][1]),  # 1D vs 2C
+            (group_standings['A'][0], group_standings['B'][1]),  # 1A vs 2B
+            (group_standings['C'][0], group_standings['A'][1]),  # 1C vs 2A
+            (group_standings['B'][0], group_standings['D'][1]),  # 1B vs 2D
         ]
         
-        for i, (team1, team2) in enumerate(matchups):
-            if i < len(major_quarterfinals):
-                match = major_quarterfinals[i]
-                old_team1 = match.team1.name if match.team1 else "TBD"
-                old_team2 = match.team2.name if match.team2 else "TBD"
-                
-                match.team1_id = team1.id
-                match.team2_id = team2.id
-                
-                print(f"🔄 Quarto ML {i+1}: {old_team1} vs {old_team2} → {team1.name} vs {team2.name}")
+        print("🔄 Aggiornamento Major League:")
+        for i, (team1, team2) in enumerate(ml_matchups):
+            if i < len(ml_quarters):
+                ml_quarters[i].team1_id = team1.id
+                ml_quarters[i].team2_id = team2.id
+                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
         
-    # Update Beer League quarterfinals  
-    beer_quarterfinals = Match.query.filter_by(
-        phase='quarterfinal', league='Beer League'
-    ).order_by(Match.time).all()
-
-    print(f"🍺 Trovati {len(beer_quarterfinals)} quarti BL da aggiornare")
-    
-    if len(beer_quarterfinals) >= 4:
-        # Accoppiamenti Beer League (3° e 4° di ogni girone)
-        matchups = [
-            (standings['B'][2], standings['A'][3]),  # 3°B vs 4°A
-            (standings['D'][2], standings['C'][3]),  # 3°D vs 4°C
-            (standings['A'][2], standings['D'][3]),  # 3°A vs 4°D
-            (standings['C'][2], standings['B'][3])   # 3°C vs 4°B
+        # Aggiorna i quarti di finale Beer League
+        bl_quarters = Match.query.filter_by(phase='quarterfinal', league='Beer League').order_by(Match.time).all()
+        
+        # Accoppiamenti Beer League: 3B vs 4A, 3D vs 4C, 3A vs 4D, 3C vs 4B
+        bl_matchups = [
+            (group_standings['B'][2], group_standings['A'][3]),  # 3B vs 4A
+            (group_standings['D'][2], group_standings['C'][3]),  # 3D vs 4C
+            (group_standings['A'][2], group_standings['D'][3]),  # 3A vs 4D
+            (group_standings['C'][2], group_standings['B'][3]),  # 3C vs 4B
         ]
         
-        for i, (team1, team2) in enumerate(matchups):
-            if i < len(beer_quarterfinals):
-                match = beer_quarterfinals[i]
-                old_team1 = match.team1.name if match.team1 else "TBD"
-                old_team2 = match.team2.name if match.team2 else "TBD"
-                
-                match.team1_id = team1.id
-                match.team2_id = team2.id
-                
-                print(f"🔄 Quarto BL {i+1}: {old_team1} vs {old_team2} → {team1.name} vs {team2.name}")
-    
-    db.session.commit()
-    print("✅ Playoff brackets aggiornati con successo!")
-    return True
+        print("🔄 Aggiornamento Beer League:")
+        for i, (team1, team2) in enumerate(bl_matchups):
+            if i < len(bl_quarters):
+                bl_quarters[i].team1_id = team1.id
+                bl_quarters[i].team2_id = team2.id
+                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
+        
+        db.session.commit()
+        print("✅ Playoff brackets aggiornati con successo!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Errore durante l'aggiornamento playoff: {e}")
+        db.session.rollback()
+        return False
+
+
 
 def all_quarterfinals_completed(league):
     incomplete_matches = Match.query.filter_by(
@@ -7688,19 +7697,6 @@ def export_standings_pdf():
                 from sqlalchemy import func
                 
                 print("📊 Caricamento marcatori...")
-                # Marcatori con nuova logica
-                # top_scorers_query = db.session.query(
-                #     Player,
-                #     func.sum(PlayerMatchStats.goals).label('total_goals'),
-                #     func.count(PlayerMatchStats.match_id).label('total_matches'),
-                #     func.sum(PlayerMatchStats.assists).label('total_assists')
-                # ).join(PlayerMatchStats).group_by(Player.id).having(
-                #     func.sum(PlayerMatchStats.goals) > 0
-                # ).order_by(
-                #     func.sum(PlayerMatchStats.goals).desc(),
-                #     func.count(PlayerMatchStats.match_id).asc(),
-                #     func.sum(PlayerMatchStats.assists).desc()
-                # )
 
 
                 top_scorers_query = db.session.query(
@@ -7709,22 +7705,22 @@ def export_standings_pdf():
                     func.count(PlayerMatchStats.match_id).label('total_matches'),
                     func.sum(PlayerMatchStats.assists).label('total_assists')
                 ).join(PlayerMatchStats).filter(
-                    PlayerMatchStats.is_removed != True  # <- AGGIUNTO: filtra solo giocatori non rimossi
+                    PlayerMatchStats.is_removed != True
                 ).group_by(Player.id).having(
                     func.sum(PlayerMatchStats.goals) > 0
                 ).order_by(
                     func.sum(PlayerMatchStats.goals).desc(),
                     func.count(PlayerMatchStats.match_id).asc(),
                     func.sum(PlayerMatchStats.assists).desc()
-                ).limit(15)          
-
+                ).limit(15)
                 
                 for player, total_goals, total_matches, total_assists in top_scorers_query:
                     player.display_goals = total_goals
                     player.display_matches = total_matches
                     player.display_assists_for_ranking = total_assists
                     top_scorers.append(player)
-                print(f"✅ Marcatori caricati: {len(top_scorers)}")
+                print(f"✅ Marcatori caricati: {len(top_scorers)}")        
+
                 
                 print("📊 Caricamento assist...")
                 # Assist con nuova logica
