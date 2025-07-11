@@ -4604,7 +4604,9 @@ def standings():
     final_rankings = None
     try:
         if db.inspect(db.engine).has_table('final_ranking'):
-            final_rankings = FinalRanking.get_complete_rankings()
+            final_rankings = FinalRanking.query.order_by(FinalRanking.final_position).all()
+            selections = AllStarTeam.query.all()
+    
             has_final_rankings = final_rankings is not None and len(final_rankings) > 0
     except Exception as e:
         print(f"Errore nel caricamento classifiche finali: {e}")
@@ -4660,6 +4662,8 @@ def standings():
                            final_rankings=final_rankings,
                            teams=teams,
                            all_star_data=all_star_data)
+
+
 @app.route('/migrate_all_star_team', methods=['POST'])
 def migrate_all_star_team():
     """Migra il database per aggiungere la tabella all_star_team."""
