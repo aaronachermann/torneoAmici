@@ -250,7 +250,43 @@
                                     <button type="button" class="btn btn-sm btn-outline-success add-time-btn" onclick="addTimeInput('final-bl-times', 'final_bl_time')">+ Aggiungi Orario</button>
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-success">💾 Salva Orari</button>
+                                <!-- Checkbox per auto-aggiornamento calendario -->
+                                <div class="row mb-3">
+                                    <div class="col-12">
+                                        <div class="alert alert-info">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="auto_update_calendar" name="auto_update_calendar" checked>
+                                                <label class="form-check-label" for="auto_update_calendar">
+                                                    <strong>🔄 Applica automaticamente al calendario esistente</strong>
+                                                </label>
+                                            </div>
+                                            <small class="text-muted">
+                                                Se abilitato, gli orari vengono applicati automaticamente alle partite già create nel calendario.
+                                                Se disabilitato, dovrai usare il pulsante "Applica al Calendario" separatamente.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- SOSTITUIRE il pulsante "💾 Salva Orari" esistente con questo gruppo: -->
+                                <div class="d-flex gap-2 flex-wrap align-items-center">
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="fas fa-save"></i> Salva Orari
+                                    </button>
+                                    
+                                    <!-- Pulsante separato per applicare gli orari al calendario esistente -->
+                                    <form method="post" action="{{ url_for('update_schedule_times') }}" class="d-inline">
+                                        <button type="submit" class="btn btn-warning" 
+                                                onclick="return confirm('Applicare gli orari salvati a tutte le partite del calendario?\n\nQuesta azione aggiornerà gli orari delle partite esistenti in base alle configurazioni attuali.')">
+                                            <i class="fas fa-calendar-alt"></i> Applica al Calendario
+                                        </button>
+                                    </form>
+                                    
+                                    <!-- Badge informativo -->
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-info-circle"></i> Gli orari si applicano solo quando generi o aggiorni il calendario
+                                    </span>
+                                </div>
                         </form>
                     </div>
                 </div>

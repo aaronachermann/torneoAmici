@@ -5,6 +5,7 @@ from itertools import combinations
 import os
 import random
 import calendar
+import json
 
 
 import io
@@ -1385,6 +1386,259 @@ def remove_all_star_selection():
         return jsonify({'success': False, 'message': str(e)})
     
 
+
+# AGGIUNGERE in app.py - Route per auto-save con localStorage
+
+@app.route('/match/<int:match_id>/sync', methods=['POST'])
+@login_required
+def sync_match_data(match_id):
+    """Sincronizza i dati del match dal localStorage al server."""
+    match = Match.query.get_or_404(match_id)
+    
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'message': 'Nessun dato ricevuto'})
+        
+        saved_data = data.get('data', {})
+        timestamp = data.get('timestamp', 0)
+        
+        # Log per debug
+        print(f"📡 Sync match {match_id}: {len(saved_data)} campi ricevuti")
+        
+        # Aggiorna il risultato se presente
+        if 'team1_score' in saved_data and 'team2_score' in saved_data:
+            try:
+                team1_score = int(saved_data['team1_score']) if saved_data['team1_score'] else None
+                team2_score = int(saved_data['team2_score']) if saved_data['team2_score'] else None
+                
+                if team1_score is not None and team2_score is not None:
+                    old_team1_score = match.team1_score
+                    old_team2_score = match.team2_score
+                    old_overtime = getattr(match, 'overtime', False)
+                    old_shootout = getattr(match, 'shootout', False)
+                    
+                    match.team1_score = team1_score
+                    match.team2_score = team2_score
+                    
+                    # Gestisci overtime e shootout se presenti
+                    if 'overtime' in saved_data:
+                        match.overtime = saved_data['overtime'] in ['true', True, 'on']
+                    if 'shootout' in saved_data:
+                        match.shootout = saved_data['shootout'] in ['true', True, 'on']
+                    
+                    # Aggiorna statistiche squadre se il risultato è cambiato
+                    if (old_team1_score != team1_score or old_team2_score != team2_score or 
+                        old_overtime != getattr(match, 'overtime', False) or 
+                        old_shootout != getattr(match, 'shootout', False)):
+                        update_team_stats(match, old_team1_score, old_team2_score, old_overtime, old_shootout)
+                        
+            except (ValueError, TypeError) as e:
+                print(f"❌ Errore conversione punteggi: {e}")
+        
+        # Aggiorna statistiche giocatori
+        all_players = []
+        if match.team1:
+            all_players.extend(match.team1.players)
+        if match.team2:
+            all_players.extend(match.team2.players)
+        
+        for player in all_players:
+            try:
+                # Estrai dati giocatore
+                goals = int(saved_data.get(f'player_{player.id}_goals', 0))
+                assists = int(saved_data.get(f'player_{player.id}_assists', 0))
+                penalties = float(saved_data.get(f'player_{player.id}_penalties', 0))
+                jersey_number = saved_data.get(f'player_{player.id}_jersey_number')
+                
+                # Gestisci tempi (se presenti)
+                goal_times_str = saved_data.get(f'player_{player.id}_goal_times', '')
+                assist_times_str = saved_data.get(f'player_{player.id}_assist_times', '')
+                penalty_times_str = saved_data.get(f'player_{player.id}_penalty_times', '')
+                penalty_durations_str = saved_data.get(f'player_{player.id}_penalty_durations', '')
+                
+                # Converti tempi in liste
+                goal_times = []
+                if goal_times_str:
+                    goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
+                
+                assist_times = []
+                if assist_times_str:
+                    assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
+                
+                penalty_times = []
+                penalty_durations = []
+                if penalty_times_str and penalty_durations_str:
+                    penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
+                    penalty_durations = [float(d.strip()) for d in penalty_durations_str.split(',') if d.strip()]
+                
+                # Calcola durata totale penalità
+                total_penalty_duration = sum(penalty_durations) if penalty_durations else penalties
+                
+                # Gestisci migliori giocatori
+                is_best_team1 = saved_data.get('best_player_team1') == str(player.id)
+                is_best_team2 = saved_data.get('best_player_team2') == str(player.id)
+                
+                # Trova o crea statistiche
+                stats = PlayerMatchStats.query.filter_by(
+                    player_id=player.id,
+                    match_id=match.id
+                ).first()
+                
+                if not stats:
+                    stats = PlayerMatchStats(
+                        player_id=player.id,
+                        match_id=match.id,
+                        goals=goals,
+                        assists=assists,
+                        penalties=total_penalty_duration,
+                        jersey_number=int(jersey_number) if jersey_number else None,
+                        goal_times=','.join(map(str, goal_times)) if goal_times else None,
+                        assist_times=','.join(map(str, assist_times)) if assist_times else None,
+                        penalty_times=','.join(map(str, penalty_times)) if penalty_times else None,
+                        penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,
+                        is_best_player_team1=is_best_team1,
+                        is_best_player_team2=is_best_team2,
+                        is_removed=getattr(player, 'is_removed', False)
+                    )
+                    db.session.add(stats)
+                else:
+                    stats.goals = goals
+                    stats.assists = assists
+                    stats.penalties = total_penalty_duration
+                    stats.jersey_number = int(jersey_number) if jersey_number else None
+                    stats.goal_times = ','.join(map(str, goal_times)) if goal_times else None
+                    stats.assist_times = ','.join(map(str, assist_times)) if assist_times else None
+                    stats.penalty_times = ','.join(map(str, penalty_times)) if penalty_times else None
+                    stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None
+                    stats.is_best_player_team1 = is_best_team1
+                    stats.is_best_player_team2 = is_best_team2
+                
+            except (ValueError, TypeError) as e:
+                print(f"❌ Errore statistiche giocatore {player.id}: {e}")
+                continue
+        
+        # Salva tutto
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Sincronizzati {len(saved_data)} campi',
+            'new_version': int(timestamp)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"❌ Errore sync match {match_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': f'Errore server: {str(e)}'})
+# SOSTITUIRE la route quick_save in app.py con questa versione corretta:
+
+@app.route('/match/<int:match_id>/quick_save', methods=['POST'])
+@login_required
+def quick_save_match(match_id):
+    """Salvataggio rapido quando l'utente sta per chiudere la pagina."""
+    try:
+        # navigator.sendBeacon() invia i dati come text/plain, non JSON
+        # Quindi dobbiamo gestire entrambi i casi
+        
+        content_type = request.content_type
+        
+        if content_type and 'application/json' in content_type:
+            # Richiesta JSON normale
+            data = request.get_json()
+        else:
+            # Richiesta da sendBeacon (text/plain)
+            raw_data = request.get_data(as_text=True)
+            if raw_data:
+                try:
+                    data = json.loads(raw_data)
+                except json.JSONDecodeError:
+                    # Se non è JSON valido, logga e continua
+                    print(f"⚠️ Quick save data non JSON: {raw_data[:100]}...")
+                    return '', 204
+            else:
+                data = {}
+        
+        if not data:
+            return '', 204
+        
+        # Log per debug - salvataggio di emergenza
+        print(f"🚨 Quick save match {match_id}: {len(data)} campi (Content-Type: {content_type})")
+        
+        # Opzionale: salva in una tabella temporanea per recovery
+        # Per ora loggiamo semplicemente i campi principali
+        if 'team1_score' in data and 'team2_score' in data:
+            print(f"   Punteggio: {data.get('team1_score')} - {data.get('team2_score')}")
+        
+        player_stats = [k for k in data.keys() if k.startswith('player_') and k.endswith('_goals')]
+        if player_stats:
+            print(f"   Statistiche giocatori: {len(player_stats)} giocatori con dati")
+        
+        return '', 204  # No Content - salvataggio beacon completato
+        
+    except Exception as e:
+        print(f"❌ Errore quick save: {e}")
+        return '', 500
+@app.route('/match/<int:match_id>/get_current_data', methods=['GET'])
+@login_required
+def get_current_match_data(match_id):
+    """Restituisce i dati attuali del match per confronto."""
+    match = Match.query.get_or_404(match_id)
+    
+    try:
+        # Costruisci i dati attuali del match
+        current_data = {
+            'team1_score': match.team1_score,
+            'team2_score': match.team2_score,
+            'overtime': getattr(match, 'overtime', False),
+            'shootout': getattr(match, 'shootout', False),
+            'last_updated': match.updated_at.isoformat() if hasattr(match, 'updated_at') else None
+        }
+        
+        # Aggiungi statistiche giocatori
+        if match.team1:
+            for player in match.team1.players:
+                stats = PlayerMatchStats.query.filter_by(player_id=player.id, match_id=match.id).first()
+                if stats:
+                    current_data[f'player_{player.id}_goals'] = stats.goals
+                    current_data[f'player_{player.id}_assists'] = stats.assists
+                    current_data[f'player_{player.id}_penalties'] = stats.penalties
+                    current_data[f'player_{player.id}_jersey_number'] = stats.jersey_number
+                    current_data[f'player_{player.id}_goal_times'] = stats.goal_times
+                    current_data[f'player_{player.id}_assist_times'] = stats.assist_times
+                    current_data[f'player_{player.id}_penalty_times'] = stats.penalty_times
+                    current_data[f'player_{player.id}_penalty_durations'] = stats.penalty_durations
+                    
+                    if stats.is_best_player_team1:
+                        current_data['best_player_team1'] = str(player.id)
+        
+        if match.team2:
+            for player in match.team2.players:
+                stats = PlayerMatchStats.query.filter_by(player_id=player.id, match_id=match.id).first()
+                if stats:
+                    current_data[f'player_{player.id}_goals'] = stats.goals
+                    current_data[f'player_{player.id}_assists'] = stats.assists
+                    current_data[f'player_{player.id}_penalties'] = stats.penalties
+                    current_data[f'player_{player.id}_jersey_number'] = stats.jersey_number
+                    current_data[f'player_{player.id}_goal_times'] = stats.goal_times
+                    current_data[f'player_{player.id}_assist_times'] = stats.assist_times
+                    current_data[f'player_{player.id}_penalty_times'] = stats.penalty_times
+                    current_data[f'player_{player.id}_penalty_durations'] = stats.penalty_durations
+                    
+                    if stats.is_best_player_team2:
+                        current_data['best_player_team2'] = str(player.id)
+        
+        return jsonify({'success': True, 'data': current_data})
+        
+    except Exception as e:
+        print(f"❌ Errore get current data: {e}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
+        
+
 @app.route('/settings', methods=['GET', 'POST'])
 @login_required
 @admin_required
@@ -1426,9 +1680,14 @@ def update_dates():
     
     return redirect(url_for('settings'))
 
+
+
+
+
+
 @app.route('/settings/times', methods=['POST'])
 def update_times():
-    """Aggiorna gli orari del torneo."""
+    """Aggiorna gli orari del torneo e applica automaticamente al calendario."""
     try:
         import json
         settings = TournamentSettings.get_settings()
@@ -1469,7 +1728,7 @@ def update_times():
                 final_bl_times.append(time_str)
             i += 1
         
-        # Salva nel database
+        # Salva nei settings
         settings.qualification_times = json.dumps(qual_times)
         settings.playoff_times = json.dumps(playoff_times)
         settings.final_times_ml = json.dumps(final_ml_times)
@@ -1478,12 +1737,294 @@ def update_times():
         settings.updated_at = datetime.utcnow()
         db.session.commit()
         
-        flash('Orari del torneo aggiornati con successo!', 'success')
+        # AUTO-AGGIORNA IL CALENDARIO ESISTENTE (se richiesto)
+        auto_update_calendar = request.form.get('auto_update_calendar') == 'on'
+        
+        if auto_update_calendar:
+            # Applica automaticamente gli orari al calendario esistente
+            updated_matches = update_existing_schedule_times(settings)
+            # IMPORTANTE: Commit esplicito per le partite
+            db.session.commit()
+            flash(f'✅ Orari del torneo aggiornati e applicati a {updated_matches} partite del calendario!', 'success')
+        else:
+            flash('✅ Orari del torneo aggiornati con successo! Usa il pulsante "Applica al Calendario" per aggiornare le partite esistenti.', 'success')
+            
     except Exception as e:
         db.session.rollback()
-        flash(f'Errore nell\'aggiornamento degli orari: {str(e)}', 'danger')
+        flash(f'❌ Errore nell\'aggiornamento degli orari: {str(e)}', 'danger')
+        import traceback
+        print(f"Errore dettagliato update_times: {traceback.format_exc()}")
     
     return redirect(url_for('settings'))
+
+
+# AGGIORNARE anche la route update_schedule_times per includere il commit:
+
+@app.route('/settings/update_schedule_times', methods=['POST'])
+def update_schedule_times():
+    """Aggiorna gli orari delle partite esistenti nel calendario in base ai nuovi settings."""
+    try:
+        settings = TournamentSettings.get_settings()
+        
+        if not settings:
+            flash('❌ Settings non trovati. Inizializza prima le configurazioni.', 'danger')
+            return redirect(url_for('settings'))
+        
+        # Chiama la funzione di aggiornamento
+        updated_matches = update_existing_schedule_times(settings)
+        
+        # IMPORTANTE: Commit esplicito
+        db.session.commit()
+        
+        if updated_matches > 0:
+            flash(f'✅ Aggiornati gli orari di {updated_matches} partite nel calendario!', 'success')
+        else:
+            flash('ℹ️ Nessuna partita da aggiornare. Gli orari erano già corretti.', 'info')
+            
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nell\'aggiornamento degli orari del calendario: {str(e)}', 'danger')
+        import traceback
+        print(f"Errore dettagliato update_schedule_times: {traceback.format_exc()}")
+    
+    return redirect(url_for('settings'))
+
+
+
+def update_existing_schedule_times(settings):
+    """Funzione helper per aggiornare gli orari del calendario esistente."""
+    import json
+    
+    # Ottieni gli orari dai settings
+    qual_times = json.loads(settings.qualification_times) if settings.qualification_times else ["09:00", "10:30", "12:00", "13:30", "15:00", "16:30"]
+    playoff_times = json.loads(settings.playoff_times) if settings.playoff_times else ["18:00", "19:30", "21:00"]
+    final_ml_times = json.loads(settings.final_times_ml) if settings.final_times_ml else ["18:00", "19:30", "21:00"]
+    final_bl_times = json.loads(settings.final_times_bl) if settings.final_times_bl else ["18:00", "19:30", "21:00"]
+    
+    updated_matches = 0
+    
+    # 1. AGGIORNA QUALIFICAZIONI
+    qualification_matches = Match.query.filter_by(phase='group').order_by(Match.date, Match.time).all()
+    matches_by_date = {}
+    for match in qualification_matches:
+        if match.date not in matches_by_date:
+            matches_by_date[match.date] = []
+        matches_by_date[match.date].append(match)
+    
+    for date, matches in matches_by_date.items():
+        for i, match in enumerate(matches):
+            if i < len(qual_times):
+                try:
+                    new_time = datetime.strptime(qual_times[i], '%H:%M').time()
+                    if match.time != new_time:
+                        match.time = new_time
+                        updated_matches += 1
+                except ValueError:
+                    continue
+    
+    # 2. AGGIORNA QUARTI DI FINALE
+    quarterfinal_matches = Match.query.filter_by(phase='quarterfinal').order_by(Match.date, Match.time).all()
+    
+    # Raggruppa per categoria (Major League vs Beer League)
+    qf_ml = [m for m in quarterfinal_matches if getattr(m, 'league', None) == 'Major League']
+    qf_bl = [m for m in quarterfinal_matches if getattr(m, 'league', None) == 'Beer League']
+    
+    # Aggiorna quarti ML
+    for i, match in enumerate(qf_ml):
+        if i < len(playoff_times):
+            try:
+                new_time = datetime.strptime(playoff_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # Aggiorna quarti BL
+    for i, match in enumerate(qf_bl):
+        if i < len(playoff_times):
+            try:
+                new_time = datetime.strptime(playoff_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # 3. AGGIORNA SEMIFINALI
+    semifinal_matches = Match.query.filter_by(phase='semifinal').order_by(Match.date, Match.time).all()
+    
+    sf_ml = [m for m in semifinal_matches if getattr(m, 'league', None) == 'Major League']
+    sf_bl = [m for m in semifinal_matches if getattr(m, 'league', None) == 'Beer League']
+    
+    # Aggiorna semifinali ML
+    for i, match in enumerate(sf_ml):
+        if i < len(playoff_times):
+            try:
+                new_time = datetime.strptime(playoff_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # Aggiorna semifinali BL
+    for i, match in enumerate(sf_bl):
+        if i < len(playoff_times):
+            try:
+                new_time = datetime.strptime(playoff_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # 4. AGGIORNA FINALI
+    final_matches = Match.query.filter_by(phase='final').order_by(Match.date, Match.time).all()
+    
+    final_ml = [m for m in final_matches if getattr(m, 'league', None) == 'Major League']
+    final_bl = [m for m in final_matches if getattr(m, 'league', None) == 'Beer League']
+    
+    # Aggiorna finali ML
+    for i, match in enumerate(final_ml):
+        if i < len(final_ml_times):
+            try:
+                new_time = datetime.strptime(final_ml_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # Aggiorna finali BL
+    for i, match in enumerate(final_bl):
+        if i < len(final_bl_times):
+            try:
+                new_time = datetime.strptime(final_bl_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # 5. AGGIORNA TERZI/QUARTI POSTI (se esistono)
+    third_place_matches = Match.query.filter_by(phase='third_place').order_by(Match.date, Match.time).all()
+    
+    tp_ml = [m for m in third_place_matches if getattr(m, 'league', None) == 'Major League']
+    tp_bl = [m for m in third_place_matches if getattr(m, 'league', None) == 'Beer League']
+    
+    # Aggiorna terzi posti ML
+    for i, match in enumerate(tp_ml):
+        if i < len(final_ml_times):
+            try:
+                new_time = datetime.strptime(final_ml_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    # Aggiorna terzi posti BL
+    for i, match in enumerate(tp_bl):
+        if i < len(final_bl_times):
+            try:
+                new_time = datetime.strptime(final_bl_times[i], '%H:%M').time()
+                if match.time != new_time:
+                    match.time = new_time
+                    updated_matches += 1
+            except ValueError:
+                continue
+    
+    return updated_matches
+
+
+# AGGIUNGERE TEMPORANEAMENTE in app.py per fare debug
+
+@app.route('/debug_times')
+def debug_times():
+    """Route di debug per verificare gli orari."""
+    import json
+    
+    # 1. Controlla i settings
+    settings = TournamentSettings.get_settings()
+    if settings:
+        print("=== SETTINGS ORARI ===")
+        print(f"qualification_times (raw): {settings.qualification_times}")
+        print(f"playoff_times (raw): {settings.playoff_times}")
+        print(f"final_times_ml (raw): {settings.final_times_ml}")
+        print(f"final_times_bl (raw): {settings.final_times_bl}")
+        
+        if settings.qualification_times:
+            qual_times = json.loads(settings.qualification_times)
+            print(f"qualification_times (parsed): {qual_times}")
+        
+        if settings.playoff_times:
+            playoff_times = json.loads(settings.playoff_times)
+            print(f"playoff_times (parsed): {playoff_times}")
+    else:
+        print("❌ NESSUN SETTINGS TROVATO")
+    
+    # 2. Controlla alcune partite di esempio
+    print("\n=== PARTITE ATTUALI ===")
+    
+    # Qualificazioni
+    qual_matches = Match.query.filter_by(phase='group').order_by(Match.date, Match.time).limit(5).all()
+    print("Prime 5 qualificazioni:")
+    for match in qual_matches:
+        print(f"  Partita {match.id}: {match.time} - {match.get_team1_display_name()} vs {match.get_team2_display_name()}")
+    
+    # Playoff
+    playoff_matches = Match.query.filter_by(phase='quarterfinal').order_by(Match.date, Match.time).limit(3).all()
+    print("Prime 3 quarti di finale:")
+    for match in playoff_matches:
+        print(f"  Partita {match.id}: {match.time} - {match.get_team1_display_name()} vs {match.get_team2_display_name()}")
+    
+    # 3. Simula l'aggiornamento senza salvare
+    if settings:
+        print("\n=== SIMULAZIONE AGGIORNAMENTO ===")
+        try:
+            qual_times = json.loads(settings.qualification_times) if settings.qualification_times else []
+            print(f"Orari qualificazioni che dovrebbero essere applicati: {qual_times}")
+            
+            for i, match in enumerate(qual_matches):
+                if i < len(qual_times):
+                    try:
+                        new_time = datetime.strptime(qual_times[i], '%H:%M').time()
+                        print(f"  Partita {match.id}: {match.time} -> {new_time} (cambio: {match.time != new_time})")
+                    except ValueError as e:
+                        print(f"  Errore parsing orario '{qual_times[i]}': {e}")
+        except Exception as e:
+            print(f"❌ Errore simulazione: {e}")
+    
+    flash('Debug stampato nella console. Controlla il terminale/log.', 'info')
+    return redirect(url_for('settings'))
+
+# AGGIUNGERE ANCHE questa route per testare l'aggiornamento manuale
+
+@app.route('/test_update_times')
+def test_update_times():
+    """Test manual di aggiornamento orari."""
+    try:
+        settings = TournamentSettings.get_settings()
+        if not settings:
+            flash('❌ Settings non trovati', 'danger')
+            return redirect(url_for('settings'))
+        
+        # Chiama la funzione di aggiornamento
+        updated_count = update_existing_schedule_times(settings)
+        
+        # IMPORTANTE: Commit esplicito
+        db.session.commit()
+        
+        flash(f'✅ Test completato! Aggiornate {updated_count} partite.', 'success')
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'❌ Errore nel test: {str(e)}', 'danger')
+        import traceback
+        print(f"Errore dettagliato: {traceback.format_exc()}")
+    
+    return redirect(url_for('schedule'))
 
 @app.route('/settings/teams', methods=['POST'])
 def update_team_settings():
@@ -2359,8 +2900,8 @@ def get_tournament_times():
             time(17, 30), time(18, 15)
         ],
         'playoff_times': [time(19, 00), time(19, 45), time(20, 30), time(21, 15)],
-        'final_times_ml': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)],
-        'final_times_bl': [time(11, 0), time(13, 0), time(15, 0), time(17, 0)]
+        'final_times_ml': [time(13, 0), time(15, 0), time(17, 0), time(19, 0)],
+        'final_times_bl': [time(12, 0), time(14, 0), time(16, 0), time(18, 0)]
     }
 
 def format_tournament_dates():
@@ -2585,17 +3126,140 @@ def team_detail(team_id):
         is_registered = 'is_registered' in request.form
         category = request.form.get('category') if is_registered else None
         
+        # Crea il nuovo giocatore
         player = Player(name=player_name, team=team, is_registered=is_registered, category=category)
         db.session.add(player)
-        db.session.commit()
+        db.session.commit()  # Commit per ottenere l'ID del giocatore
+        
+        # NUOVA LOGICA: Rimuovi automaticamente il giocatore dalle partite già completate
+        completed_matches = Match.query.filter(
+            ((Match.team1_id == team.id) | (Match.team2_id == team.id)),
+            Match.team1_score.isnot(None),
+            Match.team2_score.isnot(None)
+        ).all()
+        
+        if completed_matches:
+            matches_removed_from = 0
+            
+            # Verifica che la tabella PlayerMatchStats esista
+            if db.inspect(db.engine).has_table('player_match_stats'):
+                for match in completed_matches:
+                    # Trova o crea le statistiche per questo giocatore in questa partita
+                    stats = PlayerMatchStats.query.filter_by(
+                        player_id=player.id,
+                        match_id=match.id
+                    ).first()
+                    
+                    if not stats:
+                        # Crea nuove statistiche per questa partita, ma marcate come rimosse
+                        stats = PlayerMatchStats(
+                            player_id=player.id,
+                            match_id=match.id,
+                            goals=0,
+                            assists=0,
+                            penalties=0,
+                            is_removed=True  # Segna come rimosso automaticamente
+                        )
+                        db.session.add(stats)
+                        matches_removed_from += 1
+                    else:
+                        # Se esistono già statistiche, marcale come rimosse
+                        if not stats.is_removed:
+                            stats.is_removed = True
+                            matches_removed_from += 1
+                
+                db.session.commit()
+                
+                if matches_removed_from > 0:
+                    flash(f'✅ {player_name} aggiunto a {team.name}', 'success')
+                    flash(f'🔄 Giocatore automaticamente rimosso da {matches_removed_from} partite già completate', 'info')
+                else:
+                    flash(f'✅ {player_name} aggiunto a {team.name}', 'success')
+            else:
+                flash(f'✅ {player_name} aggiunto a {team.name}', 'success')
+                flash('⚠️ Sistema statistiche non disponibile - controlla manualmente le partite', 'warning')
+        else:
+            flash(f'✅ {player_name} aggiunto a {team.name}', 'success')
         
         # Check if team exceeds registration points limit
         if team.player_points_total > 20:
-            flash('Attenzione: La squadra supera il limite di 20 punti tesseramento!')
-        
-        flash(f'Giocatore {player_name} aggiunto a {team.name}')
-    
+            flash('⚠️ Attenzione: La squadra supera il limite di 20 punti tesseramento!', 'warning')
     return render_template('team_detail.html', team=team)
+
+
+
+@app.route('/team/<int:team_id>/fix_existing_players', methods=['POST'])
+def fix_existing_players_in_completed_matches(team_id):
+    """
+    Funzione di utilità per sistemare giocatori esistenti che potrebbero 
+    essere presenti in partite precedenti alla loro aggiunta al team.
+    """
+    team = Team.query.get_or_404(team_id)
+    
+    if not db.inspect(db.engine).has_table('player_match_stats'):
+        flash('❌ Sistema statistiche non disponibile', 'danger')
+        return redirect(url_for('team_detail', team_id=team_id))
+    
+    # Trova tutte le partite completate di questa squadra
+    completed_matches = Match.query.filter(
+        ((Match.team1_id == team.id) | (Match.team2_id == team.id)),
+        Match.team1_score.isnot(None),
+        Match.team2_score.isnot(None)
+    ).all()
+    
+    if not completed_matches:
+        flash('ℹ️ Nessuna partita completata trovata per questa squadra', 'info')
+        return redirect(url_for('team_detail', team_id=team_id))
+    
+    # Mostra una pagina di conferma con l'elenco dei giocatori e delle partite
+    players_with_stats = []
+    
+    for player in team.players:
+        player_matches = []
+        for match in completed_matches:
+            stats = PlayerMatchStats.query.filter_by(
+                player_id=player.id,
+                match_id=match.id
+            ).first()
+            
+            if stats and not stats.is_removed:
+                opponent = match.team1 if match.team2_id == team.id else match.team2
+                player_matches.append({
+                    'match': match,
+                    'opponent': opponent.name if opponent else 'Sconosciuto',
+                    'date': match.date,
+                    'has_stats': stats.goals > 0 or stats.assists > 0 or stats.penalties > 0
+                })
+        
+        if player_matches:
+            players_with_stats.append({
+                'player': player,
+                'matches': player_matches
+            })
+    
+    if request.form.get('confirm') == 'yes':
+        # Esegui la rimozione automatica
+        total_removed = 0
+        for player in team.players:
+            for match in completed_matches:
+                stats = PlayerMatchStats.query.filter_by(
+                    player_id=player.id,
+                    match_id=match.id
+                ).first()
+                
+                if stats and not stats.is_removed:
+                    stats.is_removed = True
+                    total_removed += 1
+        
+        db.session.commit()
+        flash(f'✅ {total_removed} presenze rimosse da partite completate', 'success')
+        return redirect(url_for('team_detail', team_id=team_id))
+    
+    # Mostra la pagina di conferma
+    return render_template('confirm_fix_players.html', 
+                         team=team, 
+                         players_with_stats=players_with_stats,
+                         completed_matches=completed_matches)
 
 
 @app.route('/player/<int:player_id>/edit', methods=['GET', 'POST'])
@@ -3348,16 +4012,16 @@ def generate_playoff_matches():
                 'date': formatted_dates['finals']['formatted'],
                 'day': formatted_dates['finals']['day_name_it'],
                 'ML_matches': [
-                    {'time': time(12, 0), 'match': 'Perdente partita 33 vs Perdente partita 34 (7°/8°)'},
-                    {'time': time(14, 0), 'match': 'Vincente partita 33 vs Vincente partita 34 (5°/6°)'},
-                    {'time': time(16, 0), 'match': 'Perdente partita 35 vs Perdente partita 36 (3°/4°)'},
-                    {'time': time(18, 0), 'match': 'Vincente partita 35 vs Vincente partita 36 (1°/2°)'},
+                    {'time': time(13, 0), 'match': 'Perdente partita 33 vs Perdente partita 34 (7°/8°)'},
+                    {'time': time(15, 0), 'match': 'Vincente partita 33 vs Vincente partita 34 (5°/6°)'},
+                    {'time': time(17, 0), 'match': 'Perdente partita 35 vs Perdente partita 36 (3°/4°)'},
+                    {'time': time(19, 0), 'match': 'Vincente partita 35 vs Vincente partita 36 (1°/2°)'},
                 ],
                 'BL_matches': [
-                    {'time': time(11, 0), 'match': 'Perdente partita 37 vs Perdente partita 38 (7°/8°)'},
-                    {'time': time(13, 0), 'match': 'Vincente partita 37 vs Vincente partita 38 (5°/6°)'},
-                    {'time': time(15, 0), 'match': 'Perdente partita 39 vs Perdente partita 40 (3°/4°)'},
-                    {'time': time(17, 0), 'match': 'Vincente partita 39 vs Vincente partita 40 (1°/2°)'},
+                    {'time': time(12, 0), 'match': 'Perdente partita 37 vs Perdente partita 38 (7°/8°)'},
+                    {'time': time(14, 0), 'match': 'Vincente partita 37 vs Vincente partita 38 (5°/6°)'},
+                    {'time': time(16, 0), 'match': 'Perdente partita 39 vs Perdente partita 40 (3°/4°)'},
+                    {'time': time(18, 0), 'match': 'Vincente partita 39 vs Vincente partita 40 (1°/2°)'},
                 ]
             }
         }
