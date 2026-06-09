@@ -272,7 +272,7 @@ def enforce_access_policy():
 
 
 def create_admin_user():
-    """Crea un admin solo se ADMIN_USERNAME e ADMIN_PASSWORD sono configurati."""
+    """Crea o aggiorna l'admin configurato dalle variabili ambiente."""
     username = os.environ.get('ADMIN_USERNAME')
     password = os.environ.get('ADMIN_PASSWORD')
     if not username or not password:
@@ -286,6 +286,12 @@ def create_admin_user():
         db.session.add(admin)
         db.session.commit()
         print(f"Utente admin creato: {username}")
+        return
+
+    admin.role = 'admin'
+    admin.set_password(password)
+    db.session.commit()
+    print(f"Utente admin aggiornato: {username}")
 
 
 
