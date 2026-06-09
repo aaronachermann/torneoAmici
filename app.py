@@ -1,5 +1,6 @@
 from flask import Flask, abort, render_template, request, redirect, url_for, flash, jsonify, send_file
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 from datetime import datetime, time, timedelta
 from itertools import combinations
 from urllib.parse import urlsplit
@@ -168,7 +169,7 @@ ADMIN_ENDPOINTS = {
     'migrate_add_is_removed', 'migrate_final_ranking',
     'migrate_best_player_fields', 'migrate_player_stats',
     'migrate_player_stats_schema', 'migrate_penalty_durations',
-    'migrate_overtime_system', 'migrate_from_sqlite', 'import_from_csv',
+    'migrate_overtime_system', 'migrate_from_sqlite', 'import_roster_from_sqlite', 'import_from_csv',
     'fix_category_field', 'fix_playoff_descriptions',
     'fix_complete_playoff_system', 'fix_descriptions',
     'update_playoffs', 'update_semifinals_route', 'update_finals_route',
@@ -6029,6 +6030,113 @@ def migrate_from_sqlite():
         <h2>[ERRORE] Errore durante la migrazione</h2>
         <p><strong>Errore:</strong> {str(e)}</p>
         <p><a href="/migrate_from_sqlite">← Riprova</a></p>
+        '''
+
+
+@app.route('/import_roster_from_sqlite', methods=['GET', 'POST'])
+def import_roster_from_sqlite():
+    """Importa solo squadre e giocatori da un database SQLite locale."""
+
+    if request.method == 'GET':
+        return '''
+        <h2>Importa squadre e giocatori da SQLite</h2>
+        <p>Questa funzione importa solo le tabelle team e player dal database locale.</p>
+        <p>Non importa utenti, login, partite, risultati o statistiche partita.</p>
+
+        <form method="post" enctype="multipart/form-data">
+            <h3>Database SQLite locale</h3>
+            <input type="file" name="sqlite_file" accept=".db,.sqlite,.sqlite3" required>
+            <br><br>
+            <label>
+                <input type="checkbox" name="confirm" required>
+                Confermo di voler sostituire squadre e giocatori online
+            </label>
+            <br><br>
+            <button type="submit">Importa roster</button>
+        </form>
+
+        <p><a href="/">Torna alla Home</a></p>
+        '''
+
+    if not request.form.get('confirm'):
+        return "Devi confermare l'importazione"
+
+    sqlite_file = request.files.get('sqlite_file')
+    if not sqlite_file:
+        return "Nessun file caricato"
+
+    import html
+    import sqlite3
+
+    team_columns = ['id', 'name', 'group', 'group_order', 'wins', 'losses', 'draws', 'goals_for', 'goals_against', 'points']
+    player_columns = ['id', 'name', 'team_id', 'is_registered', 'category', 'goals', 'assists', 'penalties']
+
+    try:
+        with tempfile.NamedTemporaryFile(suffix='.db') as temp_file:
+            sqlite_file.save(temp_file.name)
+            sqlite_conn = sqlite3.connect(temp_file.name)
+            sqlite_conn.row_factory = sqlite3.Row
+
+            local_tables = {
+                row['name']
+                for row in sqlite_conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            missing_tables = {'team', 'player'} - local_tables
+            if missing_tables:
+                sqlite_conn.close()
+                return f"Database non valido. Tabelle mancanti: {', '.join(sorted(missing_tables))}"
+
+            team_rows = [dict(row) for row in sqlite_conn.execute("SELECT * FROM team ORDER BY id")]
+            player_rows = [dict(row) for row in sqlite_conn.execute("SELECT * FROM player ORDER BY id")]
+            sqlite_conn.close()
+
+        PlayerMatchStats.query.delete()
+        AllStarTeam.query.delete()
+        FinalRanking.query.delete()
+        MatchDescription.query.delete()
+        Match.query.delete()
+        Player.query.delete()
+        Team.query.delete()
+        db.session.commit()
+
+        for row in team_rows:
+            data = {column: row.get(column) for column in team_columns if column in row}
+            db.session.add(Team(**data))
+
+        db.session.flush()
+
+        for row in player_rows:
+            data = {column: row.get(column) for column in player_columns if column in row}
+            if not data.get('name') or not data.get('team_id'):
+                continue
+            data['is_registered'] = bool(data.get('is_registered'))
+            data['category'] = data.get('category') or None
+            db.session.add(Player(**data))
+
+        db.session.commit()
+
+        if db.engine.dialect.name == 'postgresql':
+            db.session.execute(text("SELECT setval(pg_get_serial_sequence('team', 'id'), COALESCE((SELECT MAX(id) FROM team), 1), true)"))
+            db.session.execute(text("SELECT setval(pg_get_serial_sequence('player', 'id'), COALESCE((SELECT MAX(id) FROM player), 1), true)"))
+            db.session.commit()
+
+        imported_teams = len(team_rows)
+        imported_players = len(player_rows)
+        return f'''
+        <h2>Import completato</h2>
+        <ul>
+            <li>Squadre importate: {imported_teams}</li>
+            <li>Giocatori importati: {imported_players}</li>
+        </ul>
+        <p><a href="/teams">Vai alle squadre</a></p>
+        '''
+
+    except Exception as e:
+        db.session.rollback()
+        return f'''
+        <h2>Errore durante l'import</h2>
+        <p>{html.escape(str(e))}</p>
+        <p><a href="/import_roster_from_sqlite">Riprova</a></p>
         '''
 # Aggiungi anche questa route per importare da CSV
 
