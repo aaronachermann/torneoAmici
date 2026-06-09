@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conferma correzione giocatori - Torneo degli Amici</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">Torneo degli Amici</a>
+        </div>
+    </nav>
+
+    <main class="container my-4">
+        <div class="alert alert-warning">
+            <h1 class="h4">Conferma correzione presenze</h1>
+            <p class="mb-0">
+                Questa operazione segna come rimossi i giocatori di {{ team.name }} dalle partite gia completate elencate sotto.
+            </p>
+        </div>
+
+        {% if players_with_stats %}
+            {% for item in players_with_stats %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <strong>{{ item.player.name }}</strong>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Avversario</th>
+                                    <th>Statistiche presenti</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for row in item.matches %}
+                                    <tr>
+                                        <td>{{ row.date.strftime('%d/%m/%Y') if row.date else '-' }}</td>
+                                        <td>{{ row.opponent }}</td>
+                                        <td>{{ 'Si' if row.has_stats else 'No' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endfor %}
+
+            <form method="post" class="d-flex gap-2">
+                <input type="hidden" name="confirm" value="yes">
+                <button type="submit" class="btn btn-warning">Conferma correzione</button>
+                <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn btn-outline-secondary">Annulla</a>
+            </form>
+        {% else %}
+            <div class="alert alert-info">Non ci sono presenze da correggere.</div>
+            <a href="{{ url_for('team_detail', team_id=team.id) }}" class="btn btn-outline-secondary">Torna alla squadra</a>
+        {% endif %}
+    </main>
+</body>
+</html>

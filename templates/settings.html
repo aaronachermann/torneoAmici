@@ -53,7 +53,7 @@
                     </li> -->
                 </ul>
             </div>
-            
+
             <!-- LOGO IHC MALCANTONE AGGIUNTO -->
             <div class="navbar-logo">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="IHC Malcantone" />
@@ -86,22 +86,22 @@
         <!-- Tab Navigation -->
         <ul class="nav nav-tabs" id="settingsTab" role="tablist">
             <li class="nav-item" role="presentation">
-                <button class="nav-link active" id="dates-tab" data-bs-toggle="tab" data-bs-target="#dates" type="button" role="tab">📅 Date</button>
+                <button class="nav-link active" id="dates-tab" data-bs-toggle="tab" data-bs-target="#dates" type="button" role="tab">Date</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="times-tab" data-bs-toggle="tab" data-bs-target="#times" type="button" role="tab">⏰ Orari</button>
+                <button class="nav-link" id="times-tab" data-bs-toggle="tab" data-bs-target="#times" type="button" role="tab">Orari</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">👥 Squadre</button>
+                <button class="nav-link" id="teams-tab" data-bs-toggle="tab" data-bs-target="#teams" type="button" role="tab">Squadre</button>
             </li>
             <!-- <li class="nav-item" role="presentation">
-                <button class="nav-link" id="points-tab" data-bs-toggle="tab" data-bs-target="#points" type="button" role="tab">📊 Punti</button>
+                <button class="nav-link" id="points-tab" data-bs-toggle="tab" data-bs-target="#points" type="button" role="tab">Punti</button>
             </li> -->
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="playoff-tab" data-bs-toggle="tab" data-bs-target="#playoff" type="button" role="tab">🏆 Playoff</button>
+                <button class="nav-link" id="playoff-tab" data-bs-toggle="tab" data-bs-target="#playoff" type="button" role="tab">Playoff</button>
             </li>
             <li class="nav-item" role="presentation">
-                <button class="nav-link" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">⚙️ Generale</button>
+                <button class="nav-link" id="general-tab" data-bs-toggle="tab" data-bs-target="#general" type="button" role="tab">Generale</button>
             </li>
             <li class="nav-item" role="presentation">
                 <button class="nav-link" id="admin-tab" data-bs-toggle="tab" data-bs-target="#admin" type="button" role="tab">Amministrazione</button>
@@ -109,7 +109,7 @@
         </ul>
 
         <div class="tab-content mt-4" id="settingsTabContent">
-            
+
             <!-- TAB DATE -->
             <div class="tab-pane fade show active" id="dates" role="tabpanel">
                 <div class="card settings-card">
@@ -117,45 +117,48 @@
                         <h4 class="mb-0">Date del Torneo</h4>
                     </div>
                     <div class="card-body">
+                        <div class="alert alert-info">
+                            Queste date vengono usate per calendario e intestazione del foglio gara. Quando le cambi, le partite esistenti vengono spostate sulle nuove date.
+                        </div>
                         <form method="post" action="{{ url_for('update_dates') }}">
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label for="qualification_day1" class="form-label">Qualificazioni - Giorno 1</label>
-                                    <input type="date" class="form-control" id="qualification_day1" name="qualification_day1" 
+                                    <input type="date" class="form-control" id="qualification_day1" name="qualification_day1"
                                            value="{{ settings.qualification_day1.strftime('%Y-%m-%d') if settings.qualification_day1 else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="qualification_day2" class="form-label">Qualificazioni - Giorno 2</label>
-                                    <input type="date" class="form-control" id="qualification_day2" name="qualification_day2" 
+                                    <input type="date" class="form-control" id="qualification_day2" name="qualification_day2"
                                            value="{{ settings.qualification_day2.strftime('%Y-%m-%d') if settings.qualification_day2 else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="quarterfinals_ml_date" class="form-label">Quarti Major League</label>
-                                    <input type="date" class="form-control" id="quarterfinals_ml_date" name="quarterfinals_ml_date" 
+                                    <input type="date" class="form-control" id="quarterfinals_ml_date" name="quarterfinals_ml_date"
                                            value="{{ settings.quarterfinals_ml_date.strftime('%Y-%m-%d') if settings.quarterfinals_ml_date else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="quarterfinals_bl_date" class="form-label">Quarti Beer League</label>
-                                    <input type="date" class="form-control" id="quarterfinals_bl_date" name="quarterfinals_bl_date" 
+                                    <input type="date" class="form-control" id="quarterfinals_bl_date" name="quarterfinals_bl_date"
                                            value="{{ settings.quarterfinals_bl_date.strftime('%Y-%m-%d') if settings.quarterfinals_bl_date else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="semifinals_ml_date" class="form-label">Semifinali Major League</label>
-                                    <input type="date" class="form-control" id="semifinals_ml_date" name="semifinals_ml_date" 
+                                    <input type="date" class="form-control" id="semifinals_ml_date" name="semifinals_ml_date"
                                            value="{{ settings.semifinals_ml_date.strftime('%Y-%m-%d') if settings.semifinals_ml_date else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="semifinals_bl_date" class="form-label">Semifinali Beer League</label>
-                                    <input type="date" class="form-control" id="semifinals_bl_date" name="semifinals_bl_date" 
+                                    <input type="date" class="form-control" id="semifinals_bl_date" name="semifinals_bl_date"
                                            value="{{ settings.semifinals_bl_date.strftime('%Y-%m-%d') if settings.semifinals_bl_date else '' }}">
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label for="finals_date" class="form-label">Finali</label>
-                                    <input type="date" class="form-control" id="finals_date" name="finals_date" 
+                                    <input type="date" class="form-control" id="finals_date" name="finals_date"
                                            value="{{ settings.finals_date.strftime('%Y-%m-%d') if settings.finals_date else '' }}">
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-primary">💾 Salva Date</button>
+                            <button type="submit" class="btn btn-primary">Salva Date</button>
                         </form>
                     </div>
                 </div>
@@ -257,7 +260,7 @@
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="auto_update_calendar" name="auto_update_calendar" checked>
                                                 <label class="form-check-label" for="auto_update_calendar">
-                                                    <strong>🔄 Applica automaticamente al calendario esistente</strong>
+                                                    <strong> Applica automaticamente al calendario esistente</strong>
                                                 </label>
                                             </div>
                                             <small class="text-muted">
@@ -268,20 +271,20 @@
                                     </div>
                                 </div>
 
-                                <!-- SOSTITUIRE il pulsante "💾 Salva Orari" esistente con questo gruppo: -->
+                                <!-- SOSTITUIRE il pulsante " Salva Orari" esistente con questo gruppo: -->
                                 <div class="d-flex gap-2 flex-wrap align-items-center">
                                     <button type="submit" class="btn btn-success">
                                         <i class="fas fa-save"></i> Salva Orari
                                     </button>
-                                    
+
                                     <!-- Pulsante separato per applicare gli orari al calendario esistente -->
                                     <form method="post" action="{{ url_for('update_schedule_times') }}" class="d-inline">
-                                        <button type="submit" class="btn btn-warning" 
+                                        <button type="submit" class="btn btn-warning"
                                                 onclick="return confirm('Applicare gli orari salvati a tutte le partite del calendario?\n\nQuesta azione aggiornerà gli orari delle partite esistenti in base alle configurazioni attuali.')">
                                             <i class="fas fa-calendar-alt"></i> Applica al Calendario
                                         </button>
                                     </form>
-                                    
+
                                     <!-- Badge informativo -->
                                     <span class="badge bg-info">
                                         <i class="fas fa-info-circle"></i> Gli orari si applicano solo quando generi o aggiorni il calendario
@@ -322,7 +325,7 @@
                                     <input type="number" class="form-control" id="max_players_per_team" name="max_players_per_team" value="{{ settings.max_players_per_team or 15 }}" min="10" max="25">
                                 </div>
                             </div>
-                            <button type="submit" class="btn btn-info">💾 Salva Configurazioni Squadre</button>
+                            <button type="submit" class="btn btn-info">Salva Configurazioni Squadre</button>
                         </form>
                     </div>
                 </div>
@@ -351,12 +354,12 @@
                                 </div>
                             </div>
                             <div class="alert alert-info">
-                                <strong>💡 Sistema Attuale:</strong> 
-                                Vittoria = {{ settings.points_win or 3 }} punti, 
-                                Pareggio = {{ settings.points_draw or 1 }} punto, 
+                                <strong>Sistema Attuale:</strong>
+                                Vittoria = {{ settings.points_win or 3 }} punti,
+                                Pareggio = {{ settings.points_draw or 1 }} punto,
                                 Sconfitta = {{ settings.points_loss or 0 }} punti
                             </div>
-                            <button type="submit" class="btn btn-warning">💾 Salva Sistema Punti</button>
+                            <button type="submit" class="btn btn-warning">Salva Sistema Punti</button>
                         </form>
                     </div>
                 </div>
@@ -413,10 +416,10 @@
                                     </div>
                                 {% endfor %}
                             </div>
-                            
+
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="auto_update_playoffs" name="auto_update_playoffs" 
+                                    <input class="form-check-input" type="checkbox" id="auto_update_playoffs" name="auto_update_playoffs"
                                            {% if settings.auto_update_playoffs %}checked{% endif %}>
                                     <label class="form-check-label" for="auto_update_playoffs">
                                         Aggiornamento Automatico Playoff
@@ -424,8 +427,8 @@
                                 </div>
                                 <small class="text-muted">Se abilitato, i playoff si aggiornano automaticamente quando le fasi precedenti sono completate.</small>
                             </div>
-                            
-                            <button type="submit" class="btn btn-danger">💾 Salva Sistema Playoff</button>
+
+                            <button type="submit" class="btn btn-danger">Salva Sistema Playoff</button>
                         </form>
                     </div>
                 </div>
@@ -441,13 +444,14 @@
                         <form method="post" action="{{ url_for('update_general_settings') }}">
                             <div class="mb-3">
                                 <label for="tournament_name" class="form-label">Nome Torneo</label>
-                                <input type="text" class="form-control" id="tournament_name" name="tournament_name" 
+                                <input type="text" class="form-control" id="tournament_name" name="tournament_name"
                                        value="{{ settings.tournament_name or 'Torneo degli Amici dello Skater' }}">
+                                <small class="text-muted">Questo nome compare anche nell'intestazione del foglio gara.</small>
                             </div>
-                            
+
                             <div class="mb-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="checkbox" id="maintenance_mode" name="maintenance_mode" 
+                                    <input class="form-check-input" type="checkbox" id="maintenance_mode" name="maintenance_mode"
                                            {% if settings.maintenance_mode %}checked{% endif %}>
                                     <label class="form-check-label" for="maintenance_mode">
                                         Modalità Manutenzione
@@ -455,13 +459,13 @@
                                 </div>
                                 <small class="text-muted">Se abilitata, blocca le modifiche ai dati del torneo.</small>
                             </div>
-                            
-                            <button type="submit" class="btn btn-dark">💾 Salva Configurazioni Generali</button>
+
+                            <button type="submit" class="btn btn-dark">Salva Configurazioni Generali</button>
                         </form>
-                        
+
                         <!-- Informazioni Sistema -->
                         <hr class="my-4">
-                        <h5>📊 Informazioni Sistema</h5>
+                        <h5> Informazioni Sistema</h5>
                         <div class="row">
                             <div class="col-md-6">
                                 <p><strong>Ultima Modifica:</strong> {{ settings.updated_at.strftime('%d/%m/%Y %H:%M') if settings.updated_at else 'Mai' }}</p>
@@ -474,16 +478,16 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Zona Pericolosa -->
                 <div class="danger-zone mt-4">
-                    <h5 class="text-danger">⚠️ Zona Pericolosa</h5>
+                    <h5 class="text-danger">Attenzione: Zona Pericolosa</h5>
                     <p>Le azioni seguenti sono irreversibili e possono cancellare dati importanti.</p>
                     <div class="d-flex gap-2">
                         <form method="post" action="{{ url_for('reset_settings') }}" class="d-inline">
-                            <button type="submit" class="btn btn-outline-danger" 
+                            <button type="submit" class="btn btn-outline-danger"
                                     onclick="return confirm('Sei sicuro di voler ripristinare tutte le configurazioni ai valori di default? Questa azione non può essere annullata.')">
-                                🔄 Reset Settings
+                                 Reset Settings
                             </button>
                         </form>
                     </div>
@@ -499,7 +503,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="row">
                     <!-- Export Database -->
                     <div class="col-md-4 mb-4">
@@ -523,7 +527,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Azzera Calendario -->
                     <div class="col-md-4 mb-4">
                         <div class="card h-100">
@@ -533,23 +537,23 @@
                             <div class="card-body">
                                 <p>Cancella tutte le partite e azzera le statistiche, mantenendo squadre e giocatori.</p>
                                 <ul class="small text-danger">
-                                    <li>❌ Tutte le partite</li>
-                                    <li>❌ Statistiche squadre/giocatori</li>
-                                    <li>❌ Classifiche finali</li>
-                                    <li>✅ Squadre e giocatori</li>
+                                    <li>Rimuove tutte le partite</li>
+                                    <li>No Statistiche squadre/giocatori</li>
+                                    <li>No Classifiche finali</li>
+                                    <li>Mantiene squadre e giocatori</li>
                                 </ul>
                             </div>
                             <div class="card-footer">
                                 <form method="post" action="{{ url_for('reset_schedule') }}" class="d-inline w-100">
-                                    <button type="submit" class="btn btn-warning w-100" 
-                                            onclick="return confirm('⚠️ Sei sicuro di voler azzerare tutte le partite e statistiche? Questa azione NON può essere annullata!')">
+                                    <button type="submit" class="btn btn-warning w-100"
+                                            onclick="return confirm('Attenzione: Sei sicuro di voler azzerare tutte le partite e statistiche? Questa azione NON può essere annullata!')">
                                         <i class="fas fa-broom"></i> Azzera Calendario
                                     </button>
                                 </form>
                             </div>
                         </div>
                     </div>
-                    
+
                     <!-- Reset Completo Database -->
                     <div class="col-md-4 mb-4">
                         <div class="card h-100 border-danger">
@@ -559,11 +563,11 @@
                             <div class="card-body">
                                 <p><strong class="text-danger">PERICOLO!</strong> Cancella TUTTO il database e lo ricrea vuoto.</p>
                                 <ul class="small text-danger">
-                                    <li>❌ Tutte le squadre</li>
-                                    <li>❌ Tutti i giocatori</li>
-                                    <li>❌ Tutte le partite</li>
-                                    <li>❌ Tutte le statistiche</li>
-                                    <li>✅ Solo settings di base</li>
+                                    <li>Rimuove tutte le squadre</li>
+                                    <li>Rimuove tutti i giocatori</li>
+                                    <li>Rimuove tutte le partite</li>
+                                    <li>Rimuove tutte le statistiche</li>
+                                    <li>Mantiene solo le impostazioni di base</li>
                                 </ul>
                             </div>
                             <div class="card-footer">
@@ -574,7 +578,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Informazioni Export -->
                 <div class="row mt-4">
                     <div class="col-12">
@@ -608,14 +612,14 @@
                                 <li>All Star Team e MVP</li>
                             </ul>
                             <p>Rimarranno solo le configurazioni di base del torneo.</p>
-                            
+
                             <form method="post" action="{{ url_for('reset_database') }}" id="resetForm">
                                 <div class="mb-3">
                                     <label for="confirmation" class="form-label">
-                                        <strong>Per confermare, scrivi esattamente:</strong> 
+                                        <strong>Per confermare, scrivi esattamente:</strong>
                                         <code>CANCELLA_TUTTO</code>
                                     </label>
-                                    <input type="text" class="form-control" id="confirmation" name="confirmation" 
+                                    <input type="text" class="form-control" id="confirmation" name="confirmation"
                                         placeholder="Scrivi: CANCELLA_TUTTO" required>
                                 </div>
                             </form>
@@ -639,14 +643,14 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
         // Funzione per aggiungere campi orario dinamicamente
         function addTimeInput(containerId, inputName) {
             const container = document.getElementById(containerId);
             const inputGroups = container.querySelectorAll('.time-input-group');
             const newIndex = inputGroups.length;
-            
+
             const newGroup = document.createElement('div');
             newGroup.className = 'time-input-group';
             newGroup.innerHTML = `
@@ -655,21 +659,21 @@
                     <button type="button" class="btn btn-outline-danger btn-sm" onclick="removeTimeInput(this)">×</button>
                 </div>
             `;
-            
+
             container.appendChild(newGroup);
         }
-        
+
         // Funzione per rimuovere campi orario
         function removeTimeInput(button) {
             const timeGroup = button.closest('.time-input-group');
             timeGroup.remove();
         }
-        
+
         // Aggiorna numerazione dei campi quando si rimuove un elemento
         function updateInputNames(containerId, inputName) {
             const container = document.getElementById(containerId);
             const inputs = container.querySelectorAll('input[type="time"]');
-            
+
             inputs.forEach((input, index) => {
                 input.name = `${inputName}_${index}`;
             });

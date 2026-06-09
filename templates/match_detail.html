@@ -255,17 +255,528 @@
                 padding-left: 15px;
                 padding-right: 15px;
             }
-            
+
             .penalty-section {
                 min-width: 250px;
             }
-            
+
             .penalty-info {
                 font-size: 0.8rem;
             }
-            
+
             .stats-table {
                 font-size: 0.875rem;
+            }
+        }
+
+        body {
+            background: #f3f3f1;
+        }
+
+        .match-page-header {
+            gap: 1rem;
+        }
+
+        .match-sheet-wrap {
+            overflow-x: auto;
+            padding-bottom: 1rem;
+        }
+
+        .match-sheet {
+            background: #fff;
+            color: #111;
+            border: 1px solid #d4d4d4;
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12);
+            min-width: 1320px;
+            padding: 44px 46px 34px;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .sheet-meta-row,
+        .team-heading-row,
+        .sheet-footer-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+        }
+
+        .sheet-title {
+            text-align: right;
+            line-height: 1.05;
+            margin-bottom: 8px;
+        }
+
+        .sheet-title strong {
+            display: block;
+            font-size: 1.45rem;
+            letter-spacing: 0;
+        }
+
+        .sheet-title span {
+            display: block;
+            font-size: 1.25rem;
+        }
+
+        .sheet-rule {
+            border-top: 2px solid #111;
+            margin: 0 0 16px;
+        }
+
+        .sheet-line-field {
+            align-items: end;
+            display: grid;
+            grid-template-columns: 1fr;
+            min-height: 34px;
+        }
+
+        .sheet-line-field label {
+            border-top: 1px solid #111;
+            font-size: 0.95rem;
+            line-height: 1.2;
+            padding: 2px 8px 0;
+        }
+
+        .sheet-line-value {
+            border: 0;
+            border-top: 1px solid #111;
+            font-size: 1rem;
+            line-height: 1.2;
+            min-height: 26px;
+            padding: 2px 8px 0;
+            width: 100%;
+        }
+
+        .sheet-top-grid {
+            align-items: end;
+            display: grid;
+            grid-template-columns: 300px 290px 1fr;
+            gap: 38px;
+            margin-bottom: 18px;
+        }
+
+        .sheet-top-grid .sheet-title {
+            grid-column: 3;
+        }
+
+        .match-sides {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 34px;
+            position: relative;
+        }
+
+        .match-sides::before {
+            background: #111;
+            content: "";
+            height: calc(100% - 6px);
+            left: 50%;
+            position: absolute;
+            top: 0;
+            transform: translateX(-17px);
+            width: 2px;
+        }
+
+        .sheet-side {
+            min-width: 0;
+            padding-right: 28px;
+        }
+
+        .sheet-side:nth-child(2) {
+            padding-left: 28px;
+            padding-right: 0;
+        }
+
+        .team-heading-row {
+            align-items: end;
+            gap: 28px;
+            grid-template-columns: minmax(0, 1fr) 110px;
+            margin: 50px 0 18px;
+        }
+
+        .team-name-line {
+            border-bottom: 1px solid #111;
+            font-size: 1.05rem;
+            min-height: 30px;
+            padding: 0 8px 3px;
+        }
+
+        .team-name-line .label,
+        .score-field label {
+            display: block;
+            font-size: 0.95rem;
+            line-height: 1;
+            margin-top: 4px;
+        }
+
+        .score-field input {
+            border: 0;
+            border-bottom: 1px solid #111;
+            border-radius: 0;
+            font-size: 1.5rem;
+            font-weight: 700;
+            height: 34px;
+            text-align: center;
+            width: 100%;
+        }
+
+        .score-field input:focus,
+        .sheet-input:focus,
+        .sheet-select:focus {
+            box-shadow: inset 0 -2px 0 #111;
+            outline: 0;
+        }
+
+        .sheet-tables {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.22fr);
+            gap: 28px;
+        }
+
+        .sheet-table-title {
+            font-size: 1.45rem;
+            font-weight: 800;
+            line-height: 1;
+            margin: 0 0 2px;
+        }
+
+        .sheet-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .sheet-table th,
+        .sheet-table td {
+            border: 1px solid #111;
+            font-size: 0.8rem;
+            height: 34px;
+            padding: 2px 4px;
+            vertical-align: middle;
+        }
+
+        .sheet-table th {
+            font-size: 0.95rem;
+            font-weight: 400;
+            height: 22px;
+            text-align: center;
+        }
+
+        .sheet-table .row-number {
+            text-align: center;
+            width: 42px;
+        }
+
+        .sheet-table .jersey-cell {
+            width: 42px;
+        }
+
+        .sheet-table .player-number-cell,
+        .sheet-table .penalty-player-cell {
+            width: 132px;
+        }
+
+        .sheet-table .time-cell {
+            width: 112px;
+        }
+
+        .sheet-table .stat-count {
+            width: 58px;
+        }
+
+        .lineup-panel {
+            border: 1px solid #111;
+            margin: 10px 0 20px;
+        }
+
+        .lineup-panel summary {
+            cursor: pointer;
+            font-size: 0.95rem;
+            font-weight: 700;
+            list-style-position: inside;
+            padding: 8px 10px;
+        }
+
+        .lineup-grid {
+            border-top: 1px solid #111;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 12px;
+        }
+
+        .lineup-team-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            margin: 0 0 6px;
+            text-transform: uppercase;
+        }
+
+        .lineup-table {
+            border-collapse: collapse;
+            table-layout: fixed;
+            width: 100%;
+        }
+
+        .lineup-table th,
+        .lineup-table td {
+            border: 1px solid #111;
+            font-size: 0.8rem;
+            padding: 4px 5px;
+        }
+
+        .lineup-table th {
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .lineup-active-cell {
+            text-align: center;
+            width: 58px;
+        }
+
+        .lineup-number-cell {
+            width: 76px;
+        }
+
+        .lineup-player-name {
+            display: block;
+            font-weight: 700;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .lineup-presences {
+            color: #555;
+            display: block;
+            font-size: 0.68rem;
+        }
+
+        .lineup-player-inactive {
+            color: #777;
+            opacity: 0.62;
+            text-decoration: line-through;
+        }
+
+        .sheet-input,
+        .sheet-select {
+            background: transparent;
+            border: 0;
+            border-radius: 0;
+            color: #111;
+            font-size: 0.8rem;
+            min-height: 26px;
+            padding: 1px 2px;
+            width: 100%;
+        }
+
+        .sheet-input[type="number"] {
+            text-align: center;
+        }
+
+        .player-name-cell {
+            min-width: 118px;
+        }
+
+        .player-name-line {
+            align-items: center;
+            display: flex;
+            gap: 4px;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .player-name-line strong {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .player-number-card {
+            display: grid;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .player-number-name {
+            align-items: center;
+            display: flex;
+            gap: 4px;
+            justify-content: space-between;
+            min-width: 0;
+        }
+
+        .player-number-name strong {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .jersey-number-row {
+            align-items: center;
+            display: grid;
+            grid-template-columns: auto 48px;
+            gap: 5px;
+            margin: 0;
+        }
+
+        .jersey-number-row span {
+            color: #555;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+        }
+
+        .sheet-stat-single {
+            display: grid;
+            gap: 2px;
+        }
+
+        .sheet-stat-single small {
+            color: #555;
+            font-size: 0.68rem;
+            text-align: center;
+        }
+
+        .sheet-stat-pair {
+            align-items: center;
+            display: grid;
+            grid-template-columns: 42px minmax(0, 1fr);
+            gap: 4px;
+        }
+
+        .sheet-penalty-row small,
+        .penalty-player-cell small {
+            display: block;
+            font-size: 0.68rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .penalty-jersey-display {
+            display: block;
+            font-weight: 700;
+            min-height: 18px;
+        }
+
+        .sheet-penalties-list {
+            max-height: 76px;
+            overflow: auto;
+        }
+
+        .sheet-penalty-input,
+        .penalty-end-input {
+            font-size: 0.78rem;
+            min-height: 28px;
+            text-align: center;
+        }
+
+        .penalty-end-input {
+            color: #333;
+        }
+
+        .sheet-penalty-row .penalty-row {
+            border: 0 !important;
+            border-top: 1px solid #d6d6d6 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            margin: 2px 0 0 !important;
+            padding: 2px 0 !important;
+        }
+
+        .sheet-penalty-row .penalty-info {
+            font-size: 0.72rem;
+        }
+
+        .add-penalty.sheet-add-penalty {
+            background: transparent;
+            border: 1px solid #111;
+            border-radius: 0;
+            color: #111;
+            font-size: 0.72rem;
+            line-height: 1;
+            padding: 4px 6px !important;
+            transform: none;
+        }
+
+        .add-penalty.sheet-add-penalty:hover {
+            background: #111;
+            color: #fff;
+            transform: none;
+        }
+
+        .sheet-options {
+            border: 1px solid #111;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 20px;
+            padding: 9px 12px;
+        }
+
+        .sheet-options .form-check {
+            margin: 0;
+        }
+
+        .sheet-footer-row {
+            align-items: end;
+            gap: 42px;
+            margin-top: 24px;
+        }
+
+        .mvp-field {
+            align-items: center;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 14px;
+        }
+
+        .mvp-label {
+            font-size: 2.4rem;
+            font-weight: 800;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        .mvp-arrow {
+            font-size: 2.4rem;
+            font-weight: 800;
+        }
+
+        .mvp-field .sheet-select {
+            border-bottom: 1px solid #111;
+            font-size: 0.95rem;
+            min-height: 34px;
+        }
+
+        .sheet-actions {
+            align-items: center;
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 22px;
+        }
+
+        .sheet-save-btn,
+        .sheet-reset-btn {
+            border-radius: 0;
+            font-weight: 700;
+            letter-spacing: 0;
+            padding: 10px 18px;
+        }
+
+        .sheet-empty-row td {
+            color: #777;
+        }
+
+        @media (max-width: 992px) {
+            .match-sheet {
+                padding: 28px;
+            }
+
+            .match-page-header {
+                align-items: flex-start !important;
+                flex-direction: column;
             }
         }
     </style>
@@ -311,8 +822,8 @@
             {% endif %}
         {% endwith %}
 
-        <div class="d-flex justify-content-between align-items-center">
-            <h1>Dettagli Partita</h1>
+        <div class="d-flex justify-content-between align-items-center match-page-header">
+            <h1>Foglio Gara</h1>
             {% if return_anchor %}
                 <a href="{{ url_for('schedule') }}#{{ return_anchor }}" class="btn btn-secondary">Torna al Calendario</a>
             {% else %}
@@ -321,7 +832,7 @@
         </div>
 
         <!-- Informazioni Partita -->
-        <div class="row mt-4">
+        <div class="row mt-4 d-none">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-primary text-white">
@@ -335,7 +846,7 @@
                                 <h5>Informazioni Partita</h5>
                                 <p><strong>Data:</strong> {{ match.date.strftime('%d/%m/%Y') }}</p>
                                 <p><strong>Orario:</strong> {{ match.time.strftime('%H:%M') }}</p>
-                                <p><strong>Fase:</strong> 
+                                <p><strong>Fase:</strong>
                                     {% if match.phase == 'group' %}
                                         Qualificazioni
                                     {% elif match.phase == 'quarterfinal' %}
@@ -359,7 +870,7 @@
                                             {{ match.team1_score }} - {{ match.team2_score }}
                                         </h2>
                                         {% if match.winner %}
-                                            <p><strong>Vincitore:</strong> 
+                                            <p><strong>Vincitore:</strong>
                                                 <span class="text-primary">{{ match.winner.name }}</span>
                                             </p>
                                         {% else %}
@@ -371,20 +882,20 @@
                                         <h3 class="text-muted">Partita non ancora giocata</h3>
                                     </div>
                                 {% endif %}
-                                
+
                                 <!-- Migliori Giocatori della Partita -->
                                 {% if best_player_team1 or best_player_team2 %}
                                     <div class="mt-3">
-                                        <h6>🏆 Migliori Giocatori</h6>
+                                        <h6>Migliori Giocatori</h6>
                                         {% if best_player_team1 %}
                                             <div class="mb-2">
-                                                <span class="badge award-badge">⭐ {{ match.team1.name }}</span><br>
+                                                <span class="badge award-badge"> {{ match.team1.name }}</span><br>
                                                 <strong>{{ best_player_team1.name }}</strong>
                                             </div>
                                         {% endif %}
                                         {% if best_player_team2 %}
                                             <div class="mb-2">
-                                                <span class="badge award-badge">⭐ {{ match.team2.name }}</span><br>
+                                                <span class="badge award-badge"> {{ match.team2.name }}</span><br>
                                                 <strong>{{ best_player_team2.name }}</strong>
                                             </div>
                                         {% endif %}
@@ -410,7 +921,7 @@
                                 {% if return_anchor %}
                                     <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                                 {% endif %}
-                                
+
                                 <div class="row">
                                     <div class="col-6">
                                         <label for="team1_score" class="form-label">{{ match.team1.name }}</label>
@@ -421,7 +932,7 @@
                                         <input type="number" class="form-control" id="team2_score" name="team2_score" value="{{ match.team2_score }}" min="0" required>
                                     </div>
                                 </div>
-                                
+
                                 {% if match.phase == 'group' %}
                                     <div class="row mt-3">
                                         <div class="col-12">
@@ -429,40 +940,40 @@
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="overtime" name="overtime" {% if match.overtime %}checked{% endif %}>
                                                 <label class="form-check-label" for="overtime">
-                                                    ⏰ Overtime (tempi supplementari)
+                                                     Overtime (tempi supplementari)
                                                 </label>
                                             </div>
                                             <div class="form-check">
                                                 <input class="form-check-input" type="checkbox" id="shootout" name="shootout" {% if match.shootout %}checked{% endif %}>
                                                 <label class="form-check-label" for="shootout">
-                                                    🥅 Rigori (shootout)
+                                                     Rigori (shootout)
                                                 </label>
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="alert alert-success mt-3">
-                                        <strong>📊 Punti assegnati con questo risultato:</strong><br>
+                                        <strong>Punti assegnati con questo risultato:</strong><br>
                                         • {{ match.team1.name }}: <strong>{{ match.get_points_for_team(match.team1) }} punti</strong><br>
                                         • {{ match.team2.name }}: <strong>{{ match.get_points_for_team(match.team2) }} punti</strong>
                                         {% if match.overtime or match.shootout %}
                                             <br><small class="text-muted">
-                                                {% if match.overtime %}⏰ Decisa in overtime{% endif %}
-                                                {% if match.shootout %}🥅 Decisa ai rigori{% endif %}
+                                                {% if match.overtime %} Decisa in overtime{% endif %}
+                                                {% if match.shootout %} Decisa ai rigori{% endif %}
                                             </small>
                                         {% endif %}
                                     </div>
                                 {% endif %}
-                                
+
                                 <div class="row mt-4">
                                     <div class="col-md-6">
                                         <button type="submit" class="btn btn-primary w-100">
                                             <i class="fas fa-save"></i> Aggiorna Risultato
                                         </button>
                                     </div>
-                                    
+
                                     <div class="col-md-6">
-                                        <button type="button" class="btn btn-danger w-100" 
+                                        <button type="button" class="btn btn-danger w-100"
                                                 data-bs-toggle="modal" data-bs-target="#resetMatchModal">
                                             <i class="fas fa-undo"></i> Reset Partita
                                         </button>
@@ -477,11 +988,443 @@
 
         <!-- Statistiche Giocatori - FORM UNICO CON MIGLIORI GIOCATORI -->
         {% if match.team1 and match.team2 %}
+        {% set overtime_rules = match.get_allowed_overtime_rules() %}
+        <form method="post" action="{{ url_for('match_detail', match_id=match.id) }}" class="mt-4">
+            {% if return_anchor %}
+                <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
+            {% endif %}
+
+            <div class="match-sheet-wrap">
+                <div class="match-sheet">
+                    <div class="sheet-top-grid">
+                        <div class="sheet-line-field">
+                            <div class="sheet-line-value">{{ match.date.strftime('%d/%m/%Y') }}</div>
+                            <label>Data</label>
+                        </div>
+                        <div class="sheet-line-field">
+                            <div class="sheet-line-value">{{ match.get_match_number() }}</div>
+                            <label>No. partita</label>
+                        </div>
+                        <div class="sheet-title">
+                            <strong>{{ match_sheet_tournament.title }}</strong>
+                            <span>{{ match_sheet_tournament.subtitle }}</span>
+                        </div>
+                    </div>
+                    <div class="sheet-rule"></div>
+
+                    <div class="sheet-hidden-player-fields" hidden>
+                        {% for player in team1_players + team2_players %}
+                            {% set stats = match_stats[player.id] %}
+                            <input type="hidden" class="lineup-active-input" data-player-id="{{ player.id }}"
+                                name="player_{{ player.id }}_is_active"
+                                value="{% if stats.is_removed %}0{% else %}1{% endif %}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="goals"
+                                name="player_{{ player.id }}_goals"
+                                value="{{ stats.goals if player.id in match_stats else 0 }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="assists"
+                                name="player_{{ player.id }}_assists"
+                                value="{{ stats.assists if player.id in match_stats else 0 }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="goal_times"
+                                name="player_{{ player.id }}_goal_times"
+                                value="{{ stats.goal_times if stats.goal_times else '' }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="assist_times"
+                                name="player_{{ player.id }}_assist_times"
+                                value="{{ stats.assist_times if stats.assist_times else '' }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalty_times"
+                                name="player_{{ player.id }}_penalty_times"
+                                value="{{ stats.penalty_times if stats.penalty_times else '' }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalty_durations"
+                                name="player_{{ player.id }}_penalty_durations"
+                                value="{{ stats.penalty_durations if stats.penalty_durations else '' }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalties"
+                                name="player_{{ player.id }}_penalties"
+                                value="{{ stats.penalties if stats.penalties else 0 }}">
+                        {% endfor %}
+                    </div>
+
+                    <details class="lineup-panel">
+                        <summary>Gestione giocatori, numeri e presenze</summary>
+                        <div class="lineup-grid">
+                            <section>
+                                <h2 class="lineup-team-title">{{ match.team1.name }}</h2>
+                                <table class="lineup-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="lineup-active-cell">Gioca</th>
+                                            <th class="lineup-number-cell">No.</th>
+                                            <th>Giocatore</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for player in team1_players %}
+                                            {% set stats = match_stats[player.id] %}
+                                            <tr class="lineup-player-row {% if stats.is_removed %}lineup-player-inactive{% endif %}"
+                                                data-team="team1" data-player-id="{{ player.id }}">
+                                                <td class="lineup-active-cell">
+                                                    <input type="checkbox" class="lineup-active-checkbox"
+                                                        data-player-id="{{ player.id }}"
+                                                        {% if not stats.is_removed %}checked{% endif %}>
+                                                </td>
+                                                <td class="lineup-number-cell">
+                                                    <input type="number" class="sheet-input lineup-number-input jersey-number-input sheet-player-stat"
+                                                        name="player_{{ player.id }}_jersey_number"
+                                                        data-player-id="{{ player.id }}"
+                                                        data-team="team1"
+                                                        data-stat="jersey_number"
+                                                        value="{{ stats.jersey_number if stats.jersey_number else '' }}"
+                                                        min="1" max="99" placeholder="{{ loop.index }}">
+                                                </td>
+                                                <td>
+                                                    <span class="lineup-player-name">{{ player.name }}</span>
+                                                    <span class="lineup-presences">{{ stats.games_played }} presenze salvate</span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </section>
+
+                            <section>
+                                <h2 class="lineup-team-title">{{ match.team2.name }}</h2>
+                                <table class="lineup-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="lineup-active-cell">Gioca</th>
+                                            <th class="lineup-number-cell">No.</th>
+                                            <th>Giocatore</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for player in team2_players %}
+                                            {% set stats = match_stats[player.id] %}
+                                            <tr class="lineup-player-row {% if stats.is_removed %}lineup-player-inactive{% endif %}"
+                                                data-team="team2" data-player-id="{{ player.id }}">
+                                                <td class="lineup-active-cell">
+                                                    <input type="checkbox" class="lineup-active-checkbox"
+                                                        data-player-id="{{ player.id }}"
+                                                        {% if not stats.is_removed %}checked{% endif %}>
+                                                </td>
+                                                <td class="lineup-number-cell">
+                                                    <input type="number" class="sheet-input lineup-number-input jersey-number-input sheet-player-stat"
+                                                        name="player_{{ player.id }}_jersey_number"
+                                                        data-player-id="{{ player.id }}"
+                                                        data-team="team2"
+                                                        data-stat="jersey_number"
+                                                        value="{{ stats.jersey_number if stats.jersey_number else '' }}"
+                                                        min="1" max="99" placeholder="{{ loop.index }}">
+                                                </td>
+                                                <td>
+                                                    <span class="lineup-player-name">{{ player.name }}</span>
+                                                    <span class="lineup-presences">{{ stats.games_played }} presenze salvate</span>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </section>
+                        </div>
+                    </details>
+
+                    <div class="match-sides">
+                        <section class="sheet-side">
+                            <div class="team-heading-row">
+                                <div class="team-name-line">
+                                    {{ match.team1.name }}
+                                    <span class="label">Squadra</span>
+                                </div>
+                                <div class="score-field">
+                                    <input type="number" id="team1_score_main" name="team1_score"
+                                        value="{{ match.team1_score if match.team1_score is not none else '' }}"
+                                        min="0" placeholder="0">
+                                    <label for="team1_score_main">Score</label>
+                                </div>
+                            </div>
+
+                            <div class="sheet-tables">
+                                <div>
+                                    <h2 class="sheet-table-title">Reti</h2>
+                                    <table class="sheet-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="goal-number-cell">No.</th>
+                                                <th class="time-cell">Tempo</th>
+                                                <th>Rete</th>
+                                                <th>Assist</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row_number in range(1, 21) %}
+                                                <tr class="goal-event-row" data-team="team1">
+                                                    <td class="row-number">{{ row_number }}</td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input goal-time-input"
+                                                            min="0" max="99" step="1" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <select class="sheet-select goal-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team1_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select class="sheet-select assist-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team1_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div>
+                                    <h2 class="sheet-table-title">Penalità</h2>
+                                    <table class="sheet-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="penalty-player-cell">Giocatore</th>
+                                                <th>Durata</th>
+                                                <th>Inizio</th>
+                                                <th>Fine</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row_number in range(1, 21) %}
+                                                <tr class="penalty-event-row" data-team="team1">
+                                                    <td class="penalty-player-cell">
+                                                        <select class="sheet-select penalty-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team1_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-duration-input"
+                                                            min="0" step="0.5" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-start-input"
+                                                            min="0" max="99" step="1" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-end-input"
+                                                            min="0" step="0.5" placeholder="-">
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="sheet-side">
+                            <div class="team-heading-row">
+                                <div class="team-name-line">
+                                    {{ match.team2.name }}
+                                    <span class="label">Squadra</span>
+                                </div>
+                                <div class="score-field">
+                                    <input type="number" id="team2_score_main" name="team2_score"
+                                        value="{{ match.team2_score if match.team2_score is not none else '' }}"
+                                        min="0" placeholder="0">
+                                    <label for="team2_score_main">Score</label>
+                                </div>
+                            </div>
+
+                            <div class="sheet-tables">
+                                <div>
+                                    <h2 class="sheet-table-title">Reti</h2>
+                                    <table class="sheet-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="goal-number-cell">No.</th>
+                                                <th class="time-cell">Tempo</th>
+                                                <th>Rete</th>
+                                                <th>Assist</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row_number in range(1, 21) %}
+                                                <tr class="goal-event-row" data-team="team2">
+                                                    <td class="row-number">{{ row_number }}</td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input goal-time-input"
+                                                            min="0" max="99" step="1" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <select class="sheet-select goal-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team2_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <select class="sheet-select assist-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team2_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div>
+                                    <h2 class="sheet-table-title">Penalità</h2>
+                                    <table class="sheet-table">
+                                        <thead>
+                                            <tr>
+                                                <th class="penalty-player-cell">Giocatore</th>
+                                                <th>Durata</th>
+                                                <th>Inizio</th>
+                                                <th>Fine</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for row_number in range(1, 21) %}
+                                                <tr class="penalty-event-row" data-team="team2">
+                                                    <td class="penalty-player-cell">
+                                                        <select class="sheet-select penalty-player-select">
+                                                            <option value=""></option>
+                                                            {% for player in team2_players %}
+                                                                {% set stats = match_stats[player.id] %}
+                                                                <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}" {% if stats['is_removed'] %}disabled{% endif %}>
+                                                                    {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                                                </option>
+                                                            {% endfor %}
+                                                        </select>
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-duration-input"
+                                                            min="0" step="0.5" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-start-input"
+                                                            min="0" max="99" step="1" placeholder="-">
+                                                    </td>
+                                                    <td>
+                                                        <input type="number" class="sheet-input penalty-event-end-input"
+                                                            min="0" step="0.5" placeholder="-">
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div class="sheet-footer-row">
+                        <div class="mvp-field">
+                            <div class="mvp-label">No. MVP <span class="mvp-arrow">&rarr;</span></div>
+                            <select class="sheet-select" name="best_player_team1" id="best_player_team1">
+                                <option value=""></option>
+                                {% for player in team1_players %}
+                                    {% set stats = match_stats[player.id] %}
+                                    <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}"
+                                            {% if stats['is_removed'] %}disabled{% endif %}
+                                            {% if match_stats[player.id].is_best_player_team1 %}selected{% endif %}>
+                                        {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mvp-field">
+                            <div class="mvp-label">No. MVP <span class="mvp-arrow">&rarr;</span></div>
+                            <select class="sheet-select" name="best_player_team2" id="best_player_team2">
+                                <option value=""></option>
+                                {% for player in team2_players %}
+                                    {% set stats = match_stats[player.id] %}
+                                    <option value="{{ player.id }}" data-player-id="{{ player.id }}" data-player-name="{{ player.name }}"
+                                            {% if stats['is_removed'] %}disabled{% endif %}
+                                            {% if match_stats[player.id].is_best_player_team2 %}selected{% endif %}>
+                                        {% if stats.jersey_number %}{{ stats.jersey_number }}{% else %}No.{% endif %} - {{ player.name }}{% if stats['is_removed'] %} (non gioca){% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sheet-options">
+                        <span><strong>Fase:</strong>
+                            {% if match.phase == 'group' %}
+                                Qualificazioni
+                            {% elif match.phase == 'quarterfinal' %}
+                                Quarti di Finale
+                            {% elif match.phase == 'semifinal' %}
+                                Semifinali
+                            {% elif match.phase == 'final' %}
+                                Finali
+                            {% else %}
+                                {{ match.phase }}
+                            {% endif %}
+                        </span>
+                        {% if match.league %}
+                            <span><strong>Lega:</strong> {{ match.league }}</span>
+                        {% endif %}
+                        <span><strong>Orario:</strong> {{ match.time.strftime('%H:%M') }}</span>
+                        <span><strong>Regole:</strong> {{ overtime_rules.description }}</span>
+                        {% if overtime_rules.allow_overtime %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="overtime_main" name="overtime"
+                                    {% if match.overtime %}checked{% endif %}>
+                                <label class="form-check-label" for="overtime_main">OT</label>
+                            </div>
+                        {% endif %}
+                        {% if overtime_rules.allow_shootout %}
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" id="shootout_main" name="shootout"
+                                    {% if match.shootout %}checked{% endif %}>
+                                <label class="form-check-label" for="shootout_main">Rigori</label>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="sheet-actions">
+                        <button type="button" class="btn btn-outline-danger sheet-reset-btn"
+                                data-bs-toggle="modal" data-bs-target="#resetMatchModal">
+                            Reset partita
+                        </button>
+                        <button type="submit" class="btn btn-dark sheet-save-btn">
+                            Salva foglio gara
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+        {#
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
                     <div class="card-header bg-success text-white">
-                        <h4 class="mb-0">📊 Inserisci/Modifica: Risultato + Statistiche + MVP</h4>
+                        <h4 class="mb-0">Inserisci/Modifica: Risultato + Statistiche + MVP</h4>
                     </div>
                     <div class="card-body">
                         <!-- FORM UNICO CHE GESTISCE TUTTO -->
@@ -489,48 +1432,48 @@
                             {% if return_anchor %}
                                 <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
                             {% endif %}
-                            
+
                             <!-- SEZIONE RISULTATO -->
                             <div class="row mb-4">
                                 <div class="col-12">
-                                    <h5 class="text-primary mb-3">🏒 Risultato Partita</h5>
+                                    <h5 class="text-primary mb-3"> Risultato Partita</h5>
                                     <div class="row">
                                         <div class="col-md-4">
                                             <label for="team1_score_main" class="form-label">{{ match.team1.name }}</label>
-                                            <input type="number" class="form-control" id="team1_score_main" name="team1_score" 
-                                                value="{{ match.team1_score if match.team1_score is not none else '' }}" 
+                                            <input type="number" class="form-control" id="team1_score_main" name="team1_score"
+                                                value="{{ match.team1_score if match.team1_score is not none else '' }}"
                                                 min="0" placeholder="Gol">
                                         </div>
                                         <div class="col-md-4">
                                             <label for="team2_score_main" class="form-label">{{ match.team2.name }}</label>
-                                            <input type="number" class="form-control" id="team2_score_main" name="team2_score" 
-                                                value="{{ match.team2_score if match.team2_score is not none else '' }}" 
+                                            <input type="number" class="form-control" id="team2_score_main" name="team2_score"
+                                                value="{{ match.team2_score if match.team2_score is not none else '' }}"
                                                 min="0" placeholder="Gol">
                                         </div>
                                         <div class="col-md-4">
                                             {% set overtime_rules = match.get_allowed_overtime_rules() %}
-                                            
+
                                             <!-- Mostra le regole della fase -->
                                             <small class="text-muted d-block mb-2">
                                                 <strong>Regole {{ match.phase }}:</strong> {{ overtime_rules.description }}
                                             </small>
-                                            
+
                                             {% if overtime_rules.allow_overtime %}
                                                 <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="overtime_main" name="overtime" 
+                                                    <input class="form-check-input" type="checkbox" id="overtime_main" name="overtime"
                                                         {% if match.overtime %}checked{% endif %}>
-                                                    <label class="form-check-label" for="overtime_main">⏰ OT</label>
+                                                    <label class="form-check-label" for="overtime_main">OT</label>
                                                 </div>
                                             {% endif %}
-                                            
+
                                             {% if overtime_rules.allow_shootout %}
                                                 <div class="form-check form-check-inline">
-                                                    <input class="form-check-input" type="checkbox" id="shootout_main" name="shootout" 
+                                                    <input class="form-check-input" type="checkbox" id="shootout_main" name="shootout"
                                                         {% if match.shootout %}checked{% endif %}>
-                                                    <label class="form-check-label" for="shootout_main">🥅 Rigori</label>
+                                                    <label class="form-check-label" for="shootout_main">Rigori</label>
                                                 </div>
                                             {% endif %}
-                                            
+
                                             {% if not overtime_rules.allow_overtime and not overtime_rules.allow_shootout %}
                                                 <div class="alert alert-info">
                                                     Questa fase non prevede overtime o rigori.
@@ -540,17 +1483,17 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <hr>
-                            
+
                             <!-- SEZIONE MVP -->
                             <div class="row mb-4">
                                 <div class="col-12">
-                                    <h5 class="text-warning mb-3">⭐ Migliori Giocatori della Partita</h5>
+                                    <h5 class="text-warning mb-3">Migliori Giocatori della Partita</h5>
                                     <div class="row">
                                         <div class="col-md-6">
                                             <label for="best_player_team1" class="form-label">
-                                                <strong>🏆 Miglior giocatore {{ match.team1.name }}:</strong>
+                                                <strong>Miglior giocatore {{ match.team1.name }}:</strong>
                                             </label>
                                             <select class="form-select" name="best_player_team1" id="best_player_team1">
                                                 <option value="">-- Seleziona giocatore --</option>
@@ -564,7 +1507,7 @@
                                         </div>
                                         <div class="col-md-6">
                                             <label for="best_player_team2" class="form-label">
-                                                <strong>🏆 Miglior giocatore {{ match.team2.name }}:</strong>
+                                                <strong>Miglior giocatore {{ match.team2.name }}:</strong>
                                             </label>
                                             <select class="form-select" name="best_player_team2" id="best_player_team2">
                                                 <option value="">-- Seleziona giocatore --</option>
@@ -579,15 +1522,15 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <hr>
-                            
+
                             <!-- SEZIONE STATISTICHE GIOCATORI -->
                             <div class="row mb-4">
                                 <div class="col-12">
-                                    <h5 class="text-info mb-3">📊 Statistiche Giocatori</h5>
+                                    <h5 class="text-info mb-3"> Statistiche Giocatori</h5>
                                 </div>
-                                
+
                                 <!-- Squadra 1 -->
                                 <div class="col-md-6">
                                     <h6 class="text-primary">{{ match.team1.name }}</h6>
@@ -611,11 +1554,11 @@
                                                                 <strong {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                                     {{ player.name }}
                                                                 </strong>
-                                                                
+
                                                                 <!-- Bottone X per rimuovere/ripristinare giocatore -->
                                                                 <!-- Bottone X senza form nested - usa JavaScript invece -->
                                                                {% if match_stats[player.id]['is_removed'] %}
-                                                                    <button type="button" class="restore-player-btn" 
+                                                                    <button type="button" class="restore-player-btn"
                                                                             data-match-id="{{ match.id }}"
                                                                             data-player-id="{{ player.id }}"
                                                                             data-player-name="{{ player.name }}"
@@ -625,7 +1568,7 @@
                                                                         ↻
                                                                     </button>
                                                                 {% else %}
-                                                                    <button type="button" class="remove-player-btn" 
+                                                                    <button type="button" class="remove-player-btn"
                                                                             data-match-id="{{ match.id }}"
                                                                             data-player-id="{{ player.id }}"
                                                                             data-player-name="{{ player.name }}"
@@ -637,24 +1580,24 @@
                                                                 {% endif %}
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_jersey_number" 
-                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}" 
-                                                                    min="1" max="99" style="width: 50px;" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_jersey_number"
+                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}"
+                                                                    min="1" max="99" style="width: 50px;"
                                                                     placeholder="N°"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_goals" 
-                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_goals"
+                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}"
                                                                     min="0" max="10" style="width: 60px;"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_assists" 
-                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_assists"
+                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}"
                                                                     min="0" max="10" style="width: 60px;"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
@@ -664,8 +1607,8 @@
                                                                     <!-- Sezione delle penalità con modal -->
                                                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                                                         <small class="text-muted fw-bold">Penalità</small>
-                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty" 
-                                                                                data-player-id="{{ player.id }}" 
+                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty"
+                                                                                data-player-id="{{ player.id }}"
                                                                                 data-player-name="{{ player.name }}"
                                                                                 {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                             <i class="fas fa-plus me-1"></i>Aggiungi
@@ -686,17 +1629,17 @@
                                                             </td>
                                                             <td>
                                                                 <div class="d-flex flex-column gap-1">
-                                                                    <input type="text" class="form-control form-control-sm" 
-                                                                        name="player_{{ player.id }}_goal_times" 
-                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}" 
-                                                                        placeholder="Gol: 15,30,45" 
+                                                                    <input type="text" class="form-control form-control-sm"
+                                                                        name="player_{{ player.id }}_goal_times"
+                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}"
+                                                                        placeholder="Gol: 15,30,45"
                                                                         style="font-size: 11px; width: 120px;"
                                                                         title="Tempi dei gol separati da virgola (es: 15,30,45)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
-                                                                    <input type="text" class="form-control form-control-sm" 
-                                                                        name="player_{{ player.id }}_assist_times" 
-                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}" 
-                                                                        placeholder="Assist: 10,25" 
+                                                                    <input type="text" class="form-control form-control-sm"
+                                                                        name="player_{{ player.id }}_assist_times"
+                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}"
+                                                                        placeholder="Assist: 10,25"
                                                                         style="font-size: 11px; width: 120px;"
                                                                         title="Tempi degli assist separati da virgola (es: 10,25)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
@@ -735,11 +1678,11 @@
                                                                 <strong {% if match_stats[player.id]['is_removed'] %}class="player-removed"{% endif %}>
                                                                     {{ player.name }}
                                                                 </strong>
-                                                                
+
                                                                 <!-- Bottone X per rimuovere/ripristinare giocatore -->
                                                                 <!-- Bottone X senza form nested - usa JavaScript invece -->
                                                                 {% if match_stats[player.id]['is_removed'] %}
-                                                                    <button type="button" class="restore-player-btn" 
+                                                                    <button type="button" class="restore-player-btn"
                                                                             data-match-id="{{ match.id }}"
                                                                             data-player-id="{{ player.id }}"
                                                                             data-player-name="{{ player.name }}"
@@ -749,7 +1692,7 @@
                                                                         ↻
                                                                     </button>
                                                                 {% else %}
-                                                                    <button type="button" class="remove-player-btn" 
+                                                                    <button type="button" class="remove-player-btn"
                                                                             data-match-id="{{ match.id }}"
                                                                             data-player-id="{{ player.id }}"
                                                                             data-player-name="{{ player.name }}"
@@ -761,24 +1704,24 @@
                                                                 {% endif %}
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_jersey_number" 
-                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}" 
-                                                                    min="1" max="99" style="width: 50px;" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_jersey_number"
+                                                                    value="{{ match_stats[player.id].jersey_number if match_stats[player.id].jersey_number else '' }}"
+                                                                    min="1" max="99" style="width: 50px;"
                                                                     placeholder="N°"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_goals" 
-                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_goals"
+                                                                    value="{{ match_stats[player.id].goals if player.id in match_stats else 0 }}"
                                                                     min="0" max="10" style="width: 60px;"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
                                                             <td>
-                                                                <input type="number" class="form-control form-control-sm" 
-                                                                    name="player_{{ player.id }}_assists" 
-                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}" 
+                                                                <input type="number" class="form-control form-control-sm"
+                                                                    name="player_{{ player.id }}_assists"
+                                                                    value="{{ match_stats[player.id].assists if player.id in match_stats else 0 }}"
                                                                     min="0" max="10" style="width: 60px;"
                                                                     {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                             </td>
@@ -788,8 +1731,8 @@
                                                                     <!-- Sezione delle penalità con modal -->
                                                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                                                         <small class="text-muted fw-bold">Penalità</small>
-                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty" 
-                                                                                data-player-id="{{ player.id }}" 
+                                                                        <button type="button" class="btn btn-primary btn-sm add-penalty"
+                                                                                data-player-id="{{ player.id }}"
                                                                                 data-player-name="{{ player.name }}"
                                                                                 {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                             <i class="fas fa-plus me-1"></i>Aggiungi
@@ -810,17 +1753,17 @@
                                                             </td>
                                                             <td>
                                                                 <div class="d-flex flex-column gap-1">
-                                                                    <input type="text" class="form-control form-control-sm" 
-                                                                        name="player_{{ player.id }}_goal_times" 
-                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}" 
-                                                                        placeholder="Gol: 15,30,45" 
+                                                                    <input type="text" class="form-control form-control-sm"
+                                                                        name="player_{{ player.id }}_goal_times"
+                                                                        value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}"
+                                                                        placeholder="Gol: 15,30,45"
                                                                         style="font-size: 11px; width: 120px;"
                                                                         title="Tempi dei gol separati da virgola (es: 15,30,45)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
-                                                                    <input type="text" class="form-control form-control-sm" 
-                                                                        name="player_{{ player.id }}_assist_times" 
-                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}" 
-                                                                        placeholder="Assist: 10,25" 
+                                                                    <input type="text" class="form-control form-control-sm"
+                                                                        name="player_{{ player.id }}_assist_times"
+                                                                        value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}"
+                                                                        placeholder="Assist: 10,25"
                                                                         style="font-size: 11px; width: 120px;"
                                                                         title="Tempi degli assist separati da virgola (es: 10,25)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
@@ -836,7 +1779,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Istruzioni per l'uso -->
                             <div class="alert alert-info mt-3">
                                 <h6><i class="fas fa-info-circle"></i> Istruzioni:</h6>
@@ -849,7 +1792,7 @@
                                     <li><strong>X Rossa:</strong> Rimuovi un giocatore dalla partita (non conterà nelle statistiche)</li>
                                 </ul>
                             </div>
-                            
+
                             <!-- BOTTONE UNICO PER SALVARE TUTTO -->
                             <div class="text-center mt-4">
                                 <button type="submit" class="btn btn-success btn-lg w-100">
@@ -861,6 +1804,7 @@
                 </div>
             </div>
         </div>
+        #}
         {% endif %}
 
         <!-- Statistiche Complete della Partita -->
@@ -895,7 +1839,7 @@
                                             <td>
                                                 <strong>{{ player.name }}</strong>
                                                 {% if stats.is_best_player_team1 %}
-                                                    <span class="badge bg-warning text-dark ms-1">⭐ MVP</span>
+                                                    <span class="badge bg-warning text-dark ms-1"> MVP</span>
                                                 {% endif %}
                                             </td>
                                             <td>
@@ -939,7 +1883,7 @@
                                         </tr>
                                     {% endif %}
                                 {% endfor %}
-                                
+
                                 <!-- Giocatori Squadra 2 -->
                                 {% for player in team2_players %}
                                     {% set stats = match_stats[player.id] %}
@@ -949,7 +1893,7 @@
                                             <td>
                                                 <strong>{{ player.name }}</strong>
                                                 {% if stats.is_best_player_team2 %}
-                                                    <span class="badge bg-warning text-dark ms-1">⭐ MVP</span>
+                                                    <span class="badge bg-warning text-dark ms-1"> MVP</span>
                                                 {% endif %}
                                             </td>
                                             <td>
@@ -996,11 +1940,11 @@
                             </tbody>
                         </table>
                     </div>
-                    
+
                     <!-- Riepilogo cronologico delle azioni -->
                     {% if match_stats %}
                         <div class="mt-4">
-                            <h6>🕐 Cronologia Partita</h6>
+                            <h6> Cronologia Partita</h6>
                             <div class="timeline-container">
                                 {% set all_events = [] %}
                                 {% for player in team1_players + team2_players %}
@@ -1021,14 +1965,14 @@
                                         {% endfor %}
                                     {% endif %}
                                 {% endfor %}
-                                
+
                                 {% if all_events %}
                                     {% set sorted_events = all_events|sort(attribute='time') %}
                                     <div class="list-group">
                                         {% for event in sorted_events %}
                                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <strong>{{ event.time }}'</strong> - 
+                                                    <strong>{{ event.time }}'</strong> -
                                                     {% if event.action == 'Gol' %}
                                                         <i class="fas fa-futbol text-success"></i>
                                                     {% elif event.action == 'Assist' %}
@@ -1036,7 +1980,7 @@
                                                     {% elif event.action == 'Penalità' %}
                                                         <i class="fas fa-exclamation-triangle text-danger"></i>
                                                     {% endif %}
-                                                    <strong>{{ event.action }}</strong> 
+                                                    <strong>{{ event.action }}</strong>
                                                     {{ event.player }}
                                                     {% if event.jersey %}
                                                         <span class="badge bg-secondary">#{{ event.jersey }}</span>
@@ -1092,21 +2036,21 @@
                         </ul>
                         <p class="mb-0"><strong>La partita tornerà come "non ancora giocata".</strong></p>
                     </div>
-                    
+
                     <p>Partita: <strong>{{ match.get_team1_display_name() }} vs {{ match.get_team2_display_name() }}</strong></p>
                     <p>Data: <strong>{{ match.date.strftime('%d/%m/%Y') }} {{ match.time.strftime('%H:%M') }}</strong></p>
-                    
+
                     <p class="text-danger"><strong>Questa azione NON può essere annullata!</strong></p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="fas fa-times"></i> Annulla
                     </button>
-                    
+
                     <!-- Form per il reset della partita -->
                     <form method="POST" action="{{ url_for('reset_match', match_id=match.id) }}" style="display: inline;">
                         <input type="hidden" name="return_anchor" value="{{ return_anchor }}">
-                        <button type="submit" class="btn btn-danger" 
+                        <button type="submit" class="btn btn-danger"
                                 onclick="return confirm('Sei ASSOLUTAMENTE sicuro? Questa azione cancellerà tutti i dati della partita!')">
                             <i class="fas fa-undo"></i> RESET PARTITA
                         </button>
@@ -1130,15 +2074,15 @@
                 <div class="modal-body">
                     <div class="alert alert-info" role="alert">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Istruzioni:</strong> Inserisci il tempo (minuto) e la durata di ogni penalità. 
+                        <strong>Istruzioni:</strong> Inserisci il tempo (minuto) e la durata di ogni penalità.
                         Puoi aggiungere più penalità per lo stesso giocatore.
                     </div>
-                    
+
                     <!-- Container per le penalità nel modal -->
                     <div id="modal-penalties-container" class="penalties-list">
                         <!-- Le penalità verranno aggiunte qui dinamicamente -->
                     </div>
-                    
+
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <button type="button" class="btn btn-outline-primary" id="add-penalty-in-modal">
                             <i class="fas fa-plus me-2"></i>Aggiungi Penalità
@@ -1171,34 +2115,448 @@
 
     <script>
     const matchStatsData = {{ match_stats | tojson }};
+    const matchSheetTeams = {
+        team1: [
+            {% for player in team1_players %}
+                {% set stats = match_stats[player.id] %}
+                { id: "{{ player.id }}", name: {{ player.name | tojson }}, jerseyNumber: "{{ stats.jersey_number if stats.jersey_number else '' }}", active: {% if stats.is_removed %}false{% else %}true{% endif %} }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ],
+        team2: [
+            {% for player in team2_players %}
+                {% set stats = match_stats[player.id] %}
+                { id: "{{ player.id }}", name: {{ player.name | tojson }}, jerseyNumber: "{{ stats.jersey_number if stats.jersey_number else '' }}", active: {% if stats.is_removed %}false{% else %}true{% endif %} }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ]
+    };
+
+    function parseSheetValues(value, allowDecimal = false) {
+        if (!value) return [];
+
+        return value
+            .split(',')
+            .map((item) => item.trim().replace(',', '.'))
+            .filter(Boolean)
+            .map((item) => allowDecimal ? Number.parseFloat(item) : Number.parseInt(item, 10))
+            .filter((item) => Number.isFinite(item));
+    }
+
+    function formatSheetNumber(value) {
+        if (!Number.isFinite(value)) return '';
+        return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+    }
+
+    function getPlayerStats(playerId) {
+        return matchStatsData[playerId] || matchStatsData[String(playerId)] || {};
+    }
+
+    function getTeamPlayer(playerId) {
+        const playerIdString = String(playerId);
+        return Object.values(matchSheetTeams).flat().find((player) => player.id === playerIdString);
+    }
+
+    function getLineupNumberInput(playerId) {
+        return document.querySelector(`.jersey-number-input[data-player-id="${playerId}"]`);
+    }
+
+    function getLineupActiveInput(playerId) {
+        return document.querySelector(`.lineup-active-input[data-player-id="${playerId}"]`);
+    }
+
+    function getLineupActiveCheckbox(playerId) {
+        return document.querySelector(`.lineup-active-checkbox[data-player-id="${playerId}"]`);
+    }
+
+    function getPlayerJerseyNumber(playerId) {
+        const numberInput = getLineupNumberInput(playerId);
+        return (numberInput?.value || numberInput?.placeholder || '').trim();
+    }
+
+    function isPlayerActive(playerId) {
+        const activeInput = getLineupActiveInput(playerId);
+        return !activeInput || activeInput.value !== '0';
+    }
+
+    function updateTeamPlayerState(playerId) {
+        const player = getTeamPlayer(playerId);
+        if (!player) return;
+
+        player.jerseyNumber = getPlayerJerseyNumber(playerId);
+        player.active = isPlayerActive(playerId);
+    }
+
+    function formatPlayerOptionLabel(playerId, fallbackName) {
+        const player = getTeamPlayer(playerId);
+        const number = getPlayerJerseyNumber(playerId);
+        const name = fallbackName || player?.name || '';
+        const inactiveLabel = isPlayerActive(playerId) ? '' : ' (non gioca)';
+        return `${number || 'No.'} - ${name}${inactiveLabel}`;
+    }
+
+    function refreshPlayerOptionLabels() {
+        document.querySelectorAll('option[data-player-id]').forEach((option) => {
+            const playerId = option.dataset.playerId;
+            option.textContent = formatPlayerOptionLabel(playerId, option.dataset.playerName);
+            option.disabled = !isPlayerActive(playerId);
+
+            if (option.selected && option.disabled) {
+                const select = option.closest('select');
+                if (select) select.value = '';
+            }
+        });
+    }
+
+    function syncLineupHiddenState(playerId) {
+        const checkbox = getLineupActiveCheckbox(playerId);
+        const activeInput = getLineupActiveInput(playerId);
+        const row = document.querySelector(`.lineup-player-row[data-player-id="${playerId}"]`);
+
+        if (!checkbox || !activeInput) return;
+
+        activeInput.value = checkbox.checked ? '1' : '0';
+        row?.classList.toggle('lineup-player-inactive', !checkbox.checked);
+        updateTeamPlayerState(playerId);
+    }
+
+    function syncAllLineupHiddenStates() {
+        document.querySelectorAll('.lineup-active-checkbox').forEach((checkbox) => {
+            syncLineupHiddenState(checkbox.dataset.playerId);
+        });
+    }
+
+    function applyLineupStateFromHiddenInputs() {
+        document.querySelectorAll('.lineup-active-input').forEach((input) => {
+            const checkbox = getLineupActiveCheckbox(input.dataset.playerId);
+            if (checkbox) checkbox.checked = input.value !== '0';
+            syncLineupHiddenState(input.dataset.playerId);
+        });
+        refreshPlayerOptionLabels();
+    }
+
+    function handleJerseyNumberSwap(input) {
+        const teamKey = input.dataset.team;
+        const newNumber = input.value.trim();
+        const previousNumber = input.dataset.previousValue || '';
+
+        if (!newNumber) {
+            input.dataset.previousValue = '';
+            updateTeamPlayerState(input.dataset.playerId);
+            refreshPlayerOptionLabels();
+            return;
+        }
+
+        const duplicateInput = Array.from(document.querySelectorAll(`.jersey-number-input[data-team="${teamKey}"]`))
+            .find((candidate) => candidate !== input && candidate.value.trim() === newNumber);
+
+        if (duplicateInput) {
+            duplicateInput.value = previousNumber;
+            duplicateInput.dataset.previousValue = previousNumber;
+            updateTeamPlayerState(duplicateInput.dataset.playerId);
+        }
+
+        input.dataset.previousValue = newNumber;
+        updateTeamPlayerState(input.dataset.playerId);
+        refreshPlayerOptionLabels();
+    }
+
+    function eventSortValue(value) {
+        const number = Number.parseFloat(value);
+        return Number.isFinite(number) ? number : 9999;
+    }
+
+    function buildGoalEvents(teamKey) {
+        const players = matchSheetTeams[teamKey] || [];
+        const goals = [];
+        const assists = [];
+
+        players.forEach((player) => {
+            if (!isPlayerActive(player.id)) return;
+
+            const stats = getPlayerStats(player.id);
+            const goalTimes = parseSheetValues(stats.goal_times || '');
+            const assistTimes = parseSheetValues(stats.assist_times || '');
+            const goalCount = Math.max(Number.parseInt(stats.goals || 0, 10), goalTimes.length);
+            const assistCount = Math.max(Number.parseInt(stats.assists || 0, 10), assistTimes.length);
+
+            for (let index = 0; index < goalCount; index += 1) {
+                goals.push({
+                    time: goalTimes[index] ?? '',
+                    scorerId: player.id,
+                    assistId: ''
+                });
+            }
+
+            for (let index = 0; index < assistCount; index += 1) {
+                assists.push({
+                    time: assistTimes[index] ?? '',
+                    playerId: player.id,
+                    used: false
+                });
+            }
+        });
+
+        goals.sort((left, right) => eventSortValue(left.time) - eventSortValue(right.time));
+        assists.sort((left, right) => eventSortValue(left.time) - eventSortValue(right.time));
+
+        goals.forEach((goal) => {
+            let assist = assists.find((candidate) => !candidate.used && candidate.time !== '' && candidate.time === goal.time);
+            if (!assist) {
+                assist = assists.find((candidate) => !candidate.used);
+            }
+
+            if (assist) {
+                goal.assistId = assist.playerId;
+                assist.used = true;
+            }
+        });
+
+        return goals.slice(0, 20);
+    }
+
+    function buildPenaltyEvents(teamKey) {
+        const players = matchSheetTeams[teamKey] || [];
+        const events = [];
+
+        players.forEach((player) => {
+            if (!isPlayerActive(player.id)) return;
+
+            const stats = getPlayerStats(player.id);
+            const starts = parseSheetValues(stats.penalty_times || '');
+            const durations = parseSheetValues(stats.penalty_durations || '', true);
+            const eventCount = Math.max(starts.length, durations.length);
+
+            for (let index = 0; index < eventCount; index += 1) {
+                const start = starts[index] ?? '';
+                const duration = durations[index] ?? '';
+                events.push({
+                    playerId: player.id,
+                    start,
+                    duration,
+                    end: Number.isFinite(start) && Number.isFinite(duration) ? start + duration : ''
+                });
+            }
+        });
+
+        events.sort((left, right) => eventSortValue(left.start) - eventSortValue(right.start));
+        return events.slice(0, 20);
+    }
+
+    function fillGoalRows(teamKey) {
+        const rows = Array.from(document.querySelectorAll(`.goal-event-row[data-team="${teamKey}"]`));
+        const events = buildGoalEvents(teamKey);
+
+        rows.forEach((row, index) => {
+            const event = events[index] || {};
+            row.querySelector('.goal-time-input').value = event.time ?? '';
+            row.querySelector('.goal-player-select').value = event.scorerId || '';
+            row.querySelector('.assist-player-select').value = event.assistId || '';
+        });
+    }
+
+    function fillPenaltyRows(teamKey) {
+        const rows = Array.from(document.querySelectorAll(`.penalty-event-row[data-team="${teamKey}"]`));
+        const events = buildPenaltyEvents(teamKey);
+
+        rows.forEach((row, index) => {
+            const event = events[index] || {};
+            row.querySelector('.penalty-player-select').value = event.playerId || '';
+            row.querySelector('.penalty-event-duration-input').value = event.duration ?? '';
+            row.querySelector('.penalty-event-start-input').value = event.start ?? '';
+            row.querySelector('.penalty-event-end-input').value = event.end ?? '';
+        });
+    }
+
+    function recalculatePenaltyEvent(row, source) {
+        const startInput = row.querySelector('.penalty-event-start-input');
+        const durationInput = row.querySelector('.penalty-event-duration-input');
+        const endInput = row.querySelector('.penalty-event-end-input');
+        const start = Number.parseFloat(startInput.value);
+        const duration = Number.parseFloat(durationInput.value);
+        const end = Number.parseFloat(endInput.value);
+
+        if (source === 'end' && Number.isFinite(start) && Number.isFinite(end)) {
+            durationInput.value = formatSheetNumber(Math.max(0, end - start));
+            return;
+        }
+
+        if (Number.isFinite(start) && Number.isFinite(duration)) {
+            endInput.value = formatSheetNumber(start + duration);
+        } else if (!endInput.value) {
+            endInput.value = '';
+        }
+    }
+
+    function setPlayerStat(playerId, stat, value) {
+        const input = document.querySelector(`.sheet-player-stat[data-player-id="${playerId}"][data-stat="${stat}"]`);
+        if (input) input.value = value;
+    }
+
+    function syncMatchSheetEvents() {
+        syncAllLineupHiddenStates();
+        refreshPlayerOptionLabels();
+
+        const playerStats = {};
+
+        Object.values(matchSheetTeams).flat().forEach((player) => {
+            playerStats[player.id] = {
+                goals: 0,
+                assists: 0,
+                goalTimes: [],
+                assistTimes: [],
+                penaltyTimes: [],
+                penaltyDurations: [],
+                penaltyTotal: 0
+            };
+        });
+
+        document.querySelectorAll('.goal-event-row').forEach((row) => {
+            const time = row.querySelector('.goal-time-input').value.trim();
+            const scorerId = row.querySelector('.goal-player-select').value;
+            const assistId = row.querySelector('.assist-player-select').value;
+
+            if (scorerId && time && playerStats[scorerId] && isPlayerActive(scorerId)) {
+                playerStats[scorerId].goals += 1;
+                playerStats[scorerId].goalTimes.push(time);
+            }
+
+            if (assistId && time && playerStats[assistId] && isPlayerActive(assistId)) {
+                playerStats[assistId].assists += 1;
+                playerStats[assistId].assistTimes.push(time);
+            }
+        });
+
+        document.querySelectorAll('.penalty-event-row').forEach((row) => {
+            const playerId = row.querySelector('.penalty-player-select').value;
+            const start = row.querySelector('.penalty-event-start-input').value.trim();
+            const duration = row.querySelector('.penalty-event-duration-input').value.trim();
+            const durationNumber = Number.parseFloat(duration);
+
+            if (playerId && start && duration && playerStats[playerId] && isPlayerActive(playerId)) {
+                playerStats[playerId].penaltyTimes.push(start);
+                playerStats[playerId].penaltyDurations.push(duration);
+                if (Number.isFinite(durationNumber)) {
+                    playerStats[playerId].penaltyTotal += durationNumber;
+                }
+            }
+        });
+
+        Object.entries(playerStats).forEach(([playerId, stats]) => {
+            setPlayerStat(playerId, 'goals', stats.goals);
+            setPlayerStat(playerId, 'assists', stats.assists);
+            setPlayerStat(playerId, 'goal_times', stats.goalTimes.join(','));
+            setPlayerStat(playerId, 'assist_times', stats.assistTimes.join(','));
+            setPlayerStat(playerId, 'penalty_times', stats.penaltyTimes.join(','));
+            setPlayerStat(playerId, 'penalty_durations', stats.penaltyDurations.join(','));
+            setPlayerStat(playerId, 'penalties', formatSheetNumber(stats.penaltyTotal) || '0');
+        });
+    }
+
+    function initializeLineupManager() {
+        document.querySelectorAll('.jersey-number-input').forEach((input) => {
+            input.dataset.previousValue = input.value.trim();
+            updateTeamPlayerState(input.dataset.playerId);
+
+            input.addEventListener('focus', () => {
+                input.dataset.previousValue = input.value.trim();
+            });
+
+            input.addEventListener('input', () => {
+                updateTeamPlayerState(input.dataset.playerId);
+                refreshPlayerOptionLabels();
+            });
+
+            input.addEventListener('change', () => {
+                handleJerseyNumberSwap(input);
+                syncMatchSheetEvents();
+            });
+        });
+
+        document.querySelectorAll('.lineup-active-checkbox').forEach((checkbox) => {
+            syncLineupHiddenState(checkbox.dataset.playerId);
+
+            checkbox.addEventListener('change', () => {
+                syncLineupHiddenState(checkbox.dataset.playerId);
+                refreshPlayerOptionLabels();
+                syncMatchSheetEvents();
+            });
+        });
+
+        refreshPlayerOptionLabels();
+    }
+
+    function initializeEventMatchSheet() {
+        initializeLineupManager();
+        fillGoalRows('team1');
+        fillGoalRows('team2');
+        fillPenaltyRows('team1');
+        fillPenaltyRows('team2');
+
+        document.querySelectorAll('.penalty-event-row').forEach((row) => {
+            row.querySelector('.penalty-event-start-input').addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'start');
+                syncMatchSheetEvents();
+            });
+            row.querySelector('.penalty-event-duration-input').addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'duration');
+                syncMatchSheetEvents();
+            });
+            row.querySelector('.penalty-event-end-input').addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'end');
+                syncMatchSheetEvents();
+            });
+        });
+
+        document.querySelectorAll('.goal-event-row input, .goal-event-row select, .penalty-event-row select').forEach((input) => {
+            input.addEventListener('input', syncMatchSheetEvents);
+            input.addEventListener('change', syncMatchSheetEvents);
+        });
+
+        const sheetForm = document.querySelector('.match-sheet')?.closest('form');
+        if (sheetForm) {
+            sheetForm.addEventListener('submit', syncMatchSheetEvents);
+        }
+
+        syncMatchSheetEvents();
+    }
+
+    document.addEventListener('DOMContentLoaded', initializeEventMatchSheet);
+
+    function getPenaltyTotalDisplay(container) {
+        if (!container) return null;
+
+        return container.closest('.sheet-penalty-row')?.querySelector('.penalty-total') ||
+               container.closest('.penalty-section')?.querySelector('.penalty-total') ||
+               container.parentElement?.querySelector('.penalty-total') ||
+               null;
+    }
 
     // Funzione per caricare le penalità esistenti di un giocatore
     function loadExistingPenalties(playerId) {
         const playerStats = matchStatsData[playerId];
         if (!playerStats) return;
-        
+
         const penaltyTimes = playerStats.penalty_times ? playerStats.penalty_times.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t)) : [];
         const penaltyDurations = playerStats.penalty_durations ? playerStats.penalty_durations.split(',').map(d => parseFloat(d.trim())).filter(d => !isNaN(d)) : [];
-        
+
         // Se non ci sono penalità, esci
         if (penaltyTimes.length === 0 || penaltyDurations.length === 0 || penaltyTimes.length !== penaltyDurations.length) {
             return;
         }
-        
+
         // Trova il container delle penalità per questo giocatore
         const container = document.getElementById(`penalties-container-${playerId}`);
         if (!container) return;
-        
+
         // Pulisci il container
         container.innerHTML = '';
-        
+
         let totalDuration = 0;
-        
+
         // Crea gli elementi delle penalità esistenti
         penaltyTimes.forEach((time, index) => {
             const duration = penaltyDurations[index];
             totalDuration += duration;
-            
+
             // Crea l'elemento della penalità
             const penaltyRow = document.createElement('div');
             penaltyRow.className = 'penalty-row d-flex justify-content-between align-items-center mb-1 p-2 bg-light border rounded';
@@ -1206,38 +2564,38 @@
                 <div class="penalty-info">
                     <small><strong>${time}'</strong> - ${duration} min</small>
                 </div>
-                <button type="button" class="btn btn-danger btn-sm remove-penalty" 
+                <button type="button" class="btn btn-danger btn-sm remove-penalty"
                         title="Rimuovi penalità">
                     <i class="fas fa-times"></i>
                 </button>
                 <input type="hidden" class="penalty-time" value="${time}">
                 <input type="hidden" class="penalty-duration" value="${duration}">
             `;
-            
+
             container.appendChild(penaltyRow);
         });
-        
+
         // Aggiungi gli input nascosti per il form
         const penaltyTimesInput = document.createElement('input');
         penaltyTimesInput.type = 'hidden';
         penaltyTimesInput.name = `player_${playerId}_penalty_times`;
         penaltyTimesInput.value = penaltyTimes.join(',');
         container.appendChild(penaltyTimesInput);
-        
+
         const penaltyDurationsInput = document.createElement('input');
         penaltyDurationsInput.type = 'hidden';
         penaltyDurationsInput.name = `player_${playerId}_penalty_durations`;
         penaltyDurationsInput.value = penaltyDurations.join(',');
         container.appendChild(penaltyDurationsInput);
-        
+
         const totalPenaltiesInput = document.createElement('input');
         totalPenaltiesInput.type = 'hidden';
         totalPenaltiesInput.name = `player_${playerId}_penalties`;
         totalPenaltiesInput.value = totalDuration;
         container.appendChild(totalPenaltiesInput);
-        
+
         // Aggiorna il display del totale
-        const totalDisplay = container.parentElement.querySelector('.penalty-total');
+        const totalDisplay = getPenaltyTotalDisplay(container);
         if (totalDisplay) {
             totalDisplay.textContent = `${totalDuration} min`;
             totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
@@ -1247,32 +2605,32 @@
         let currentPlayerId = null;
         const penaltyModalElement = document.getElementById('penaltyModal');
         const penaltyModal = penaltyModalElement ? new bootstrap.Modal(penaltyModalElement) : null;
-        
+
         // Controllo per verificare che il pareggio abbia OT o Rigori (solo per qualificazioni)
         function checkForTie() {
             const team1ScoreInput = document.getElementById('team1_score_main');
             const team2ScoreInput = document.getElementById('team2_score_main');
             const overtimeCheckbox = document.getElementById('overtime_main');
             const shootoutCheckbox = document.getElementById('shootout_main');
-            
+
             if (team1ScoreInput && team2ScoreInput) {
                 const score1 = parseInt(team1ScoreInput.value) || 0;
                 const score2 = parseInt(team2ScoreInput.value) || 0;
                 const isOvertimeOrShootout = (overtimeCheckbox && overtimeCheckbox.checked) || (shootoutCheckbox && shootoutCheckbox.checked);
-                
+
                 // Per le fasi playoff, il pareggio deve essere risolto
-                const isPlayoff = window.location.href.includes('phase=quarterfinal') || 
-                                window.location.href.includes('phase=semifinal') || 
+                const isPlayoff = window.location.href.includes('phase=quarterfinal') ||
+                                window.location.href.includes('phase=semifinal') ||
                                 window.location.href.includes('phase=final') ||
                                 window.location.href.includes('phase=placement');
-                
+
                 let tieWarning = document.getElementById('tie-warning');
-                
+
                 if (!tieWarning && score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
-                    const warningText = isPlayoff ? 
+                    const warningText = isPlayoff ?
                         'Pareggio nei playoff non permesso! Deve finire con overtime o rigori.' :
                         'Attenzione: pareggio nelle qualificazioni! Seleziona OT o Rigori.';
-                        
+
                     tieWarning = document.createElement('div');
                     tieWarning.id = 'tie-warning';
                     tieWarning.className = isPlayoff ? 'alert alert-danger mt-2' : 'alert alert-warning mt-2';
@@ -1290,37 +2648,37 @@
         const team2ScoreInput = document.getElementById('team2_score_main');
         const overtimeCheckbox = document.getElementById('overtime_main');
         const shootoutCheckbox = document.getElementById('shootout_main');
-        
+
         if (team1ScoreInput) team1ScoreInput.addEventListener('input', checkForTie);
         if (team2ScoreInput) team2ScoreInput.addEventListener('input', checkForTie);
         if (overtimeCheckbox) overtimeCheckbox.addEventListener('change', checkForTie);
         if (shootoutCheckbox) shootoutCheckbox.addEventListener('change', checkForTie);
-        
+
         // Assicurati che overtime e shootout non siano selezionati insieme
         if (overtimeCheckbox && shootoutCheckbox) {
             overtimeCheckbox.addEventListener('change', function() {
                 if (this.checked) shootoutCheckbox.checked = false;
             });
-            
+
             shootoutCheckbox.addEventListener('change', function() {
                 if (this.checked) overtimeCheckbox.checked = false;
             });
         }
 
         // ========== GESTIONE MODAL PENALITÀ ==========
-        
+
         // Funzione per aprire il modal delle penalità
         function openPenaltyModal(playerId, playerName) {
             if (!penaltyModal) return;
-            
+
             currentPlayerId = playerId;
             const modalPlayerName = document.getElementById('modal-player-name');
             if (modalPlayerName) modalPlayerName.textContent = playerName;
-            
+
             // Pulisci il container delle penalità nel modal
             const modalContainer = document.getElementById('modal-penalties-container');
             if (modalContainer) modalContainer.innerHTML = '';
-            
+
             // Copia le penalità esistenti dal form principale al modal
             const existingPenalties = document.querySelectorAll(`#penalties-container-${playerId} .penalty-row`);
             existingPenalties.forEach(penalty => {
@@ -1328,21 +2686,21 @@
                 const durationValue = penalty.querySelector('.penalty-duration')?.value || '';
                 addPenaltyToModal(timeValue, durationValue);
             });
-            
+
             // Se non ci sono penalità esistenti, aggiungi una riga vuota
             if (existingPenalties.length === 0) {
                 addPenaltyToModal('', '');
             }
-            
+
             updateModalPenaltyTotal();
             penaltyModal.show();
         }
-        
+
         // Funzione per aggiungere una penalità al modal
         function addPenaltyToModal(timeValue = '', durationValue = '') {
             const modalContainer = document.getElementById('modal-penalties-container');
             if (!modalContainer) return;
-            
+
             const penaltyRow = document.createElement('div');
             penaltyRow.className = 'penalty-row mb-3 p-3 border rounded bg-light';
             penaltyRow.innerHTML = `
@@ -1351,7 +2709,7 @@
                         <label class="form-label fw-bold">
                             <i class="fas fa-clock me-1"></i>Tempo (minuto)
                         </label>
-                        <input type="number" class="form-control modal-penalty-time" 
+                        <input type="number" class="form-control modal-penalty-time"
                                placeholder="es. 25" min="1" max="60" step="1" value="${timeValue}">
                         <div class="form-text">Inserisci il minuto della penalità</div>
                     </div>
@@ -1376,16 +2734,16 @@
                     </div>
                 </div>
             `;
-            
+
             modalContainer.appendChild(penaltyRow);
-            
+
             // Aggiungi listener per aggiornare il totale
             const timeInput = penaltyRow.querySelector('.modal-penalty-time');
             const durationSelect = penaltyRow.querySelector('.modal-penalty-duration');
-            
+
             if (timeInput) timeInput.addEventListener('input', updateModalPenaltyTotal);
             if (durationSelect) durationSelect.addEventListener('change', updateModalPenaltyTotal);
-            
+
             // Aggiungi listener per rimuovere la penalità
             const removeBtn = penaltyRow.querySelector('.remove-modal-penalty');
             if (removeBtn) {
@@ -1403,30 +2761,30 @@
                 });
             }
         }
-        
+
         // Funzione per aggiornare il totale delle penalità nel modal
         function updateModalPenaltyTotal() {
             const modalContainer = document.getElementById('modal-penalties-container');
             const totalDisplay = document.getElementById('modal-total-penalty-time');
-            
+
             if (!modalContainer || !totalDisplay) return;
-            
+
             const durations = [];
-            
+
             modalContainer.querySelectorAll('.penalty-row').forEach(row => {
                 const timeInput = row.querySelector('.modal-penalty-time');
                 const durationSelect = row.querySelector('.modal-penalty-duration');
-                
+
                 if (timeInput && durationSelect && timeInput.value && durationSelect.value) {
                     durations.push(parseFloat(durationSelect.value));
                 }
             });
-            
+
             const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
             totalDisplay.textContent = `${totalDuration} min`;
             totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
         }
-        
+
         // Event listener per aggiungere penalità nel modal
         const addPenaltyBtn = document.getElementById('add-penalty-in-modal');
         if (addPenaltyBtn) {
@@ -1434,54 +2792,54 @@
                 addPenaltyToModal();
             });
         }
-        
+
         // Event listener per salvare le penalità
         const savePenaltiesBtn = document.getElementById('save-penalties');
         if (savePenaltiesBtn) {
             savePenaltiesBtn.addEventListener('click', function() {
                 if (!currentPlayerId) return;
-                
+
                 // Ottieni le penalità dal modal
                 const modalContainer = document.getElementById('modal-penalties-container');
                 if (!modalContainer) return;
-                
+
                 const modalPenalties = modalContainer.querySelectorAll('.penalty-row');
-                
+
                 // Trova il container delle penalità nella pagina principale
                 const mainContainer = document.getElementById(`penalties-container-${currentPlayerId}`);
                 if (!mainContainer) return;
-                
+
                 // Pulisci il container principale
                 mainContainer.innerHTML = '';
-                
+
                 let totalDuration = 0;
                 let penaltyCount = 0;
                 const penaltyTimes = [];
                 const penaltyDurations = [];
-                
+
                 // Copia le penalità dal modal al form principale
                 modalPenalties.forEach(modalPenalty => {
                     const timeValue = modalPenalty.querySelector('.modal-penalty-time')?.value;
                     const durationValue = modalPenalty.querySelector('.modal-penalty-duration')?.value;
-                    
+
                     if (timeValue && durationValue) {
                         penaltyCount++;
                         totalDuration += parseFloat(durationValue);
                         penaltyTimes.push(timeValue);
                         penaltyDurations.push(durationValue);
-                        
+
                         // Crea una nuova riga nel form principale (formato compatto)
                         const mainPenaltyRow = document.createElement('div');
                         mainPenaltyRow.className = 'penalty-row mb-1 p-2 border rounded bg-white';
                         mainPenaltyRow.innerHTML = `
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="penalty-info">
-                                    <small class="text-muted">Minuto:</small> 
+                                    <small class="text-muted">Minuto:</small>
                                     <span class="fw-bold">${timeValue}'</span>
-                                    <small class="text-muted ms-2">Durata:</small> 
+                                    <small class="text-muted ms-2">Durata:</small>
                                     <span class="text-danger fw-bold">${durationValue} min</span>
                                 </div>
-                                <button type="button" class="btn btn-outline-danger btn-sm remove-penalty" 
+                                <button type="button" class="btn btn-outline-danger btn-sm remove-penalty"
                                         style="padding: 2px 6px; font-size: 10px;">
                                     <i class="fas fa-times"></i>
                                 </button>
@@ -1490,45 +2848,45 @@
                             <input type="hidden" class="penalty-time" value="${timeValue}">
                             <input type="hidden" class="penalty-duration" value="${durationValue}">
                         `;
-                        
+
                         mainContainer.appendChild(mainPenaltyRow);
                     }
                 });
-                
+
                 // Aggiungi input nascosti per l'invio del form
                 const penaltyTimesInput = document.createElement('input');
                 penaltyTimesInput.type = 'hidden';
                 penaltyTimesInput.name = `player_${currentPlayerId}_penalty_times`;
                 penaltyTimesInput.value = penaltyTimes.join(',');
                 mainContainer.appendChild(penaltyTimesInput);
-                
+
                 const penaltyDurationsInput = document.createElement('input');
                 penaltyDurationsInput.type = 'hidden';
                 penaltyDurationsInput.name = `player_${currentPlayerId}_penalty_durations`;
                 penaltyDurationsInput.value = penaltyDurations.join(',');
                 mainContainer.appendChild(penaltyDurationsInput);
-                
+
                 const totalPenaltiesInput = document.createElement('input');
                 totalPenaltiesInput.type = 'hidden';
                 totalPenaltiesInput.name = `player_${currentPlayerId}_penalties`;
                 totalPenaltiesInput.value = totalDuration;
                 mainContainer.appendChild(totalPenaltiesInput);
-                
+
                 // Aggiorna il totale nella pagina principale
-                const totalDisplay = mainContainer.parentElement.querySelector('.penalty-total');
+                const totalDisplay = getPenaltyTotalDisplay(mainContainer);
                 if (totalDisplay) {
                     totalDisplay.textContent = `${totalDuration} min`;
                     totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
                 }
-                
+
                 // Chiudi il modal
                 if (penaltyModal) penaltyModal.hide();
-                
+
                 // Mostra messaggio di successo
                 showSuccessMessage('Penalità salvate con successo!');
             });
         }
-        
+
         // Funzione per mostrare messaggio di successo
         function showSuccessMessage(message) {
             const toast = document.createElement('div');
@@ -1543,19 +2901,19 @@
                     <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
                 </div>
             `;
-            
+
             document.body.appendChild(toast);
             const bsToast = new bootstrap.Toast(toast);
             bsToast.show();
-            
+
             // Rimuovi il toast dopo che è stato nascosto
             toast.addEventListener('hidden.bs.toast', function() {
                 toast.remove();
             });
         }
-        
+
         // ========== GESTIONE BOTTONI PENALITÀ ==========
-        
+
         // Modifica i bottoni "Aggiungi Penalità" per aprire il modal
         document.querySelectorAll('.add-penalty').forEach(button => {
             button.addEventListener('click', function() {
@@ -1564,26 +2922,26 @@
                 openPenaltyModal(playerId, playerName);
             });
         });
-        
+
         // Gestione rimozione penalità dalla vista compatta
         document.addEventListener('click', function(e) {
-            if (e.target.classList.contains('remove-penalty') || 
+            if (e.target.classList.contains('remove-penalty') ||
                 e.target.closest('.remove-penalty')) {
                 const penaltyRow = e.target.closest('.penalty-row');
                 const container = penaltyRow.closest('[id*="penalties-container"]');
-                
+
                 if (container) {
                     const playerId = container.id.split('-')[2];
-                    
+
                     // Rimuovi la penalità
                     penaltyRow.remove();
-                    
+
                     // Ricalcola il totale e aggiorna gli input nascosti
                     const remainingPenalties = container.querySelectorAll('.penalty-row');
                     let totalDuration = 0;
                     const times = [];
                     const durations = [];
-                    
+
                     remainingPenalties.forEach(row => {
                         const timeInput = row.querySelector('.penalty-time');
                         const durationInput = row.querySelector('.penalty-duration');
@@ -1593,18 +2951,18 @@
                             totalDuration += parseFloat(durationInput.value);
                         }
                     });
-                    
+
                     // Aggiorna gli input nascosti
                     let timesInput = container.querySelector(`input[name="player_${playerId}_penalty_times"]`);
                     let durationsInput = container.querySelector(`input[name="player_${playerId}_penalty_durations"]`);
                     let totalInput = container.querySelector(`input[name="player_${playerId}_penalties"]`);
-                    
+
                     if (timesInput) timesInput.value = times.join(',');
                     if (durationsInput) durationsInput.value = durations.join(',');
                     if (totalInput) totalInput.value = totalDuration;
-                    
+
                     // Aggiorna il display del totale
-                    const totalDisplay = container.parentElement.querySelector('.penalty-total');
+                    const totalDisplay = getPenaltyTotalDisplay(container);
                     if (totalDisplay) {
                         totalDisplay.textContent = `${totalDuration} min`;
                         totalDisplay.style.color = totalDuration > 0 ? '#dc3545' : '#6c757d';
@@ -1612,7 +2970,7 @@
                 }
             }
         });
-        
+
         // Inizializzazione: carica le penalità esistenti se presenti
         document.querySelectorAll('[id*="penalties-container"]').forEach(container => {
             const playerId = container.id.split('-')[2];
@@ -1626,20 +2984,20 @@
         const playerId = button.dataset.playerId;
         const playerName = button.dataset.playerName;
         const action = button.dataset.action;
-        
+
         let confirmMessage;
         if (action === 'remove') {
             confirmMessage = `Sei sicuro di voler rimuovere ${playerName} da questa partita?`;
         } else {
             confirmMessage = `Sei sicuro di voler ripristinare ${playerName} nella partita?`;
         }
-        
+
         if (confirm(confirmMessage)) {
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = `/match/${matchId}/toggle_player/${playerId}`;
             form.style.display = 'none';
-            
+
             document.body.appendChild(form);
             form.submit();
         }
@@ -1656,7 +3014,7 @@
             this.hasUnsavedChanges = false;
             this.isInitialized = false;
             this.debounceTimeout = null;
-            
+
             // Aspetta che il DOM sia pronto
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', () => this.init());
@@ -1664,24 +3022,24 @@
                 this.init();
             }
         }
-        
+
         init() {
-            console.log(`🚀 Inizializzando auto-save per match ${this.matchId}`);
-            
+            console.log(` Inizializzando auto-save per match ${this.matchId}`);
+
             this.createStatusIndicator();
             this.loadSavedData();
             this.setupEventListeners();
             this.startAutoSave();
             this.startPeriodicSync();
             this.isInitialized = true;
-            
-            // this.showStatus('💾 Auto-save attivato', 'info');
+
+            // this.showStatus(' Auto-save attivato', 'info');
         }
-        
+
         // SALVATAGGIO LOCALE
         saveToLocalStorage() {
             if (!this.isInitialized) return;
-            
+
             try {
                 const matchData = this.collectAllMatchData();
                 const saveData = {
@@ -1689,25 +3047,25 @@
                     timestamp: Date.now(),
                     version: Date.now()
                 };
-                
+
                 localStorage.setItem(this.storageKey, JSON.stringify(saveData));
                 this.hasUnsavedChanges = false;
-                
+
                 const dataSize = JSON.stringify(saveData).length;
-                console.log(`💾 Salvati ${dataSize} caratteri localmente`);
-                
-                //this.showStatus('💾 Salvato localmente', 'success', 2000);
-                
+                console.log(` Salvati ${dataSize} caratteri localmente`);
+
+                //this.showStatus(' Salvato localmente', 'success', 2000);
+
             } catch (error) {
-                console.error('❌ Errore salvataggio locale:', error);
+                console.error('Errore salvataggio locale:', error);
                 if (error.name === 'QuotaExceededError') {
-                    this.showStatus('⚠️ Memoria locale piena', 'danger');
+                    this.showStatus('Attenzione: Memoria locale piena', 'danger');
                 } else {
-                    this.showStatus('❌ Errore salvataggio', 'danger');
+                    this.showStatus('Errore salvataggio', 'danger');
                 }
             }
         }
-        
+
         // CARICAMENTO DATI SALVATI
         loadSavedData() {
             try {
@@ -1716,24 +3074,24 @@
                     const saveData = JSON.parse(saved);
                     const age = Date.now() - saveData.timestamp;
                     const ageMinutes = Math.floor(age / 60000);
-                    
+
                     if (age < 24 * 60 * 60 * 1000) { // Carica solo se meno di 24 ore
                         this.populateForm(saveData.data);
-                        this.showStatus(`🔄 Dati ripristinati (${ageMinutes}min fa)`, 'info', 4000);
+                        this.showStatus(` Dati ripristinati (${ageMinutes}min fa)`, 'info', 4000);
                         return true;
                     }
                 }
             } catch (error) {
-                console.error('❌ Errore caricamento dati:', error);
+                console.error('Errore caricamento dati:', error);
             }
             return false;
         }
         forceSaveAndSync() {
                 this.saveToLocalStorage();
-                
+
                 // Salvataggio sincrono sul server
                 const data = this.collectAllMatchData();
-                
+
                 return fetch(`/match/${this.matchId}/sync`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1745,18 +3103,18 @@
                 }).then(response => {
                     if (response.ok) {
                         this.hasUnsavedChanges = false;
-                        this.showStatus('✅ Salvato e sincronizzato', 'success', 2000);
+                        this.showStatus('OK Salvato e sincronizzato', 'success', 2000);
                         return true;
                     } else {
                         throw new Error(`HTTP ${response.status}`);
                     }
                 }).catch(error => {
-                    this.showStatus('❌ Errore sincronizzazione', 'danger', 3000);
+                    this.showStatus('Errore sincronizzazione', 'danger', 3000);
                     console.error('Errore sync:', error);
                     return false;
                 });
             }
-        
+
         collectAllMatchData() {
     // Selettori multipli per trovare il form giusto
     const selectors = [
@@ -1765,63 +3123,67 @@
         'form[method="post"]',                     // qualsiasi form POST
         '.card-body form'                          // form dentro card-body
     ];
-    
+
     let form = null;
     for (const selector of selectors) {
         form = document.querySelector(selector);
         if (form) {
-            console.log(`📝 Form trovato con selettore: ${selector}`);
+            console.log(` Form trovato con selettore: ${selector}`);
             break;
         }
     }
-    
+
     if (!form) {
-        console.warn('⚠️ Nessun form trovato, provo con tutti i form...');
+        console.warn('Attenzione: Nessun form trovato, provo con tutti i form...');
         const allForms = document.querySelectorAll('form');
-        console.log(`📋 Trovati ${allForms.length} form totali`);
-        
+        console.log(` Trovati ${allForms.length} form totali`);
+
         // Prendi il primo form che ha input di giocatori
         for (const f of allForms) {
             const playerInputs = f.querySelectorAll('input[name*="player_"]');
             if (playerInputs.length > 0) {
                 form = f;
-                console.log(`✅ Usato form con ${playerInputs.length} input giocatori`);
+                console.log(`OK Usato form con ${playerInputs.length} input giocatori`);
                 break;
             }
         }
     }
-    
+
     if (!form) {
-        console.error('❌ NESSUN FORM TROVATO!');
+        console.error('No NESSUN FORM TROVATO!');
         return {};
     }
-    
-    console.log('📊 Form action:', form.action);
-    console.log('📊 Form method:', form.method);
-    
+
+    console.log(' Form action:', form.action);
+    console.log(' Form method:', form.method);
+
+    if (typeof syncMatchSheetEvents === 'function') {
+        syncMatchSheetEvents();
+    }
+
     const formData = new FormData(form);
     const data = {};
-    
+
     // Raccogli tutti i dati del form
     let fieldCount = 0;
     for (let [key, value] of formData.entries()) {
         data[key] = value;
         fieldCount++;
     }
-    
-    console.log(`📈 Raccolti ${fieldCount} campi dal form`);
-    
+
+    console.log(` Raccolti ${fieldCount} campi dal form`);
+
     // Log dei primi 5 campi per debug
     const keys = Object.keys(data).slice(0, 5);
-    console.log('🔍 Primi campi:', keys.map(k => `${k}=${data[k]}`));
-    
+    console.log(' Primi campi:', keys.map(k => `${k}=${data[k]}`));
+
     // Aggiungi dati dalle penalità (se esistono)
     document.querySelectorAll('[id*="penalties-container"]').forEach(container => {
         const playerId = container.id.split('-')[2];
         const timesInput = container.querySelector(`input[name="player_${playerId}_penalty_times"]`);
         const durationsInput = container.querySelector(`input[name="player_${playerId}_penalty_durations"]`);
         const totalInput = container.querySelector(`input[name="player_${playerId}_penalties"]`);
-        
+
         if (timesInput && timesInput.value) {
             data[`player_${playerId}_penalty_times`] = timesInput.value;
         }
@@ -1832,20 +3194,20 @@
             data[`player_${playerId}_penalties`] = totalInput.value;
         }
     });
-    
+
     // Aggiungi metadata
     data._saved_at = new Date().toISOString();
     data._match_id = this.matchId;
-    
-    console.log(`✅ Totale finale: ${Object.keys(data).length} campi raccolti`);
-    
+
+    console.log(`OK Totale finale: ${Object.keys(data).length} campi raccolti`);
+
     return data;
 }
         // RIPOPOLAMENTO FORM
         populateForm(data) {
             Object.entries(data).forEach(([name, value]) => {
                 if (name.startsWith('_')) return; // Skip metadata
-                
+
                 const input = document.querySelector(`[name="${name}"]`);
                 if (input) {
                     if (input.type === 'checkbox') {
@@ -1853,16 +3215,23 @@
                     } else {
                         input.value = value;
                     }
-                    
+
                     // Trigger change event per aggiornare UI
                     input.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
-            
+
+            if (typeof applyLineupStateFromHiddenInputs === 'function') {
+                applyLineupStateFromHiddenInputs();
+            }
+            if (typeof syncMatchSheetEvents === 'function') {
+                syncMatchSheetEvents();
+            }
+
             // Ricarica le penalità se necessario
             this.reloadPenaltiesFromData(data);
         }
-        
+
         // RICARICA PENALITÀ DAI DATI
         reloadPenaltiesFromData(data) {
             Object.keys(data).forEach(key => {
@@ -1875,50 +3244,50 @@
                 }
             });
         }
-        
+
         // SINCRONIZZAZIONE CON SERVER
         async syncWithServer() {
             const saved = localStorage.getItem(this.storageKey);
             if (!saved || !this.hasUnsavedChanges) return;
-            
+
             try {
-                this.showStatus('☁️ Sincronizzazione...', 'warning');
-                
+                this.showStatus(' Sincronizzazione...', 'warning');
+
                 const response = await fetch(`/match/${this.matchId}/sync`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: saved
                 });
-                
+
                 if (response.ok) {
                     const result = await response.json();
                     if (result.success) {
                         this.hasUnsavedChanges = false;
-                        this.showStatus('☁️ Sincronizzato', 'success', 2000);
-                        console.log(`✅ Sync completato: ${result.message}`);
+                        this.showStatus(' Sincronizzato', 'success', 2000);
+                        console.log(`OK Sync completato: ${result.message}`);
                     } else {
-                        this.showStatus(`❌ ${result.message}`, 'danger');
+                        this.showStatus(`No ${result.message}`, 'danger');
                     }
                 } else {
                     throw new Error(`HTTP ${response.status}`);
                 }
             } catch (error) {
-                console.log('📡 Server non raggiungibile, mantengo dati locali');
-                this.showStatus('📡 Offline - salvato localmente', 'warning', 3000);
+                console.log(' Server non raggiungibile, mantengo dati locali');
+                this.showStatus(' Offline - salvato localmente', 'warning', 3000);
             }
         }
-        
+
         // SETUP EVENT LISTENERS
         setupEventListeners() {
             // Rileva modifiche su tutti gli input
             const selectors = [
                 'input[type="number"]',
-                'input[type="text"]', 
+                'input[type="text"]',
                 'input[type="checkbox"]',
                 'select',
                 'textarea'
             ];
-            
+
             selectors.forEach(selector => {
                 document.querySelectorAll(selector).forEach(input => {
                     ['input', 'change'].forEach(eventType => {
@@ -1928,15 +3297,15 @@
                     });
                 });
             });
-            
+
             // Salva prima di chiudere la pagina
            window.addEventListener('beforeunload', () => {
                 if (this.hasUnsavedChanges) {
                     this.saveToLocalStorage();
-                    
+
                     // Salvataggio di emergenza con sendBeacon
                     const data = this.collectAllMatchData();
-                    
+
                     // sendBeacon ha limitazioni sul Content-Type, quindi usa un approch diverso
                     try {
                         // Prova prima con fetch sincrono (più affidabile)
@@ -1947,18 +3316,18 @@
                             keepalive: true  // Mantiene la richiesta anche se la pagina si chiude
                         }).catch(() => {
                             // Fallback con sendBeacon se fetch fallisce
-                            console.log('🚨 Fallback a sendBeacon per salvataggio emergenza');
+                            console.log(' Fallback a sendBeacon per salvataggio emergenza');
                             navigator.sendBeacon(`/match/${this.matchId}/quick_save`, JSON.stringify(data));
                         });
                     } catch (error) {
                         // Ultimo tentativo con sendBeacon
-                        console.log('🚨 Ultimo tentativo con sendBeacon');
+                        console.log(' Ultimo tentativo con sendBeacon');
                         navigator.sendBeacon(`/match/${this.matchId}/quick_save`, JSON.stringify(data));
                     }
                 }
             });
 
-            
+
             // Rileva nuovi elementi dinamici (penalità)
             const observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
@@ -1976,22 +3345,22 @@
                     });
                 });
             });
-            
+
             observer.observe(document.body, { childList: true, subtree: true });
         }
-        
+
         // GESTIONE CAMBIO CAMPO
         onFieldChange() {
             this.hasUnsavedChanges = true;
-            //this.showStatus('✏️ Modifiche non salvate', 'warning');
-            
+            //this.showStatus(' Modifiche non salvate', 'warning');
+
             // Debounce per evitare troppi salvataggi
             clearTimeout(this.debounceTimeout);
             this.debounceTimeout = setTimeout(() => {
                 this.saveToLocalStorage();
             }, 1000); // Salva 1 secondo dopo l'ultima modifica
         }
-        
+
         // AUTO-SAVE PERIODICO
         startAutoSave() {
             setInterval(() => {
@@ -2000,25 +3369,25 @@
                 }
             }, this.autoSaveInterval);
         }
-        
+
         // SYNC PERIODICO
         startPeriodicSync() {
             setInterval(() => {
                 this.syncWithServer();
             }, this.syncInterval);
         }
-        
+
         // UTILITY
         getMatchId() {
             const path = window.location.pathname;
             const match = path.match(/\/match\/(\d+)/);
             return match ? match[1] : null;
         }
-        
+
         // INDICATORI VISIVI
         createStatusIndicator() {
             if (document.getElementById('autosave-status')) return;
-            
+
             const indicator = document.createElement('div');
             indicator.id = 'autosave-status';
             indicator.style.cssText = `
@@ -2034,40 +3403,40 @@
             `;
             document.body.appendChild(indicator);
         }
-        
+
         showStatus(message, type, duration = null) {
             const indicator = document.getElementById('autosave-status');
             if (!indicator) return;
-            
+
             const typeClasses = {
                 success: 'alert alert-success',
-                warning: 'alert alert-warning', 
+                warning: 'alert alert-warning',
                 danger: 'alert alert-danger',
                 info: 'alert alert-info'
             };
-            
+
             indicator.innerHTML = message;
             indicator.className = typeClasses[type] || typeClasses.info;
             indicator.style.display = 'block';
-            
+
             if (duration) {
                 setTimeout(() => {
                     indicator.style.display = 'none';
                 }, duration);
             }
         }
-        
+
         // API PUBBLICA
         forceSave() {
             this.saveToLocalStorage();
             this.syncWithServer();
         }
-        
+
         clearSavedData() {
             localStorage.removeItem(this.storageKey);
-            this.showStatus('🗑️ Dati locali cancellati', 'info', 2000);
+            this.showStatus(' Dati locali cancellati', 'info', 2000);
         }
-        
+
         getStorageUsage() {
             const data = localStorage.getItem(this.storageKey);
             return data ? (data.length / 1024).toFixed(1) + ' KB' : '0 KB';
@@ -2085,8 +3454,8 @@
         showData: () => console.log(localStorage.getItem(window.matchAutoSave.storageKey))
     };
 
-    console.log('🎯 Auto-save localStorage inizializzato! Usa autoSaveDebug per testare.');
-   
+    console.log(' Auto-save localStorage inizializzato! Usa autoSaveDebug per testare.');
+
     </script>
 </body>
 </html>

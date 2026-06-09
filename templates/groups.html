@@ -12,7 +12,7 @@
             list-style: none;
             padding: 0;
         }
-        
+
         .sortable-item {
             background: #f8f9fa;
             border: 1px solid #dee2e6;
@@ -25,46 +25,46 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .sortable-item:hover {
             background: #e9ecef;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        
+
         .sortable-item.dragging {
             opacity: 0.5;
             transform: rotate(5deg);
         }
-        
+
         .drag-handle {
             color: #6c757d;
             cursor: grab;
             display: none;
         }
-        
+
         .drag-handle:active {
             cursor: grabbing;
         }
-        
+
         .team-info {
             flex-grow: 1;
         }
-        
+
         .team-name {
             font-weight: 600;
             margin-bottom: 2px;
         }
-        
+
         .team-stats {
             font-size: 0.85em;
             color: #6c757d;
         }
-        
+
         .group-card.sortable-active {
             border: 2px solid #007bff;
             background: rgba(0, 123, 255, 0.05);
         }
-        
+
         .empty-group {
             text-align: center;
             color: #6c757d;
@@ -97,23 +97,23 @@
                         <a class="nav-link" href="{{ url_for('standings') }}">Classifiche</a>
                     </li>
                 </ul>
-                
+
                 <!-- Menu utente -->
                 <ul class="navbar-nav ms-auto">
                     {% if current_user.is_authenticated %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                👤 {{ current_user.username }}
+                                 {{ current_user.username }}
                                 {% if current_user.is_admin() %}
                                     <span class="badge bg-danger">ADMIN</span>
                                 {% endif %}
                             </a>
                             <ul class="dropdown-menu">
                                 {% if current_user.is_admin() %}
-                                    <li><a class="dropdown-item" href="{{ url_for('settings') }}">⚙️ Settings</a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('settings') }}">Settings</a></li>
                                     <li><hr class="dropdown-divider"></li>
                                 {% endif %}
-                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">🚪 Logout</a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('logout') }}">Logout</a></li>
                             </ul>
                         </li>
                     {% else %}
@@ -121,12 +121,12 @@
                             <a class="nav-link" href="{{ url_for('login') }}">Login</a>
                         </li>
                         <!-- <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('register') }}">📝 Registrati</a>
+                            <a class="nav-link" href="{{ url_for('register') }}">Registrati</a>
                         </li> -->
                     {% endif %}
                 </ul>
             </div>
-            
+
             <!-- LOGO IHC MALCANTONE -->
             <div class="navbar-logo">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="IHC Malcantone" />
@@ -152,10 +152,10 @@
                 <!-- <a href="{{ url_for('teams') }}" class="btn btn-primary">Gestisci Assegnazioni</a> -->
                 <button id="toggleSortMode" class="btn btn-outline-success">
                     <i class="fas fa-sort"></i> Modalità Riordino
-             
+
             </div>
         </div>
-        
+
         <!-- Alert per modalità riordino -->
         <div id="sortModeAlert" class="alert alert-info mt-3" style="display: none;">
             <div class="d-flex justify-content-between align-items-center">
@@ -173,7 +173,7 @@
             {% for group in ['A', 'B', 'C', 'D'] %}
                 {% set group_teams = groups[group] %}
                 <div class="col-md-3 mb-4">
-                    <div class="card group-card {% if group_teams|length == 4 %}border-success{% elif group_teams|length > 4 %}border-danger{% else %}border-warning{% endif %}" 
+                    <div class="card group-card {% if group_teams|length == 4 %}border-success{% elif group_teams|length > 4 %}border-danger{% else %}border-warning{% endif %}"
                          data-group="{{ group }}">
                         <div class="card-header bg-primary text-white">
                             <h4 class="mb-0 d-flex justify-content-between align-items-center">
@@ -282,7 +282,7 @@
                                 <small>Squadre Totali</small>
                             </div>
                         </div>
-                        
+
                         {% if groups_stats.complete == 4 %}
                             <div class="alert alert-success mt-3 mb-0">
                                 <i class="fas fa-check-circle"></i>
@@ -307,13 +307,13 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
     console.log("Script iniziato");
-    
+
     document.addEventListener('DOMContentLoaded', function() {
         console.log("DOM caricato - inizializzando riordino gironi");
-        
+
         let sortMode = false;
         let hasChanges = false;
         let originalOrders = {};
@@ -321,12 +321,12 @@
         const toggleBtn = document.getElementById('toggleSortMode');
         const sortAlert = document.getElementById('sortModeAlert');
         const saveBtn = document.getElementById('saveSortChanges');
-        
+
         if (!toggleBtn) {
             console.error("Pulsante toggleSortMode non trovato!");
             return;
         }
-        
+
         console.log("Elementi UI trovati correttamente");
 
         // Salva l'ordine originale
@@ -344,9 +344,9 @@
         toggleBtn.addEventListener('click', function(e) {
             e.preventDefault();
             console.log("Toggle button cliccato!");
-            
+
             sortMode = !sortMode;
-            
+
             if (sortMode) {
                 enableSortMode();
             } else {
@@ -356,14 +356,14 @@
 
         function enableSortMode() {
             console.log("Attivando modalità riordino");
-            
+
             toggleBtn.innerHTML = '<i class="fas fa-times"></i> Esci dal Riordino';
             toggleBtn.className = 'btn btn-outline-danger';
-            
+
             if (sortAlert) {
                 sortAlert.style.display = 'block';
             }
-            
+
             // Mostra i drag handle
             document.querySelectorAll('.drag-handle').forEach(handle => {
                 handle.style.display = 'block';
@@ -382,18 +382,18 @@
 
         function disableSortMode() {
             console.log("Disattivando modalità riordino");
-            
+
             toggleBtn.innerHTML = '<i class="fas fa-sort"></i> Modalità Riordino';
             toggleBtn.className = 'btn btn-outline-success';
-            
+
             if (sortAlert) {
                 sortAlert.style.display = 'none';
             }
-            
+
             if (saveBtn) {
                 saveBtn.style.display = 'none';
             }
-            
+
             // Nascondi i drag handle
             document.querySelectorAll('.drag-handle').forEach(handle => {
                 handle.style.display = 'none';
@@ -414,7 +414,7 @@
                     restoreOriginalOrder();
                 }
             }
-            
+
             hasChanges = false;
         }
 
@@ -445,7 +445,7 @@
 
         function handleDragStart(e) {
             if (!e.target.classList.contains('sortable-item')) return;
-            
+
             draggedElement = e.target;
             e.target.classList.add('dragging');
             e.dataTransfer.effectAllowed = 'move';
@@ -455,7 +455,7 @@
         function handleDragOver(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            
+
             const afterElement = getDragAfterElement(e.currentTarget, e.clientY);
             if (afterElement == null) {
                 e.currentTarget.appendChild(draggedElement);
@@ -477,11 +477,11 @@
 
         function getDragAfterElement(container, y) {
             const draggableElements = [...container.querySelectorAll('.sortable-item:not(.dragging)')];
-            
+
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
-                
+
                 if (offset < 0 && offset > closest.offset) {
                     return { offset: offset, element: child };
                 } else {
@@ -502,9 +502,9 @@
             Object.keys(originalOrders).forEach(group => {
                 const list = document.querySelector(`[data-group="${group}"]`);
                 if (!list) return;
-                
+
                 const items = Array.from(list.children);
-                
+
                 originalOrders[group].forEach(teamId => {
                     const item = items.find(item => item.dataset.teamId === teamId);
                     if (item) {
@@ -512,7 +512,7 @@
                     }
                 });
             });
-            
+
             hasChanges = false;
             if (saveBtn) {
                 saveBtn.style.display = 'none';
@@ -523,14 +523,14 @@
         if (saveBtn) {
             saveBtn.addEventListener('click', function() {
                 console.log("Salvando modifiche...");
-                
+
                 const updates = {};
                 let hasActualChanges = false;
-                
+
                 document.querySelectorAll('.sortable-list').forEach(list => {
                     const group = list.dataset.group;
                     const currentOrder = Array.from(list.children).map(item => item.dataset.teamId);
-                    
+
                     if (JSON.stringify(currentOrder) !== JSON.stringify(originalOrders[group])) {
                         updates[group] = currentOrder;
                         hasActualChanges = true;
@@ -568,7 +568,7 @@
                     saveOriginalOrders();
                     hasChanges = false;
                     saveBtn.style.display = 'none';
-                    
+
                     showAlert('Ordine delle squadre aggiornato con successo!', 'success');
                 })
                 .catch(error => {
@@ -585,11 +585,11 @@
                 ${message}
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
-            
+
             const container = document.querySelector('.container');
             const firstChild = container.firstElementChild;
             container.insertBefore(alertDiv, firstChild);
-            
+
             setTimeout(() => {
                 if (alertDiv.parentNode) {
                     alertDiv.remove();
