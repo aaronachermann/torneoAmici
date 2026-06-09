@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, time, timedelta
 from itertools import combinations
 from urllib.parse import urlsplit
+from time import sleep
 import os
 import random
 import calendar
@@ -89,6 +90,9 @@ def load_user(user_id):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if os.environ.get('AUTO_INIT_DB') == '1':
+        initialize_database(retries=1, retry_delay=0)
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
@@ -10276,14 +10280,28 @@ def reset_scores_only():
 
 
 
-def initialize_database():
+_database_initialized = False
+
+
+def initialize_database(retries=5, retry_delay=5):
+    global _database_initialized
+    if _database_initialized:
+        return
+
     with app.app_context():
-        try:
-            db.create_all()
-            print("Database inizializzato con successo")
-            create_admin_user()
-        except Exception as e:
-            print(f"Errore inizializzazione database: {e}")
+        for attempt in range(1, retries + 1):
+            try:
+                db.create_all()
+                print("Database inizializzato con successo")
+                create_admin_user()
+                _database_initialized = True
+                return
+            except Exception as e:
+                db.session.rollback()
+                db.session.remove()
+                print(f"Errore inizializzazione database ({attempt}/{retries}): {e}")
+                if attempt < retries and retry_delay:
+                    sleep(retry_delay)
 
 
 if os.environ.get('AUTO_INIT_DB') == '1':
