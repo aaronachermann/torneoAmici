@@ -496,6 +496,11 @@
             padding: 8px 10px;
         }
 
+        .lineup-pdf-button {
+            float: right;
+            margin-top: -3px;
+        }
+
         .lineup-grid {
             border-top: 1px solid #111;
             display: grid;
@@ -1043,7 +1048,14 @@
                     </div>
 
                     <details class="lineup-panel">
-                        <summary>Gestione giocatori, numeri e presenze</summary>
+                        <summary>
+                            Gestione giocatori, numeri e presenze
+                            <a href="{{ url_for('download_lineup_pdf', match_id=match.id) }}"
+                                class="btn btn-sm btn-outline-danger lineup-pdf-button"
+                                onclick="event.stopPropagation();">
+                                <i class="fas fa-file-pdf"></i> PDF
+                            </a>
+                        </summary>
                         <div class="lineup-grid">
                             <section>
                                 <h2 class="lineup-team-title">{{ match.team1.name }}</h2>

@@ -186,7 +186,7 @@ LOGIN_ENDPOINTS = {
     'schedule', 'standings', 'match_detail', 'reset_match',
     'toggle_player_in_match', 'sync_match_data', 'quick_save_match',
     'get_current_match_data', 'update_player_stats', 'get_team_players',
-    'export_standings_pdf', 'download_daily_results_pdf',
+    'export_standings_pdf', 'download_daily_results_pdf', 'download_lineup_pdf',
 }
 
 DEV_ONLY_ENDPOINTS = {
@@ -5557,6 +5557,166 @@ def match_detail(match_id):
                            best_player_team2=best_player_team2,
                            match_sheet_tournament=get_match_sheet_tournament_context(match),
                            return_anchor=return_anchor)
+
+
+@app.route('/match/<int:match_id>/lineup_pdf')
+@login_required
+def download_lineup_pdf(match_id):
+    """Genera la distinta giocatori stampabile con presenza, numero e nome."""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.graphics.shapes import Drawing, Rect
+        from xml.sax.saxutils import escape
+
+        match = Match.query.get_or_404(match_id)
+        if not match.team1 or not match.team2:
+            flash('PDF giocatori disponibile solo per partite con entrambe le squadre assegnate.', 'warning')
+            return redirect(url_for('match_detail', match_id=match_id))
+
+        team1_players = list(match.team1.players)
+        team2_players = list(match.team2.players)
+        all_players = team1_players + team2_players
+        player_ids = [player.id for player in all_players]
+
+        stats_available = db.inspect(db.engine).has_table('player_match_stats')
+        last_jersey_numbers = get_last_player_jersey_numbers(player_ids, match) if stats_available else {}
+        current_jersey_numbers = {}
+
+        if stats_available and player_ids:
+            current_stats = PlayerMatchStats.query.filter(
+                PlayerMatchStats.match_id == match.id,
+                PlayerMatchStats.player_id.in_(player_ids)
+            ).all()
+            current_jersey_numbers = {
+                stats.player_id: stats.jersey_number
+                for stats in current_stats
+                if stats.jersey_number
+            }
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            rightMargin=0.45 * inch,
+            leftMargin=0.45 * inch,
+            topMargin=0.55 * inch,
+            bottomMargin=0.45 * inch
+        )
+
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'LineupTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            leading=20,
+            alignment=1,
+            textColor=colors.HexColor('#111111'),
+            spaceAfter=8
+        )
+        meta_style = ParagraphStyle(
+            'LineupMeta',
+            parent=styles['Normal'],
+            fontSize=9,
+            leading=12,
+            alignment=1,
+            textColor=colors.HexColor('#444444'),
+            spaceAfter=16
+        )
+        team_style = ParagraphStyle(
+            'LineupTeam',
+            parent=styles['Heading2'],
+            fontSize=12,
+            leading=15,
+            textColor=colors.HexColor('#111111'),
+            spaceBefore=8,
+            spaceAfter=6
+        )
+        player_style = ParagraphStyle(
+            'LineupPlayer',
+            parent=styles['Normal'],
+            fontSize=9,
+            leading=11
+        )
+
+        def empty_checkbox():
+            drawing = Drawing(12, 12)
+            drawing.add(Rect(1, 1, 10, 10, strokeColor=colors.black, fillColor=None, strokeWidth=1))
+            return drawing
+
+        def pdf_text(value):
+            return escape(str(value or ''))
+
+        def get_player_number(player):
+            return current_jersey_numbers.get(player.id) or last_jersey_numbers.get(player.id) or ''
+
+        def build_team_table(players):
+            table_data = [['Gioca', 'No.', 'Giocatore']]
+
+            if not players:
+                table_data.append(['', '', Paragraph('Nessun giocatore', player_style)])
+            else:
+                for player in players:
+                    table_data.append([
+                        empty_checkbox(),
+                        str(get_player_number(player)),
+                        Paragraph(pdf_text(player.name), player_style)
+                    ])
+
+            table = Table(
+                table_data,
+                colWidths=[0.65 * inch, 0.7 * inch, 4.85 * inch],
+                repeatRows=1,
+                hAlign='LEFT'
+            )
+            table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f0f0f0')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#111111')),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 8.5),
+                ('ALIGN', (0, 0), (1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.6, colors.HexColor('#111111')),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#fbfbfb')]),
+            ]))
+            return table
+
+        elements = []
+        elements.append(Paragraph(f"Distinta giocatori - Partita {match.get_match_number()}", title_style))
+
+        date_text = match.date.strftime('%d/%m/%Y') if match.date else 'Data da definire'
+        time_text = match.time.strftime('%H:%M') if match.time else 'Orario da definire'
+        elements.append(Paragraph(
+            pdf_text(f"{match.get_team1_display_name()} vs {match.get_team2_display_name()} - {date_text} {time_text}"),
+            meta_style
+        ))
+
+        for team, players in ((match.team1, team1_players), (match.team2, team2_players)):
+            elements.append(Paragraph(pdf_text(team.name), team_style))
+            elements.append(build_team_table(players))
+            elements.append(Spacer(1, 12))
+
+        doc.build(elements)
+        buffer.seek(0)
+
+        filename = f"distinta_giocatori_partita_{match.get_match_number()}.pdf"
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/pdf'
+        )
+    except Exception as e:
+        flash(f'Errore nella generazione del PDF giocatori: {str(e)}', 'danger')
+        return redirect(url_for('match_detail', match_id=match_id))
+
 
 @app.route('/match/<int:match_id>/toggle_player/<int:player_id>', methods=['POST'])
 @login_required
