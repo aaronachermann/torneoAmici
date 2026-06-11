@@ -158,7 +158,8 @@ def admin_required(f):
 
 ADMIN_ENDPOINTS = {
     'settings', 'update_dates', 'update_times', 'update_schedule_times',
-    'update_team_settings', 'update_points_system', 'update_playoff_system',
+    'update_team_settings', 'update_points_system', 'update_qualification_system',
+    'update_playoff_system',
     'update_general_settings', 'reset_settings', 'migrate_settings',
     'teams', 'add_team', 'update_team_group', 'edit_team', 'delete_team',
     'team_detail', 'fix_existing_players_in_completed_matches',
@@ -1229,6 +1230,80 @@ class PlayerMatchStats(db.Model):
 
         return " | ".join(display_parts) if display_parts else "-"
 
+
+QUALIFICATION_GROUPS = ['A', 'B', 'C', 'D']
+QUALIFICATION_TEAM_POSITIONS = [1, 2, 3, 4]
+QUALIFICATION_PAIR_SET = {tuple(pair) for pair in combinations(QUALIFICATION_TEAM_POSITIONS, 2)}
+
+
+def get_default_qualification_sequence():
+    """Sequenza qualificazioni storica: 24 partite, 6 per ogni girone."""
+    rows = [
+        ('A', 1, 3), ('B', 1, 3), ('C', 1, 3), ('D', 1, 3),
+        ('A', 3, 4), ('B', 3, 4), ('C', 3, 4), ('D', 3, 4),
+        ('A', 1, 2), ('B', 1, 2), ('C', 4, 1), ('D', 1, 2),
+        ('C', 2, 4), ('D', 2, 4), ('A', 2, 4), ('B', 2, 4),
+        ('C', 3, 2), ('D', 3, 2), ('A', 3, 2), ('B', 3, 2),
+        ('C', 1, 2), ('D', 4, 1), ('A', 4, 1), ('B', 4, 1),
+    ]
+    return [
+        {'position': index + 1, 'group': group, 'team1': team1, 'team2': team2}
+        for index, (group, team1, team2) in enumerate(rows)
+    ]
+
+
+def normalize_qualification_sequence(sequence):
+    """Valida e normalizza la sequenza qualificazioni salvata nelle settings."""
+    if not sequence:
+        sequence = get_default_qualification_sequence()
+
+    if len(sequence) != 24:
+        raise ValueError('La sequenza qualificazioni deve contenere esattamente 24 partite.')
+
+    normalized = []
+    pairs_by_group = {group: set() for group in QUALIFICATION_GROUPS}
+
+    for index, row in enumerate(sequence):
+        group = str(row.get('group', '')).upper()
+        try:
+            team1 = int(row.get('team1'))
+            team2 = int(row.get('team2'))
+        except (TypeError, ValueError):
+            raise ValueError(f'Partita {index + 1}: seleziona due posizioni valide.')
+
+        if group not in QUALIFICATION_GROUPS:
+            raise ValueError(f'Partita {index + 1}: girone non valido.')
+        if team1 not in QUALIFICATION_TEAM_POSITIONS or team2 not in QUALIFICATION_TEAM_POSITIONS:
+            raise ValueError(f'Partita {index + 1}: le posizioni devono essere tra 1 e 4.')
+        if team1 == team2:
+            raise ValueError(f'Partita {index + 1}: una squadra non puo giocare contro se stessa.')
+
+        pair_key = tuple(sorted((team1, team2)))
+        if pair_key in pairs_by_group[group]:
+            raise ValueError(
+                f'Girone {group}: la coppia {pair_key[0]}-{pair_key[1]} e duplicata.'
+            )
+
+        pairs_by_group[group].add(pair_key)
+        normalized.append({
+            'position': index + 1,
+            'group': group,
+            'team1': team1,
+            'team2': team2
+        })
+
+    for group, pairs in pairs_by_group.items():
+        if pairs != QUALIFICATION_PAIR_SET:
+            missing_pairs = sorted(QUALIFICATION_PAIR_SET - pairs)
+            missing_text = ', '.join(f'{a}-{b}' for a, b in missing_pairs)
+            raise ValueError(
+                f'Girone {group}: mancano o sono sbagliate alcune coppie'
+                f'{": " + missing_text if missing_text else "."}'
+            )
+
+    return normalized
+
+
 class TournamentSettings(db.Model):
     """Configurazioni del torneo."""
     __tablename__ = 'tournament_settings'
@@ -1269,6 +1344,7 @@ class TournamentSettings(db.Model):
     # Sistema playoff
     playoff_system = db.Column(db.String(50), default='standard')  # standard, custom
     quarterfinal_matchups = db.Column(db.Text)  # JSON array
+    qualification_sequence = db.Column(db.Text)  # JSON array
 
     # Configurazioni generali
     tournament_name = db.Column(db.String(200), default='Torneo degli Amici dello Skater')
@@ -1288,6 +1364,7 @@ class TournamentSettings(db.Model):
                 print("[ATTENZIONE] Tabella tournament_settings non trovata, ritorno None")
                 return None
 
+            TournamentSettings.ensure_schema()
             settings = TournamentSettings.query.first()
             if not settings:
                 print("[REGISTRA] Nessuna configurazione trovata, creando default...")
@@ -1296,6 +1373,26 @@ class TournamentSettings(db.Model):
         except Exception as e:
             print(f"[ERRORE] Errore nel recupero settings: {e}")
             return None
+
+    @staticmethod
+    def ensure_schema():
+        """Aggiunge colonne settings opzionali mancanti sui database esistenti."""
+        inspector = db.inspect(db.engine)
+        columns = [col['name'] for col in inspector.get_columns('tournament_settings')]
+        missing_columns = []
+
+        if 'qualification_sequence' not in columns:
+            missing_columns.append(('qualification_sequence', 'TEXT'))
+
+        if not missing_columns:
+            return
+
+        with db.engine.connect() as conn:
+            for column_name, column_type in missing_columns:
+                conn.execute(db.text(
+                    f'ALTER TABLE tournament_settings ADD COLUMN {column_name} {column_type}'
+                ))
+            conn.commit()
 
     @staticmethod
     def create_default():
@@ -1345,6 +1442,7 @@ class TournamentSettings(db.Model):
             final_times_bl=json.dumps(final_bl_times),
 
             quarterfinal_matchups=json.dumps(default_quarterfinals),
+            qualification_sequence=json.dumps(get_default_qualification_sequence()),
             registration_categories=json.dumps(default_categories)
         )
 
@@ -1376,6 +1474,16 @@ class TournamentSettings(db.Model):
         if self.quarterfinal_matchups:
             return json.loads(self.quarterfinal_matchups)
         return []
+
+    def get_qualification_sequence_list(self):
+        """Ottieni la sequenza delle qualificazioni come lista validata."""
+        import json
+        if self.qualification_sequence:
+            try:
+                return normalize_qualification_sequence(json.loads(self.qualification_sequence))
+            except (TypeError, ValueError, json.JSONDecodeError) as e:
+                print(f"Sequenza qualificazioni non valida, uso default: {e}")
+        return get_default_qualification_sequence()
 
     def get_registration_categories_dict(self):
         """Ottieni le categorie di tesseramento come dizionario."""
@@ -2091,6 +2199,189 @@ def update_existing_schedule_times(settings):
     return updated_matches
 
 
+def build_qualification_match_specs(settings=None):
+    """Costruisce le partite di qualificazione partendo dalla sequenza salvata."""
+    tournament_dates = get_tournament_dates()
+    tournament_times = get_tournament_times()
+
+    qualification_dates = [
+        tournament_dates['qualification_day1'],
+        tournament_dates['qualification_day2']
+    ]
+    match_times = tournament_times['qualification_times']
+    sequence = (
+        settings.get_qualification_sequence_list()
+        if settings else get_default_qualification_sequence()
+    )
+    sequence = normalize_qualification_sequence(sequence)
+
+    teams_by_position = {}
+    for group in QUALIFICATION_GROUPS:
+        teams = Team.query.filter_by(group=group).order_by(Team.group_order, Team.name).all()
+        if len(teams) != 4:
+            raise ValueError(f'Il Girone {group} ha {len(teams)} squadre invece di 4.')
+
+        for index, team in enumerate(teams, start=1):
+            teams_by_position[f'{group}{index}'] = team
+
+    matches_per_day = (len(sequence) + len(qualification_dates) - 1) // len(qualification_dates)
+    if len(match_times) < matches_per_day:
+        raise ValueError(
+            f'Servono almeno {matches_per_day} orari di qualificazione per giorno.'
+        )
+
+    specs = []
+    for index, row in enumerate(sequence):
+        day_index = index // matches_per_day
+        if day_index >= len(qualification_dates):
+            raise ValueError('La sequenza qualificazioni supera i giorni disponibili.')
+
+        time_index = index % matches_per_day
+        group = row['group']
+        team1 = teams_by_position.get(f'{group}{row["team1"]}')
+        team2 = teams_by_position.get(f'{group}{row["team2"]}')
+
+        if not team1 or not team2:
+            raise ValueError(
+                f'Partita {index + 1}: non trovo le squadre del Girone {group}.'
+            )
+
+        specs.append({
+            'team1': team1,
+            'team2': team2,
+            'date': qualification_dates[day_index],
+            'time': match_times[time_index],
+            'phase': 'group',
+            'league': None
+        })
+
+    return specs
+
+
+def update_existing_qualification_schedule(settings):
+    """Applica la sequenza qualificazioni al calendario se non ci sono risultati."""
+    completed_matches = Match.query.filter_by(phase='group').filter(
+        db.or_(Match.team1_score.isnot(None), Match.team2_score.isnot(None))
+    ).count()
+    if completed_matches:
+        raise ValueError(
+            'Ci sono gia partite di qualificazione con risultato: azzera il calendario '
+            'o rigenera prima di cambiare gli accoppiamenti.'
+        )
+
+    specs = build_qualification_match_specs(settings)
+    existing_matches = Match.query.filter_by(phase='group').order_by(
+        Match.date, Match.time, Match.id
+    ).all()
+
+    def matches_spec(match, spec):
+        return (
+            match.team1_id == spec['team1'].id and
+            match.team2_id == spec['team2'].id and
+            match.date == spec['date'] and
+            match.time == spec['time'] and
+            match.phase == spec['phase'] and
+            match.league == spec['league']
+        )
+
+    needs_reset = len(existing_matches) != len(specs) or any(
+        not matches_spec(match, specs[index])
+        for index, match in enumerate(existing_matches[:len(specs)])
+    )
+
+    if not needs_reset:
+        return 0
+
+    existing_ids = [match.id for match in existing_matches]
+    if existing_ids:
+        if db.inspect(db.engine).has_table('player_match_stats'):
+            PlayerMatchStats.query.filter(
+                PlayerMatchStats.match_id.in_(existing_ids)
+            ).delete(synchronize_session=False)
+        if db.inspect(db.engine).has_table('match_description'):
+            MatchDescription.query.filter(
+                MatchDescription.match_id.in_(existing_ids)
+            ).delete(synchronize_session=False)
+
+    updated_matches = 0
+    for index, spec in enumerate(specs):
+        if index < len(existing_matches):
+            match = existing_matches[index]
+            match.team1 = spec['team1']
+            match.team2 = spec['team2']
+            match.date = spec['date']
+            match.time = spec['time']
+            match.phase = spec['phase']
+            match.league = spec['league']
+        else:
+            match = Match(
+                team1=spec['team1'],
+                team2=spec['team2'],
+                date=spec['date'],
+                time=spec['time'],
+                phase=spec['phase'],
+                league=spec['league']
+            )
+            db.session.add(match)
+        updated_matches += 1
+
+    for match in existing_matches[len(specs):]:
+        db.session.delete(match)
+        updated_matches += 1
+
+    return updated_matches
+
+
+@app.route('/settings/qualifications', methods=['POST'])
+def update_qualification_system():
+    """Aggiorna ordine e priorita delle qualificazioni."""
+    try:
+        settings = TournamentSettings.get_settings()
+        if not settings:
+            flash('[ERRORE] Settings non trovati. Inizializza prima le configurazioni.', 'danger')
+            return redirect(url_for('settings'))
+
+        sequence = []
+        for index in range(24):
+            sequence.append({
+                'position': index + 1,
+                'group': request.form.get(f'qual_group_{index}'),
+                'team1': request.form.get(f'qual_team1_{index}'),
+                'team2': request.form.get(f'qual_team2_{index}')
+            })
+
+        sequence = normalize_qualification_sequence(sequence)
+        settings.qualification_sequence = json.dumps(sequence)
+        settings.updated_at = datetime.utcnow()
+
+        auto_update_calendar = request.form.get('auto_update_qualification_schedule') == 'on'
+        if auto_update_calendar:
+            updated_matches = update_existing_qualification_schedule(settings)
+            db.session.commit()
+            if updated_matches:
+                flash(
+                    f'Qualificazioni aggiornate e applicate a {updated_matches} partite del calendario.',
+                    'success'
+                )
+            else:
+                flash('Qualificazioni aggiornate. Il calendario era gia allineato.', 'success')
+        else:
+            db.session.commit()
+            flash(
+                'Qualificazioni aggiornate. Le modifiche saranno usate alla prossima generazione del calendario.',
+                'success'
+            )
+
+    except ValueError as e:
+        db.session.rollback()
+        flash(f'Errore nelle qualificazioni: {str(e)}', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Errore nell\'aggiornamento qualificazioni: {str(e)}', 'danger')
+
+    return redirect(url_for('settings'))
+
+
 # AGGIUNGERE TEMPORANEAMENTE in app.py per fare debug
 
 @app.route('/debug_times')
@@ -2412,98 +2703,30 @@ def migrate_settings():
 #         db.session.add(match)
 
 def generate_qualification_matches_simple():
-    """Genera partite di qualificazione seguendo la logica esatta del torneo reale."""
-
-    tournament_dates = get_tournament_dates()
-    tournament_times = get_tournament_times()
-
-    qualification_dates = [
-        tournament_dates['qualification_day1'],  # Sabato
-        tournament_dates['qualification_day2']   # Domenica
-    ]
-    match_times = tournament_times['qualification_times']
-
-    # Sequenza ESATTA delle partite basata sulle immagini del torneo
-    QUALIFICATION_SEQUENCE = [
-        # SABATO - Partite 1-12
-        ('A1', 'A3'),  # Partita 1: 10:00 - Barrhock vs Yellowstone Team
-        ('B1', 'B3'),  # Partita 2: 10:50 - Original Twins vs Arosio Capital
-        ('C1', 'C3'),  # Partita 3: 11:40 - Peppa Beer vs Tirabüscion
-        ('D1', 'D3'),  # Partita 4: 12:30 - Drunk Junior vs Tre Sejdlar
-        ('A3', 'A4'),  # Partita 5: 13:20 - Flory Motos vs Hocktail
-        ('B3', 'B4'),  # Partita 6: 14:10 - I Gamb Rott vs Animal's team
-        ('C3', 'C4'),  # Partita 7: 15:00 - Bardolino vs Le Padelle
-        ('D3', 'D4'),  # Partita 8: 15:50 - HC Caterpillars vs Giügaduu dala Lippa
-        ('A1', 'A2'),  # Partita 9: 16:40 - Barrhock vs Flory Motos
-        ('B1', 'B2'),  # Partita 10: 17:30 - Original Twins vs I Gamb Rott
-        ('C4', 'C1'),  # Partita 11: 18:20 - Peppa Beer vs Bardolino
-        ('D1', 'D2'),  # Partita 12: 19:10 - Drunk Junior vs HC Caterpillars
-
-        # DOMENICA - Partite 13-24
-        ('C2', 'C4'),  # Partita 13: 10:00 - Barrhock vs Hocktail
-        ('D2', 'D4'),  # Partita 14: 10:50 - Original Twins vs Animal's team
-        ('A2', 'A4'),  # Partita 15: 11:40 - Peppa Beer vs Le Padelle
-        ('B2', 'B4'),  # Partita 16: 12:30 - Drunk Junior vs Giügaduu dala Lippa
-        ('C3', 'C2'),  # Partita 17: 13:20 - Yellowstone Team vs Flory Motos
-        ('D3', 'D2'),  # Partita 18: 14:10 - Arosio Capital vs I Gamb Rott
-        ('A3', 'A2'),  # Partita 19: 15:00 - Tirabüscion vs Bardolino
-        ('B3', 'B2'),  # Partita 20: 15:50 - Tre Sejdlar vs HC Caterpillars
-        ('C1', 'C2'),  # Partita 21: 16:40 - Yellowstone Team vs Hocktail
-        ('D4', 'D1'),  # Partita 22: 17:30 - Arosio Capital vs Animal's team
-        ('A4', 'A1'),  # Partita 23: 18:20 - Tirabüscion vs Le Padelle
-        ('B4', 'B1'),  # Partita 24: 19:10 - Tre Sejdlar vs Giügaduu dala Lippa
-    ]
-
-    # Recupera le squadre ordinate per girone e posizione
-    teams_by_position = {}
-    for group in ['A', 'B', 'C', 'D']:
-        # Ordina le squadre per group_order (posizione nel girone)
-        teams = Team.query.filter_by(group=group).order_by(Team.group_order, Team.name).all()
-
-        if len(teams) != 4:
-            print(f"ERRORE: Girone {group} ha {len(teams)} squadre invece di 4!")
-            return False
-
-        # Mappa le posizioni (1=primo, 2=secondo, 3=terzo, 4=quarto)
-        for i, team in enumerate(teams):
-            position_key = f"{group}{i+1}"  # A1, A2, A3, A4, ecc.
-            teams_by_position[position_key] = team
-            print(f"Posizione {position_key}: {team.name}")
+    """Genera partite di qualificazione usando la sequenza configurata."""
+    settings = TournamentSettings.get_settings()
+    match_specs = build_qualification_match_specs(settings)
 
     # Elimina le partite di qualificazione esistenti
     Match.query.filter_by(phase='group').delete()
 
-    # Genera le partite seguendo la sequenza esatta
-    for i, (pos1, pos2) in enumerate(QUALIFICATION_SEQUENCE):
-        # Calcola data e orario
-        day_index = i // 12  # 0 per sabato (partite 0-11), 1 per domenica (partite 12-23)
-        time_index = i % 12  # Indice dell'orario nel giorno
-
-        match_date = qualification_dates[day_index]
-        match_time = match_times[time_index]
-
-        # Ottieni le squadre dalle posizioni
-        team1 = teams_by_position.get(pos1)
-        team2 = teams_by_position.get(pos2)
-
-        if not team1 or not team2:
-            print(f"ERRORE: Non trovate squadre per posizioni {pos1} vs {pos2}")
-            continue
-
-        # Crea la partita
+    for index, spec in enumerate(match_specs, start=1):
         match = Match(
-            team1=team1,
-            team2=team2,
-            date=match_date,
-            time=match_time,
+            team1=spec['team1'],
+            team2=spec['team2'],
+            date=spec['date'],
+            time=spec['time'],
             phase='group'
         )
         db.session.add(match)
 
-        print(f"Partita {i+1}: {team1.name} vs {team2.name} - {match_date} {match_time}")
+        print(
+            f"Partita {index}: {spec['team1'].name} vs {spec['team2'].name} - "
+            f"{spec['date']} {spec['time']}"
+        )
 
     db.session.commit()
-    print("Qualificazioni generate con successo seguendo la logica del torneo!")
+    print("Qualificazioni generate con successo usando la sequenza configurata!")
     return True
 
 
