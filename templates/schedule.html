@@ -622,14 +622,15 @@
                                             <td>{{ match.get_team1_display_name() }}</td>
                                             <td>{{ match.get_team2_display_name() }}</td>
                                             <td>
-                                                {% set match_number = match.get_match_number() %}
-                                                {% if match_number in [41, 42] %}
+                                                {% set final_description = match.get_playoff_description() %}
+                                                {% set placement = final_description.placement %}
+                                                {% if placement == '7-8' %}
                                                     <span class="badge bg-secondary">7°/8° posto</span>
-                                                {% elif match_number in [43, 44] %}
+                                                {% elif placement == '5-6' %}
                                                     <span class="badge bg-warning text-dark">5°/6° posto</span>
-                                                {% elif match_number in [45, 46] %}
+                                                {% elif placement == '3-4' %}
                                                     <span class="badge bg-info">3°/4° posto</span>
-                                                {% elif match_number in [47, 48] %}
+                                                {% elif placement == '1-2' %}
                                                     <span class="badge bg-primary">1. 1°/2° posto</span>
                                                 {% endif %}
                                             </td>

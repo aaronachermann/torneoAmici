@@ -19,7 +19,8 @@
         .settings-card {
             box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
-        .qualification-sequence-table select {
+        .qualification-sequence-table select,
+        .playoff-config-table select {
             min-width: 150px;
         }
         .danger-zone {
@@ -462,49 +463,128 @@
                     </div>
                     <div class="card-body">
                         <form method="post" action="{{ url_for('update_playoff_system') }}">
-                            <h5>Accoppiamenti Quarti di Finale</h5>
-                            <div class="row">
-                                {% set quarterfinal_matchups = settings.get_quarterfinal_matchups_list() %}
-                                {% for i in range(4) %}
-                                    {% set matchup = quarterfinal_matchups[i] if i < quarterfinal_matchups|length else {} %}
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <strong>Quarto {{ i + 1 }}</strong>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-2">
-                                                    <label class="form-label">Squadra 1</label>
-                                                    <select class="form-select" name="qf_team1_{{ i }}">
-                                                        <option value="1° gruppo A" {% if matchup.team1 == "1° gruppo A" %}selected{% endif %}>1° gruppo A</option>
-                                                        <option value="1° gruppo B" {% if matchup.team1 == "1° gruppo B" %}selected{% endif %}>1° gruppo B</option>
-                                                        <option value="1° gruppo C" {% if matchup.team1 == "1° gruppo C" %}selected{% endif %}>1° gruppo C</option>
-                                                        <option value="1° gruppo D" {% if matchup.team1 == "1° gruppo D" %}selected{% endif %}>1° gruppo D</option>
-                                                        <option value="2° gruppo A" {% if matchup.team1 == "2° gruppo A" %}selected{% endif %}>2° gruppo A</option>
-                                                        <option value="2° gruppo B" {% if matchup.team1 == "2° gruppo B" %}selected{% endif %}>2° gruppo B</option>
-                                                        <option value="2° gruppo C" {% if matchup.team1 == "2° gruppo C" %}selected{% endif %}>2° gruppo C</option>
-                                                        <option value="2° gruppo D" {% if matchup.team1 == "2° gruppo D" %}selected{% endif %}>2° gruppo D</option>
-                                                    </select>
-                                                </div>
-                                                <div class="text-center mb-2"><strong>VS</strong></div>
-                                                <div class="mb-2">
-                                                    <label class="form-label">Squadra 2</label>
-                                                    <select class="form-select" name="qf_team2_{{ i }}">
-                                                        <option value="1° gruppo A" {% if matchup.team2 == "1° gruppo A" %}selected{% endif %}>1° gruppo A</option>
-                                                        <option value="1° gruppo B" {% if matchup.team2 == "1° gruppo B" %}selected{% endif %}>1° gruppo B</option>
-                                                        <option value="1° gruppo C" {% if matchup.team2 == "1° gruppo C" %}selected{% endif %}>1° gruppo C</option>
-                                                        <option value="1° gruppo D" {% if matchup.team2 == "1° gruppo D" %}selected{% endif %}>1° gruppo D</option>
-                                                        <option value="2° gruppo A" {% if matchup.team2 == "2° gruppo A" %}selected{% endif %}>2° gruppo A</option>
-                                                        <option value="2° gruppo B" {% if matchup.team2 == "2° gruppo B" %}selected{% endif %}>2° gruppo B</option>
-                                                        <option value="2° gruppo C" {% if matchup.team2 == "2° gruppo C" %}selected{% endif %}>2° gruppo C</option>
-                                                        <option value="2° gruppo D" {% if matchup.team2 == "2° gruppo D" %}selected{% endif %}>2° gruppo D</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                {% endfor %}
+                            {% set playoff_bracket = settings.get_playoff_bracket_config() %}
+                            <div class="alert alert-info">
+                                Configura separatamente Major League e Beer League. I quarti prendono le posizioni dei gironi; semifinali e finali prendono vincente o perdente della fase precedente.
                             </div>
+
+                            {% for league in playoff_leagues %}
+                                {% set slug = playoff_league_slugs[league] %}
+                                {% set league_config = playoff_bracket[league] %}
+                                <div class="border rounded p-3 mb-4">
+                                    <h5 class="mb-3">{{ league }}</h5>
+
+                                    <h6>Quarti di Finale</h6>
+                                    <div class="table-responsive playoff-config-table mb-4">
+                                        <table class="table table-sm align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th>Quarto</th>
+                                                    <th>Squadra 1</th>
+                                                    <th>Squadra 2</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for row in league_config.quarterfinals %}
+                                                    {% set row_index = loop.index0 %}
+                                                    <tr>
+                                                        <td><strong>{{ loop.index }}</strong></td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_quarterfinals_team1_{{ row_index }}">
+                                                                {% for option in playoff_group_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team1 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_quarterfinals_team2_{{ row_index }}">
+                                                                {% for option in playoff_group_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team2 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h6>Semifinali</h6>
+                                    <div class="table-responsive playoff-config-table mb-4">
+                                        <table class="table table-sm align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th>Semifinale</th>
+                                                    <th>Squadra 1</th>
+                                                    <th>Squadra 2</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for row in league_config.semifinals %}
+                                                    {% set row_index = loop.index0 %}
+                                                    <tr>
+                                                        <td><strong>{{ loop.index }}</strong></td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_semifinals_team1_{{ row_index }}">
+                                                                {% for option in playoff_quarter_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team1 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_semifinals_team2_{{ row_index }}">
+                                                                {% for option in playoff_quarter_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team2 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <h6>Finali</h6>
+                                    <div class="table-responsive playoff-config-table">
+                                        <table class="table table-sm align-middle">
+                                            <thead>
+                                                <tr>
+                                                    <th>Finale</th>
+                                                    <th>Piazzamento</th>
+                                                    <th>Squadra 1</th>
+                                                    <th>Squadra 2</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for row in league_config.finals %}
+                                                    {% set row_index = loop.index0 %}
+                                                    <tr>
+                                                        <td><strong>{{ loop.index }}</strong></td>
+                                                        <td>
+                                                            <span class="badge bg-secondary">{{ row.placement }}</span>
+                                                            <input type="hidden" name="playoff_{{ slug }}_finals_placement_{{ row_index }}" value="{{ row.placement }}">
+                                                        </td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_finals_team1_{{ row_index }}">
+                                                                {% for option in playoff_semifinal_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team1 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                        <td>
+                                                            <select class="form-select form-select-sm" name="playoff_{{ slug }}_finals_team2_{{ row_index }}">
+                                                                {% for option in playoff_semifinal_options %}
+                                                                    <option value="{{ option.value }}" {% if row.team2 == option.value %}selected{% endif %}>{{ option.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            {% endfor %}
 
                             <div class="mb-3">
                                 <div class="form-check">

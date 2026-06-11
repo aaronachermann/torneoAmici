@@ -559,6 +559,14 @@ class Match(db.Model):
 
     def get_playoff_description(self):
         """Genera descrizioni per le partite playoff."""
+        configured_match = get_playoff_match_config_for_match(self)
+        if configured_match:
+            return {
+                'team1': get_playoff_source_label(configured_match.get('team1')),
+                'team2': get_playoff_source_label(configured_match.get('team2')),
+                'placement': configured_match.get('placement')
+            }
+
         match_number = self.get_match_number()
 
         if self.phase == 'quarterfinal':
@@ -645,6 +653,20 @@ class Match(db.Model):
             }
         elif self.phase == 'final' or self.phase == 'placement':
             # Distingui tra finali 1°-4° e 5°-8° per entrambe le leghe
+            placement = self.get_playoff_description().get('placement')
+            if placement in ['1-2', '3-4']:
+                return {
+                    'allow_overtime': True,
+                    'allow_shootout': True,
+                    'description': 'Finale 1°-4°: Overtime + rigori se necessario'
+                }
+            if placement in ['5-6', '7-8']:
+                return {
+                    'allow_overtime': False,
+                    'allow_shootout': True,
+                    'description': 'Finale 5°-8°: Solo rigori (no overtime)'
+                }
+
             all_finals = Match.query.filter_by(
                 phase=self.phase,
                 league=self.league,
@@ -699,7 +721,9 @@ class FinalRanking(db.Model):
             FinalRanking.query.delete()
 
             # Ottieni tutti i risultati delle finali
-            final_matches = Match.query.filter_by(phase='final').order_by(Match.time).all()
+            final_matches = Match.query.filter_by(phase='final').order_by(
+                Match.date, Match.time, Match.id
+            ).all()
 
             if not final_matches:
                 print("[ATTENZIONE] Nessuna finale trovata per calcolare la classifica")
@@ -744,14 +768,16 @@ class FinalRanking(db.Model):
         finals_by_placement = {}
 
         for i, match in enumerate(finals):
-            if i == 0:  # Prima finale = 7°/8° posto
-                placement = "7-8"
-            elif i == 1:  # Seconda finale = 5°/6° posto
-                placement = "5-6"
-            elif i == 2:  # Terza finale = 3°/4° posto
-                placement = "3-4"
-            elif i == 3:  # Quarta finale = 1°/2° posto
-                placement = "1-2"
+            placement = match.get_playoff_description().get('placement')
+            if not placement:
+                if i == 0:  # Prima finale = 7°/8° posto
+                    placement = "7-8"
+                elif i == 1:  # Seconda finale = 5°/6° posto
+                    placement = "5-6"
+                elif i == 2:  # Terza finale = 3°/4° posto
+                    placement = "3-4"
+                elif i == 3:  # Quarta finale = 1°/2° posto
+                    placement = "1-2"
 
             finals_by_placement[placement] = match
 
@@ -1304,6 +1330,275 @@ def normalize_qualification_sequence(sequence):
     return normalized
 
 
+PLAYOFF_LEAGUES = ['Major League', 'Beer League']
+PLAYOFF_LEAGUE_SLUGS = {
+    'Major League': 'ml',
+    'Beer League': 'bl',
+}
+PLAYOFF_SLUG_LEAGUES = {slug: league for league, slug in PLAYOFF_LEAGUE_SLUGS.items()}
+PLAYOFF_PHASE_KEYS = {
+    'quarterfinal': 'quarterfinals',
+    'semifinal': 'semifinals',
+    'final': 'finals',
+}
+PLAYOFF_PLACEMENTS = ['7-8', '5-6', '3-4', '1-2']
+
+
+def make_group_source(position, group):
+    return f'group:{position}:{group}'
+
+
+def make_playoff_source(phase, outcome, position):
+    return f'{phase}:{outcome}:{position}'
+
+
+def get_default_playoff_bracket():
+    """Tabellone playoff di default, separato per lega."""
+    return {
+        'Major League': {
+            'quarterfinals': [
+                {'position': 1, 'team1': make_group_source(1, 'D'), 'team2': make_group_source(2, 'C')},
+                {'position': 2, 'team1': make_group_source(1, 'A'), 'team2': make_group_source(2, 'B')},
+                {'position': 3, 'team1': make_group_source(1, 'C'), 'team2': make_group_source(2, 'A')},
+                {'position': 4, 'team1': make_group_source(1, 'B'), 'team2': make_group_source(2, 'D')},
+            ],
+            'semifinals': [
+                {'position': 1, 'team1': make_playoff_source('quarterfinal', 'loser', 3), 'team2': make_playoff_source('quarterfinal', 'loser', 4)},
+                {'position': 2, 'team1': make_playoff_source('quarterfinal', 'loser', 1), 'team2': make_playoff_source('quarterfinal', 'loser', 2)},
+                {'position': 3, 'team1': make_playoff_source('quarterfinal', 'winner', 3), 'team2': make_playoff_source('quarterfinal', 'winner', 4)},
+                {'position': 4, 'team1': make_playoff_source('quarterfinal', 'winner', 1), 'team2': make_playoff_source('quarterfinal', 'winner', 2)},
+            ],
+            'finals': [
+                {'position': 1, 'placement': '7-8', 'team1': make_playoff_source('semifinal', 'loser', 1), 'team2': make_playoff_source('semifinal', 'loser', 2)},
+                {'position': 2, 'placement': '5-6', 'team1': make_playoff_source('semifinal', 'winner', 1), 'team2': make_playoff_source('semifinal', 'winner', 2)},
+                {'position': 3, 'placement': '3-4', 'team1': make_playoff_source('semifinal', 'loser', 3), 'team2': make_playoff_source('semifinal', 'loser', 4)},
+                {'position': 4, 'placement': '1-2', 'team1': make_playoff_source('semifinal', 'winner', 3), 'team2': make_playoff_source('semifinal', 'winner', 4)},
+            ],
+        },
+        'Beer League': {
+            'quarterfinals': [
+                {'position': 1, 'team1': make_group_source(3, 'B'), 'team2': make_group_source(4, 'A')},
+                {'position': 2, 'team1': make_group_source(3, 'D'), 'team2': make_group_source(4, 'C')},
+                {'position': 3, 'team1': make_group_source(3, 'A'), 'team2': make_group_source(4, 'D')},
+                {'position': 4, 'team1': make_group_source(3, 'C'), 'team2': make_group_source(4, 'B')},
+            ],
+            'semifinals': [
+                {'position': 1, 'team1': make_playoff_source('quarterfinal', 'loser', 3), 'team2': make_playoff_source('quarterfinal', 'loser', 4)},
+                {'position': 2, 'team1': make_playoff_source('quarterfinal', 'loser', 1), 'team2': make_playoff_source('quarterfinal', 'loser', 2)},
+                {'position': 3, 'team1': make_playoff_source('quarterfinal', 'winner', 3), 'team2': make_playoff_source('quarterfinal', 'winner', 4)},
+                {'position': 4, 'team1': make_playoff_source('quarterfinal', 'winner', 1), 'team2': make_playoff_source('quarterfinal', 'winner', 2)},
+            ],
+            'finals': [
+                {'position': 1, 'placement': '7-8', 'team1': make_playoff_source('semifinal', 'loser', 1), 'team2': make_playoff_source('semifinal', 'loser', 2)},
+                {'position': 2, 'placement': '5-6', 'team1': make_playoff_source('semifinal', 'winner', 1), 'team2': make_playoff_source('semifinal', 'winner', 2)},
+                {'position': 3, 'placement': '3-4', 'team1': make_playoff_source('semifinal', 'loser', 3), 'team2': make_playoff_source('semifinal', 'loser', 4)},
+                {'position': 4, 'placement': '1-2', 'team1': make_playoff_source('semifinal', 'winner', 3), 'team2': make_playoff_source('semifinal', 'winner', 4)},
+            ],
+        },
+    }
+
+
+def get_playoff_group_source_options():
+    options = []
+    for position in QUALIFICATION_TEAM_POSITIONS:
+        for group in QUALIFICATION_GROUPS:
+            options.append({
+                'value': make_group_source(position, group),
+                'label': f'{position}° gruppo {group}',
+            })
+    return options
+
+
+def get_playoff_result_source_options(phase):
+    phase_label = 'quarto' if phase == 'quarterfinal' else 'semifinale'
+    options = []
+    for position in range(1, 5):
+        options.append({
+            'value': make_playoff_source(phase, 'winner', position),
+            'label': f'Vincente {phase_label} {position}',
+        })
+        options.append({
+            'value': make_playoff_source(phase, 'loser', position),
+            'label': f'Perdente {phase_label} {position}',
+        })
+    return options
+
+
+def get_playoff_source_label(source):
+    parts = str(source or '').split(':')
+    if len(parts) != 3:
+        return 'TBD'
+
+    if parts[0] == 'group':
+        try:
+            position = int(parts[1])
+        except ValueError:
+            return 'TBD'
+        group = parts[2].upper()
+        if position in QUALIFICATION_TEAM_POSITIONS and group in QUALIFICATION_GROUPS:
+            return f'{position}° gruppo {group}'
+        return 'TBD'
+
+    if parts[0] in ['quarterfinal', 'semifinal'] and parts[1] in ['winner', 'loser']:
+        try:
+            position = int(parts[2])
+        except ValueError:
+            return 'TBD'
+        if position not in range(1, 5):
+            return 'TBD'
+
+        outcome = 'Vincente' if parts[1] == 'winner' else 'Perdente'
+        phase_label = 'quarto' if parts[0] == 'quarterfinal' else 'semifinale'
+        return f'{outcome} {phase_label} {position}'
+
+    return 'TBD'
+
+
+def validate_playoff_source(source, expected_source):
+    parts = str(source or '').split(':')
+    if len(parts) != 3:
+        raise ValueError('Sorgente playoff non valida.')
+
+    if expected_source == 'group':
+        if parts[0] != 'group':
+            raise ValueError('Nei quarti puoi scegliere solo posizioni dei gironi.')
+        try:
+            position = int(parts[1])
+        except ValueError:
+            raise ValueError('Posizione girone non valida.')
+        group = parts[2].upper()
+        if position not in QUALIFICATION_TEAM_POSITIONS or group not in QUALIFICATION_GROUPS:
+            raise ValueError('Posizione girone non valida.')
+        return make_group_source(position, group)
+
+    if expected_source in ['quarterfinal', 'semifinal']:
+        if parts[0] != expected_source or parts[1] not in ['winner', 'loser']:
+            raise ValueError('Sorgente playoff non valida per questa fase.')
+        try:
+            position = int(parts[2])
+        except ValueError:
+            raise ValueError('Numero partita playoff non valido.')
+        if position not in range(1, 5):
+            raise ValueError('Numero partita playoff non valido.')
+        return make_playoff_source(expected_source, parts[1], position)
+
+    raise ValueError('Sorgente playoff non valida.')
+
+
+def normalize_playoff_rows(rows, phase_key):
+    expected_source = {
+        'quarterfinals': 'group',
+        'semifinals': 'quarterfinal',
+        'finals': 'semifinal',
+    }[phase_key]
+
+    if not rows or len(rows) != 4:
+        raise ValueError('Ogni fase playoff deve contenere esattamente 4 partite.')
+
+    normalized = []
+    for index, row in enumerate(rows):
+        team1 = validate_playoff_source(row.get('team1'), expected_source)
+        team2 = validate_playoff_source(row.get('team2'), expected_source)
+        if team1 == team2:
+            raise ValueError(f'Playoff partita {index + 1}: una squadra non puo giocare contro se stessa.')
+
+        normalized_row = {
+            'position': index + 1,
+            'team1': team1,
+            'team2': team2,
+        }
+        if phase_key == 'finals':
+            placement = row.get('placement') or PLAYOFF_PLACEMENTS[index]
+            normalized_row['placement'] = placement if placement in PLAYOFF_PLACEMENTS else PLAYOFF_PLACEMENTS[index]
+
+        normalized.append(normalized_row)
+
+    return normalized
+
+
+def normalize_playoff_bracket(bracket):
+    if not bracket:
+        bracket = get_default_playoff_bracket()
+
+    normalized = {}
+    for league in PLAYOFF_LEAGUES:
+        league_config = bracket.get(league, {})
+        normalized[league] = {
+            'quarterfinals': normalize_playoff_rows(league_config.get('quarterfinals'), 'quarterfinals'),
+            'semifinals': normalize_playoff_rows(league_config.get('semifinals'), 'semifinals'),
+            'finals': normalize_playoff_rows(league_config.get('finals'), 'finals'),
+        }
+
+    return normalized
+
+
+def get_playoff_match_position(match):
+    matches = Match.query.filter_by(
+        phase=match.phase,
+        league=match.league
+    ).order_by(Match.date, Match.time, Match.id).all()
+
+    for index, candidate in enumerate(matches, start=1):
+        if candidate.id == match.id:
+            return index
+
+    return None
+
+
+def get_playoff_match_config_for_match(match):
+    if match.phase not in PLAYOFF_PHASE_KEYS or match.league not in PLAYOFF_LEAGUES:
+        return None
+
+    settings = TournamentSettings.get_settings()
+    bracket = settings.get_playoff_bracket_config() if settings else get_default_playoff_bracket()
+    phase_key = PLAYOFF_PHASE_KEYS[match.phase]
+    position = get_playoff_match_position(match)
+    if not position:
+        return None
+
+    rows = bracket.get(match.league, {}).get(phase_key, [])
+    return rows[position - 1] if position <= len(rows) else None
+
+
+def resolve_group_playoff_source(source, group_standings):
+    parts = str(source or '').split(':')
+    if len(parts) != 3 or parts[0] != 'group':
+        raise ValueError('Sorgente girone non valida.')
+
+    position = int(parts[1])
+    group = parts[2].upper()
+    teams = group_standings.get(group, [])
+    if position < 1 or position > len(teams):
+        raise ValueError(f'Girone {group}: posizione {position} non disponibile.')
+    return teams[position - 1]
+
+
+def get_match_result_team(match, outcome):
+    if not match or not match.is_completed:
+        raise ValueError('La partita precedente non e completata.')
+    winner = match.winner
+    if not winner:
+        raise ValueError('La partita precedente non ha un vincitore.')
+    if outcome == 'winner':
+        return winner
+    if outcome == 'loser':
+        return match.team1 if winner == match.team2 else match.team2
+    raise ValueError('Risultato playoff non valido.')
+
+
+def resolve_result_playoff_source(source, source_matches):
+    parts = str(source or '').split(':')
+    if len(parts) != 3:
+        raise ValueError('Sorgente playoff non valida.')
+
+    phase, outcome, position_text = parts
+    position = int(position_text)
+    matches = source_matches.get(phase, [])
+    if position < 1 or position > len(matches):
+        raise ValueError('Partita playoff precedente non disponibile.')
+    return get_match_result_team(matches[position - 1], outcome)
+
+
 class TournamentSettings(db.Model):
     """Configurazioni del torneo."""
     __tablename__ = 'tournament_settings'
@@ -1345,6 +1640,7 @@ class TournamentSettings(db.Model):
     playoff_system = db.Column(db.String(50), default='standard')  # standard, custom
     quarterfinal_matchups = db.Column(db.Text)  # JSON array
     qualification_sequence = db.Column(db.Text)  # JSON array
+    playoff_bracket = db.Column(db.Text)  # JSON object
 
     # Configurazioni generali
     tournament_name = db.Column(db.String(200), default='Torneo degli Amici dello Skater')
@@ -1383,6 +1679,8 @@ class TournamentSettings(db.Model):
 
         if 'qualification_sequence' not in columns:
             missing_columns.append(('qualification_sequence', 'TEXT'))
+        if 'playoff_bracket' not in columns:
+            missing_columns.append(('playoff_bracket', 'TEXT'))
 
         if not missing_columns:
             return
@@ -1443,6 +1741,7 @@ class TournamentSettings(db.Model):
 
             quarterfinal_matchups=json.dumps(default_quarterfinals),
             qualification_sequence=json.dumps(get_default_qualification_sequence()),
+            playoff_bracket=json.dumps(get_default_playoff_bracket()),
             registration_categories=json.dumps(default_categories)
         )
 
@@ -1484,6 +1783,16 @@ class TournamentSettings(db.Model):
             except (TypeError, ValueError, json.JSONDecodeError) as e:
                 print(f"Sequenza qualificazioni non valida, uso default: {e}")
         return get_default_qualification_sequence()
+
+    def get_playoff_bracket_config(self):
+        """Ottieni il tabellone playoff configurato, separato per lega."""
+        import json
+        if self.playoff_bracket:
+            try:
+                return normalize_playoff_bracket(json.loads(self.playoff_bracket))
+            except (AttributeError, TypeError, ValueError, json.JSONDecodeError) as e:
+                print(f"Tabellone playoff non valido, uso default: {e}")
+        return get_default_playoff_bracket()
 
     def get_registration_categories_dict(self):
         """Ottieni le categorie di tesseramento come dizionario."""
@@ -1900,7 +2209,16 @@ def settings():
         if not settings:
             # Se non ci sono settings, mostra una pagina di inizializzazione
             return render_template('settings_init.html')
-        return render_template('settings.html', settings=settings)
+        return render_template(
+            'settings.html',
+            settings=settings,
+            playoff_leagues=PLAYOFF_LEAGUES,
+            playoff_league_slugs=PLAYOFF_LEAGUE_SLUGS,
+            playoff_group_options=get_playoff_group_source_options(),
+            playoff_quarter_options=get_playoff_result_source_options('quarterfinal'),
+            playoff_semifinal_options=get_playoff_result_source_options('semifinal'),
+            playoff_placements=PLAYOFF_PLACEMENTS
+        )
     except Exception as e:
         flash(f'[ERRORE] Errore nel caricamento delle configurazioni: {str(e)}', 'danger')
         return render_template('settings_init.html')
@@ -2519,25 +2837,45 @@ def update_playoff_system():
         import json
         settings = TournamentSettings.get_settings()
 
-        # Aggiorna accoppiamenti quarti di finale
-        matchups = []
-        for i in range(4):
-            team1 = request.form.get(f'qf_team1_{i}')
-            team2 = request.form.get(f'qf_team2_{i}')
-            if team1 and team2:
-                matchups.append({
-                    "position": i + 1,
-                    "team1": team1,
-                    "team2": team2
-                })
+        bracket = {}
+        for league in PLAYOFF_LEAGUES:
+            slug = PLAYOFF_LEAGUE_SLUGS[league]
+            bracket[league] = {}
+            for phase_key in ['quarterfinals', 'semifinals', 'finals']:
+                rows = []
+                for index in range(4):
+                    row = {
+                        'position': index + 1,
+                        'team1': request.form.get(f'playoff_{slug}_{phase_key}_team1_{index}'),
+                        'team2': request.form.get(f'playoff_{slug}_{phase_key}_team2_{index}'),
+                    }
+                    if phase_key == 'finals':
+                        row['placement'] = request.form.get(
+                            f'playoff_{slug}_{phase_key}_placement_{index}',
+                            PLAYOFF_PLACEMENTS[index]
+                        )
+                    rows.append(row)
+                bracket[league][phase_key] = rows
 
-        settings.quarterfinal_matchups = json.dumps(matchups)
+        bracket = normalize_playoff_bracket(bracket)
+        settings.playoff_bracket = json.dumps(bracket)
+        settings.quarterfinal_matchups = json.dumps([
+            {
+                'position': row['position'],
+                'team1': get_playoff_source_label(row['team1']),
+                'team2': get_playoff_source_label(row['team2'])
+            }
+            for row in bracket['Major League']['quarterfinals']
+        ])
         settings.auto_update_playoffs = 'auto_update_playoffs' in request.form
 
         settings.updated_at = datetime.utcnow()
         db.session.commit()
 
         flash('Sistema playoff aggiornato con successo!', 'success')
+    except ValueError as e:
+        db.session.rollback()
+        flash(f'Errore nel sistema playoff: {str(e)}', 'danger')
     except Exception as e:
         db.session.rollback()
         flash(f'Errore nell\'aggiornamento sistema playoff: {str(e)}', 'danger')
@@ -6865,41 +7203,26 @@ def update_playoff_brackets():
             return False
 
     try:
-        # Aggiorna i quarti di finale Major League
-        ml_quarters = Match.query.filter_by(phase='quarterfinal', league='Major League').order_by(Match.time).all()
+        settings = TournamentSettings.get_settings()
+        bracket = settings.get_playoff_bracket_config() if settings else get_default_playoff_bracket()
 
-        # Accoppiamenti Major League: 1D vs 2C, 1A vs 2B, 1C vs 2A, 1B vs 2D
-        ml_matchups = [
-            (group_standings['D'][0], group_standings['C'][1]),  # 1D vs 2C
-            (group_standings['A'][0], group_standings['B'][1]),  # 1A vs 2B
-            (group_standings['C'][0], group_standings['A'][1]),  # 1C vs 2A
-            (group_standings['B'][0], group_standings['D'][1]),  # 1B vs 2D
-        ]
+        for league in PLAYOFF_LEAGUES:
+            quarterfinals = Match.query.filter_by(
+                phase='quarterfinal',
+                league=league
+            ).order_by(Match.date, Match.time, Match.id).all()
 
-        print("[AGGIORNA] Aggiornamento Major League:")
-        for i, (team1, team2) in enumerate(ml_matchups):
-            if i < len(ml_quarters):
-                ml_quarters[i].team1_id = team1.id
-                ml_quarters[i].team2_id = team2.id
-                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
+            if len(quarterfinals) != 4:
+                print(f"[ERRORE] {league}: trovati {len(quarterfinals)} quarti invece di 4")
+                return False
 
-        # Aggiorna i quarti di finale Beer League
-        bl_quarters = Match.query.filter_by(phase='quarterfinal', league='Beer League').order_by(Match.time).all()
-
-        # Accoppiamenti Beer League: 3B vs 4A, 3D vs 4C, 3A vs 4D, 3C vs 4B
-        bl_matchups = [
-            (group_standings['B'][2], group_standings['A'][3]),  # 3B vs 4A
-            (group_standings['D'][2], group_standings['C'][3]),  # 3D vs 4C
-            (group_standings['A'][2], group_standings['D'][3]),  # 3A vs 4D
-            (group_standings['C'][2], group_standings['B'][3]),  # 3C vs 4B
-        ]
-
-        print("[AGGIORNA] Aggiornamento Beer League:")
-        for i, (team1, team2) in enumerate(bl_matchups):
-            if i < len(bl_quarters):
-                bl_quarters[i].team1_id = team1.id
-                bl_quarters[i].team2_id = team2.id
-                print(f"  Partita {i+1}: {team1.name} vs {team2.name}")
+            print(f"[AGGIORNA] Aggiornamento {league}:")
+            for index, row in enumerate(bracket[league]['quarterfinals']):
+                team1 = resolve_group_playoff_source(row['team1'], group_standings)
+                team2 = resolve_group_playoff_source(row['team2'], group_standings)
+                quarterfinals[index].team1_id = team1.id
+                quarterfinals[index].team2_id = team2.id
+                print(f"  Quarto {index + 1}: {team1.name} vs {team2.name}")
 
         db.session.commit()
         print("[OK] Playoff brackets aggiornati con successo!")
@@ -6930,7 +7253,7 @@ def update_semifinals(league):
     quarterfinals = Match.query.filter_by(
         phase='quarterfinal',
         league=league
-    ).order_by(Match.time).all()
+    ).order_by(Match.date, Match.time, Match.id).all()
 
     if len(quarterfinals) != 4:
         print(f"[ERRORE] Errore: {league} dovrebbe avere 4 quarti, trovati {len(quarterfinals)}")
@@ -6942,40 +7265,26 @@ def update_semifinals(league):
             print(f"[ERRORE] Quarto {quarter.id} non completato")
             return False
 
-    # Ottieni vincitori e perdenti
-    winners = []
-    losers = []
-    for quarter in quarterfinals:
-        winner = quarter.winner
-        loser = quarter.team1 if winner == quarter.team2 else quarter.team2
-        winners.append(winner)
-        losers.append(loser)
-
-    print(f"[CLASSIFICA] Vincenti: {[w.name for w in winners]}")
-    print(f"[SCONFITTI] Perdenti: {[l.name for l in losers]}")
-
     # Ottieni le semifinali della lega
     semifinals = Match.query.filter_by(
         phase='semifinal',
         league=league
-    ).order_by(Match.time).all()
+    ).order_by(Match.date, Match.time, Match.id).all()
 
     if len(semifinals) != 4:
         print(f"[ERRORE] Errore: {league} dovrebbe avere 4 semifinali, trovate {len(semifinals)}")
         return False
 
-    # Aggiorna le semifinali
-    # Semifinali perdenti (prime due partite)
-    semifinals[0].team1_id = losers[2].id  # Perdente Q1
-    semifinals[0].team2_id = losers[3].id  # Perdente Q2
-    semifinals[1].team1_id = losers[0].id  # Perdente Q3
-    semifinals[1].team2_id = losers[1].id  # Perdente Q4
+    settings = TournamentSettings.get_settings()
+    bracket = settings.get_playoff_bracket_config() if settings else get_default_playoff_bracket()
+    source_matches = {'quarterfinal': quarterfinals}
 
-    # Semifinali vincenti (ultime due partite)
-    semifinals[2].team1_id = winners[2].id  # Vincente Q1
-    semifinals[2].team2_id = winners[3].id  # Vincente Q2
-    semifinals[3].team1_id = winners[0].id  # Vincente Q3
-    semifinals[3].team2_id = winners[1].id  # Vincente Q4
+    for index, row in enumerate(bracket[league]['semifinals']):
+        team1 = resolve_result_playoff_source(row['team1'], source_matches)
+        team2 = resolve_result_playoff_source(row['team2'], source_matches)
+        semifinals[index].team1_id = team1.id
+        semifinals[index].team2_id = team2.id
+        print(f"  Semifinale {index + 1}: {team1.name} vs {team2.name}")
 
     db.session.commit()
     print(f"[OK] Semifinali {league} aggiornate")
@@ -6990,7 +7299,7 @@ def update_finals(league):
     semifinals = Match.query.filter_by(
         phase='semifinal',
         league=league
-    ).order_by(Match.time).all()
+    ).order_by(Match.date, Match.time, Match.id).all()
 
     if len(semifinals) != 4:
         print(f"[ERRORE] Errore: {league} dovrebbe avere 4 semifinali, trovate {len(semifinals)}")
@@ -7002,48 +7311,26 @@ def update_finals(league):
             print(f"[ERRORE] Semifinale {semi.id} non completata")
             return False
 
-    # Ottieni vincitori e perdenti delle semifinali
-    # Prime due semifinali = perdenti quarti, ultime due = vincenti quarti
-    losers_bracket_winners = [semifinals[0].winner, semifinals[1].winner]
-    winners_bracket_winners = [semifinals[2].winner, semifinals[3].winner]
-    losers_bracket_losers = [
-        semifinals[0].team1 if semifinals[0].winner == semifinals[0].team2 else semifinals[0].team2,
-        semifinals[1].team1 if semifinals[1].winner == semifinals[1].team2 else semifinals[1].team2
-    ]
-    winners_bracket_losers = [
-        semifinals[2].team1 if semifinals[2].winner == semifinals[2].team2 else semifinals[2].team2,
-        semifinals[3].team1 if semifinals[3].winner == semifinals[3].team2 else semifinals[3].team2
-    ]
-
-    print(f"[CLASSIFICA] Vincenti bracket perdenti: {[w.name for w in losers_bracket_winners]}")
-    print(f"[CLASSIFICA] Vincenti bracket vincenti: {[w.name for w in winners_bracket_winners]}")
-
     # Ottieni le finali della lega
     finals = Match.query.filter_by(
         phase='final',
         league=league
-    ).order_by(Match.time).all()
+    ).order_by(Match.date, Match.time, Match.id).all()
 
     if len(finals) != 4:
         print(f"[ERRORE] Errore: {league} dovrebbe avere 4 finali, trovate {len(finals)}")
         return False
 
-    # Aggiorna le finali
-    # Finale 7°/8° posto
-    finals[0].team1_id = losers_bracket_losers[0].id
-    finals[0].team2_id = losers_bracket_losers[1].id
+    settings = TournamentSettings.get_settings()
+    bracket = settings.get_playoff_bracket_config() if settings else get_default_playoff_bracket()
+    source_matches = {'semifinal': semifinals}
 
-    # Finale 5°/6° posto
-    finals[1].team1_id = losers_bracket_winners[0].id
-    finals[1].team2_id = losers_bracket_winners[1].id
-
-    # Finale 3°/4° posto
-    finals[2].team1_id = winners_bracket_losers[0].id
-    finals[2].team2_id = winners_bracket_losers[1].id
-
-    # Finale 1°/2° posto
-    finals[3].team1_id = winners_bracket_winners[0].id
-    finals[3].team2_id = winners_bracket_winners[1].id
+    for index, row in enumerate(bracket[league]['finals']):
+        team1 = resolve_result_playoff_source(row['team1'], source_matches)
+        team2 = resolve_result_playoff_source(row['team2'], source_matches)
+        finals[index].team1_id = team1.id
+        finals[index].team2_id = team2.id
+        print(f"  Finale {index + 1} ({row.get('placement', '')}): {team1.name} vs {team2.name}")
 
     db.session.commit()
     print(f"[OK] Finali {league} aggiornate")
@@ -9946,16 +10233,15 @@ def get_final_placement(match):
     if not match.is_completed:
         return "TBD"
 
-    if match.league == 'Champions League':
-        if 'Finale' in match.get_playoff_description().get('description', ''):
-            return "1° vs 2°"
-        else:
-            return "3° vs 4°"
-    elif match.league == 'Beer League':
-        if 'Finale' in match.get_playoff_description().get('description', ''):
-            return "5° vs 6°"
-        else:
-            return "7° vs 8°"
+    placement = match.get_playoff_description().get('placement')
+    placement_labels = {
+        '1-2': "1° vs 2°",
+        '3-4': "3° vs 4°",
+        '5-6': "5° vs 6°",
+        '7-8': "7° vs 8°",
+    }
+    if placement in placement_labels:
+        return placement_labels[placement]
 
     return "N/A"
 
