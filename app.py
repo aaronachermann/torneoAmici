@@ -1131,6 +1131,79 @@ class MatchDescription(db.Model):
 
     match = db.relationship('Match', backref='description', lazy=True)
 
+
+def normalize_match_time_value(value):
+    """Normalizza tempi partita in formato minuti o minuti:secondi."""
+    if value is None:
+        return None
+
+    text_value = str(value).strip().replace("'", '').replace('’', '')
+    if not text_value:
+        return None
+
+    if ':' in text_value:
+        parts = text_value.split(':')
+        if len(parts) != 2:
+            return None
+
+        try:
+            minutes = int(parts[0].strip())
+            seconds = int(parts[1].strip())
+        except ValueError:
+            return None
+
+        if minutes < 0 or seconds < 0 or seconds > 59:
+            return None
+
+        return f"{minutes}:{seconds:02d}"
+
+    try:
+        minute_value = float(text_value.replace(',', '.'))
+    except ValueError:
+        return None
+
+    if minute_value < 0:
+        return None
+
+    total_seconds = int(round(minute_value * 60))
+    minutes, seconds = divmod(total_seconds, 60)
+    return str(minutes) if seconds == 0 else f"{minutes}:{seconds:02d}"
+
+
+def parse_match_time_list(value):
+    """Legge una lista di tempi separati da virgola, mantenendo eventuali secondi."""
+    if not value:
+        return []
+
+    times = []
+    for raw_time in str(value).split(','):
+        normalized = normalize_match_time_value(raw_time)
+        if normalized:
+            times.append(normalized)
+
+    return times
+
+
+def match_time_sort_key(value):
+    normalized = normalize_match_time_value(value)
+    if not normalized:
+        return 999999
+
+    if ':' in normalized:
+        minutes, seconds = normalized.split(':', 1)
+        return int(minutes) * 60 + int(seconds)
+
+    return int(normalized) * 60
+
+
+def format_match_time_for_display(value):
+    normalized = normalize_match_time_value(value)
+    if not normalized:
+        return ''
+
+    return normalized if ':' in normalized else f"{normalized}'"
+
+
 class PlayerMatchStats(db.Model):
     """Statistiche di un giocatore in una singola partita."""
     __tablename__ = 'player_match_stats'
@@ -1150,9 +1223,9 @@ class PlayerMatchStats(db.Model):
     penalty_durations = db.Column(db.Text)
 
     # NUOVI CAMPI: Tempi per ogni azione
-    goal_times = db.Column(db.Text)  # Es: "15,23,67" per gol al 15°, 23° e 67° minuto
-    assist_times = db.Column(db.Text)  # Es: "10,45" per assist al 10° e 45° minuto
-    penalty_times = db.Column(db.Text)  # Es: "30" per penalità al 30° minuto
+    goal_times = db.Column(db.Text)  # Es: "15,23:30,67" per gol con minuti ed eventuali secondi
+    assist_times = db.Column(db.Text)  # Es: "10,45:15" per assist con minuti ed eventuali secondi
+    penalty_times = db.Column(db.Text)  # Es: "30,31:45" per penalità con minuti ed eventuali secondi
 
     # NUOVO CAMPO: Numero di maglia per questa partita
     jersey_number = db.Column(db.Integer)  # Numero di maglia per questa specifica partita
@@ -1169,40 +1242,37 @@ class PlayerMatchStats(db.Model):
 
     def get_goal_times_list(self):
         """Restituisce una lista dei tempi dei gol."""
-        if not self.goal_times:
-            return []
-        return [int(time.strip()) for time in self.goal_times.split(',') if time.strip()]
+        return parse_match_time_list(self.goal_times)
 
     def set_goal_times_list(self, times_list):
         """Imposta i tempi dei gol da una lista."""
-        if times_list:
-            self.goal_times = ','.join(map(str, sorted(times_list)))
+        normalized_times = parse_match_time_list(','.join(map(str, times_list))) if times_list else []
+        if normalized_times:
+            self.goal_times = ','.join(sorted(normalized_times, key=match_time_sort_key))
         else:
             self.goal_times = None
 
     def get_assist_times_list(self):
         """Restituisce una lista dei tempi degli assist."""
-        if not self.assist_times:
-            return []
-        return [int(time.strip()) for time in self.assist_times.split(',') if time.strip()]
+        return parse_match_time_list(self.assist_times)
 
     def set_assist_times_list(self, times_list):
         """Imposta i tempi degli assist da una lista."""
-        if times_list:
-            self.assist_times = ','.join(map(str, sorted(times_list)))
+        normalized_times = parse_match_time_list(','.join(map(str, times_list))) if times_list else []
+        if normalized_times:
+            self.assist_times = ','.join(sorted(normalized_times, key=match_time_sort_key))
         else:
             self.assist_times = None
 
     def get_penalty_times_list(self):
         """Restituisce una lista dei tempi delle penalità."""
-        if not self.penalty_times:
-            return []
-        return [int(time.strip()) for time in self.penalty_times.split(',') if time.strip()]
+        return parse_match_time_list(self.penalty_times)
 
     def set_penalty_times_list(self, times_list):
         """Imposta i tempi delle penalità da una lista."""
-        if times_list:
-            self.penalty_times = ','.join(map(str, sorted(times_list)))
+        normalized_times = parse_match_time_list(','.join(map(str, times_list))) if times_list else []
+        if normalized_times:
+            self.penalty_times = ','.join(sorted(normalized_times, key=match_time_sort_key))
         else:
             self.penalty_times = None
 
@@ -1210,7 +1280,7 @@ class PlayerMatchStats(db.Model):
         """Restituisce una lista delle durate delle penalità."""
         if not self.penalty_durations:
             return []
-        return [float(duration.strip()) for duration in self.penalty_durations.split(',') if duration.strip()]
+        return [float(duration.strip().replace(',', '.')) for duration in self.penalty_durations.split(',') if duration.strip()]
 
     def set_penalty_durations_list(self, durations_list):
         """Imposta le durate delle penalità da una lista."""
@@ -1236,12 +1306,12 @@ class PlayerMatchStats(db.Model):
         if self.goals > 0:
             goal_times = self.get_goal_times_list()
             if goal_times:
-                display_parts.append(f"Gol: {', '.join(map(str, goal_times))}'")
+                display_parts.append(f"Gol: {', '.join(format_match_time_for_display(time) for time in goal_times)}")
 
         if self.assists > 0:
             assist_times = self.get_assist_times_list()
             if assist_times:
-                display_parts.append(f"Assist: {', '.join(map(str, assist_times))}'")
+                display_parts.append(f"Assist: {', '.join(format_match_time_for_display(time) for time in assist_times)}")
 
         # NUOVA LOGICA per penalità con durate
         penalty_times = self.get_penalty_times_list()
@@ -1250,7 +1320,7 @@ class PlayerMatchStats(db.Model):
         if penalty_times and penalty_durations:
             penalty_info = []
             for i, (time, duration) in enumerate(zip(penalty_times, penalty_durations)):
-                penalty_info.append(f"{time}' ({duration}min)")
+                penalty_info.append(f"{format_match_time_for_display(time)} ({duration}min)")
 
             display_parts.append(f"Penalità: {', '.join(penalty_info)}")
 
@@ -2005,20 +2075,13 @@ def sync_match_data(match_id):
                 penalty_times_str = saved_data.get(f'player_{player.id}_penalty_times', '')
                 penalty_durations_str = saved_data.get(f'player_{player.id}_penalty_durations', '')
 
-                # Converti tempi in liste
-                goal_times = []
-                if goal_times_str:
-                    goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
-
-                assist_times = []
-                if assist_times_str:
-                    assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
-
-                penalty_times = []
+                # Converti tempi in liste, supportando anche minuti:secondi.
+                goal_times = parse_match_time_list(goal_times_str)
+                assist_times = parse_match_time_list(assist_times_str)
+                penalty_times = parse_match_time_list(penalty_times_str)
                 penalty_durations = []
-                if penalty_times_str and penalty_durations_str:
-                    penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
-                    penalty_durations = [float(d.strip()) for d in penalty_durations_str.split(',') if d.strip()]
+                if penalty_durations_str:
+                    penalty_durations = [float(d.strip().replace(',', '.')) for d in penalty_durations_str.split(',') if d.strip()]
 
                 # Calcola durata totale penalità
                 total_penalty_duration = sum(penalty_durations) if penalty_durations else penalties
@@ -2050,9 +2113,9 @@ def sync_match_data(match_id):
                         assists=assists,
                         penalties=total_penalty_duration,
                         jersey_number=int(jersey_number) if jersey_number else None,
-                        goal_times=','.join(map(str, goal_times)) if goal_times else None,
-                        assist_times=','.join(map(str, assist_times)) if assist_times else None,
-                        penalty_times=','.join(map(str, penalty_times)) if penalty_times else None,
+                        goal_times=','.join(goal_times) if goal_times else None,
+                        assist_times=','.join(assist_times) if assist_times else None,
+                        penalty_times=','.join(penalty_times) if penalty_times else None,
                         penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,
                         is_best_player_team1=is_best_team1,
                         is_best_player_team2=is_best_team2,
@@ -2064,9 +2127,9 @@ def sync_match_data(match_id):
                     stats.assists = assists
                     stats.penalties = total_penalty_duration
                     stats.jersey_number = int(jersey_number) if jersey_number else None
-                    stats.goal_times = ','.join(map(str, goal_times)) if goal_times else None
-                    stats.assist_times = ','.join(map(str, assist_times)) if assist_times else None
-                    stats.penalty_times = ','.join(map(str, penalty_times)) if penalty_times else None
+                    stats.goal_times = ','.join(goal_times) if goal_times else None
+                    stats.assist_times = ','.join(assist_times) if assist_times else None
+                    stats.penalty_times = ','.join(penalty_times) if penalty_times else None
                     stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None
                     stats.is_best_player_team1 = is_best_team1
                     stats.is_best_player_team2 = is_best_team2
@@ -5366,18 +5429,13 @@ def match_detail(match_id):
                 penalty_durations_str = request.form.get(f'player_{player.id}_penalty_durations', '').strip()
                 total_penalty_duration = float(request.form.get(f'player_{player.id}_penalties', 0) or 0)
 
-                # Converte i tempi e le durate in liste
-                penalty_times = []
-                if penalty_times_str:
-                    try:
-                        penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
-                    except:
-                        penalty_times = []
+                # Converte i tempi e le durate in liste, supportando anche minuti:secondi.
+                penalty_times = parse_match_time_list(penalty_times_str)
 
                 penalty_durations = []
                 if penalty_durations_str:
                     try:
-                        penalty_durations = [float(d.strip()) for d in penalty_durations_str.split(',') if d.strip()]
+                        penalty_durations = [float(d.strip().replace(',', '.')) for d in penalty_durations_str.split(',') if d.strip()]
                     except:
                         penalty_durations = []
 
@@ -5386,20 +5444,9 @@ def match_detail(match_id):
                     flash(f'Errore: {player.name} ha {len(penalty_times)} tempi penalità ma {len(penalty_durations)} durate', 'danger')
                     continue
 
-                # Converte altri tempi in liste di interi
-                goal_times = []
-                if goal_times_str:
-                    try:
-                        goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
-                    except:
-                        goal_times = []
-
-                assist_times = []
-                if assist_times_str:
-                    try:
-                        assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
-                    except:
-                        assist_times = []
+                # Converte altri tempi in liste.
+                goal_times = parse_match_time_list(goal_times_str)
+                assist_times = parse_match_time_list(assist_times_str)
 
                 # Validazioni esistenti per gol e assist
                 if len(goal_times) != goals and goals > 0:
@@ -5435,9 +5482,9 @@ def match_detail(match_id):
                         assists=assists,
                         penalties=total_penalty_duration,  # ORA CONTIENE LA DURATA TOTALE
                         jersey_number=jersey_number,
-                        goal_times=','.join(map(str, goal_times)) if goal_times else None,
-                        assist_times=','.join(map(str, assist_times)) if assist_times else None,
-                        penalty_times=','.join(map(str, penalty_times)) if penalty_times else None,
+                        goal_times=','.join(goal_times) if goal_times else None,
+                        assist_times=','.join(assist_times) if assist_times else None,
+                        penalty_times=','.join(penalty_times) if penalty_times else None,
                         penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,  # NUOVO CAMPO
                         is_best_player_team1=is_best_team1,
                         is_best_player_team2=is_best_team2,
@@ -5450,9 +5497,9 @@ def match_detail(match_id):
                     stats.assists = assists
                     stats.penalties = total_penalty_duration  # ORA CONTIENE LA DURATA TOTALE
                     stats.jersey_number = jersey_number if jersey_number else None
-                    stats.goal_times = ','.join(map(str, goal_times)) if goal_times else None
-                    stats.assist_times = ','.join(map(str, assist_times)) if assist_times else None
-                    stats.penalty_times = ','.join(map(str, penalty_times)) if penalty_times else None
+                    stats.goal_times = ','.join(goal_times) if goal_times else None
+                    stats.assist_times = ','.join(assist_times) if assist_times else None
+                    stats.penalty_times = ','.join(penalty_times) if penalty_times else None
                     stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None  # NUOVO CAMPO
                     stats.is_best_player_team1 = is_best_team1
                     stats.is_best_player_team2 = is_best_team2
@@ -5709,7 +5756,7 @@ def download_lineup_pdf(match_id):
         filename = f"distinta_giocatori_partita_{match.get_match_number()}.pdf"
         return send_file(
             buffer,
-            as_attachment=True,
+            as_attachment=False,
             download_name=filename,
             mimetype='application/pdf'
         )
@@ -6006,27 +6053,10 @@ def update_player_stats(match_id):
             assist_times_str = request.form.get(f'player_{player.id}_assist_times', '').strip()
             penalty_times_str = request.form.get(f'player_{player.id}_penalty_times', '').strip()
 
-            # Converte i tempi in liste di interi
-            goal_times = []
-            if goal_times_str:
-                try:
-                    goal_times = [int(t.strip()) for t in goal_times_str.split(',') if t.strip().isdigit()]
-                except:
-                    goal_times = []
-
-            assist_times = []
-            if assist_times_str:
-                try:
-                    assist_times = [int(t.strip()) for t in assist_times_str.split(',') if t.strip().isdigit()]
-                except:
-                    assist_times = []
-
-            penalty_times = []
-            if penalty_times_str:
-                try:
-                    penalty_times = [int(t.strip()) for t in penalty_times_str.split(',') if t.strip().isdigit()]
-                except:
-                    penalty_times = []
+            # Converte i tempi in liste, supportando anche minuti:secondi.
+            goal_times = parse_match_time_list(goal_times_str)
+            assist_times = parse_match_time_list(assist_times_str)
+            penalty_times = parse_match_time_list(penalty_times_str)
 
             # Validazioni: il numero di tempi deve corrispondere al numero di azioni
             if len(goal_times) != goals and goals > 0:
@@ -7071,6 +7101,14 @@ def format_datetime(value, format='%d/%m/%Y'):
 @app.template_filter('timeformat')
 def format_time(value, format='%H:%M'):
     return value.strftime(format)
+
+@app.template_filter('match_time_display')
+def match_time_display(value):
+    return format_match_time_for_display(value)
+
+@app.template_filter('match_time_sort')
+def match_time_sort(value):
+    return match_time_sort_key(value)
 
 @app.template_filter('player_total_goals')
 def player_total_goals(player):

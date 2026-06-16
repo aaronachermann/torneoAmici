@@ -1052,6 +1052,8 @@
                             Gestione giocatori, numeri e presenze
                             <a href="{{ url_for('download_lineup_pdf', match_id=match.id) }}"
                                 class="btn btn-sm btn-outline-danger lineup-pdf-button"
+                                target="_blank"
+                                rel="noopener"
                                 onclick="event.stopPropagation();">
                                 <i class="fas fa-file-pdf"></i> PDF
                             </a>
@@ -1169,8 +1171,8 @@
                                                 <tr class="goal-event-row" data-team="team1">
                                                     <td class="row-number">{{ row_number }}</td>
                                                     <td>
-                                                        <input type="number" class="sheet-input goal-time-input"
-                                                            min="0" max="99" step="1" placeholder="-">
+                                                        <input type="text" class="sheet-input goal-time-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                     <td>
                                                         <select class="sheet-select goal-player-select">
@@ -1230,12 +1232,12 @@
                                                             min="0" step="0.5" placeholder="-">
                                                     </td>
                                                     <td>
-                                                        <input type="number" class="sheet-input penalty-event-start-input"
-                                                            min="0" max="99" step="1" placeholder="-">
+                                                        <input type="text" class="sheet-input penalty-event-start-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                     <td>
-                                                        <input type="number" class="sheet-input penalty-event-end-input"
-                                                            min="0" step="0.5" placeholder="-">
+                                                        <input type="text" class="sheet-input penalty-event-end-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                 </tr>
                                             {% endfor %}
@@ -1276,8 +1278,8 @@
                                                 <tr class="goal-event-row" data-team="team2">
                                                     <td class="row-number">{{ row_number }}</td>
                                                     <td>
-                                                        <input type="number" class="sheet-input goal-time-input"
-                                                            min="0" max="99" step="1" placeholder="-">
+                                                        <input type="text" class="sheet-input goal-time-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                     <td>
                                                         <select class="sheet-select goal-player-select">
@@ -1337,12 +1339,12 @@
                                                             min="0" step="0.5" placeholder="-">
                                                     </td>
                                                     <td>
-                                                        <input type="number" class="sheet-input penalty-event-start-input"
-                                                            min="0" max="99" step="1" placeholder="-">
+                                                        <input type="text" class="sheet-input penalty-event-start-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                     <td>
-                                                        <input type="number" class="sheet-input penalty-event-end-input"
-                                                            min="0" step="0.5" placeholder="-">
+                                                        <input type="text" class="sheet-input penalty-event-end-input"
+                                                            inputmode="numeric" placeholder="0:00">
                                                     </td>
                                                 </tr>
                                             {% endfor %}
@@ -1644,16 +1646,16 @@
                                                                     <input type="text" class="form-control form-control-sm"
                                                                         name="player_{{ player.id }}_goal_times"
                                                                         value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}"
-                                                                        placeholder="Gol: 15,30,45"
+                                                                        placeholder="Gol: 15,30:25,45"
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)"
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30:25,45)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm"
                                                                         name="player_{{ player.id }}_assist_times"
                                                                         value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}"
-                                                                        placeholder="Assist: 10,25"
+                                                                        placeholder="Assist: 10,25:40"
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi degli assist separati da virgola (es: 10,25)"
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25:40)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                 </div>
                                                             </td>
@@ -1768,16 +1770,16 @@
                                                                     <input type="text" class="form-control form-control-sm"
                                                                         name="player_{{ player.id }}_goal_times"
                                                                         value="{{ match_stats[player.id].goal_times if match_stats[player.id].goal_times else '' }}"
-                                                                        placeholder="Gol: 15,30,45"
+                                                                        placeholder="Gol: 15,30:25,45"
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi dei gol separati da virgola (es: 15,30,45)"
+                                                                        title="Tempi dei gol separati da virgola (es: 15,30:25,45)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                     <input type="text" class="form-control form-control-sm"
                                                                         name="player_{{ player.id }}_assist_times"
                                                                         value="{{ match_stats[player.id].assist_times if match_stats[player.id].assist_times else '' }}"
-                                                                        placeholder="Assist: 10,25"
+                                                                        placeholder="Assist: 10,25:40"
                                                                         style="font-size: 11px; width: 120px;"
-                                                                        title="Tempi degli assist separati da virgola (es: 10,25)"
+                                                                        title="Tempi degli assist separati da virgola (es: 10,25:40)"
                                                                         {% if match_stats[player.id]['is_removed'] %}disabled{% endif %}>
                                                                 </div>
                                                             </td>
@@ -1799,7 +1801,7 @@
                                     <li><strong>Risultato:</strong> Inserisci i gol delle due squadre. Per le qualificazioni, spunta OT o Rigori se il pareggio è stato risolto</li>
                                     <li><strong>Nr.:</strong> Numero di maglia per questa partita (opzionale)</li>
                                     <li><strong>Penalità:</strong> Usa il bottone "Aggiungi" per aprire il popup e inserire tempo e durata delle penalità</li>
-                                    <li><strong>Tempi:</strong> Inserisci i minuti separati da virgola (es: "15,30,45" per gol al 15°, 30° e 45° minuto)</li>
+                                    <li><strong>Tempi:</strong> Inserisci minuti o minuto:secondi separati da virgola (es: "15,30:25,45")</li>
                                     <li><strong>MVP:</strong> Seleziona il miglior giocatore di ogni squadra</li>
                                     <li><strong>X Rossa:</strong> Rimuovi un giocatore dalla partita (non conterà nelle statistiche)</li>
                                 </ul>
@@ -1963,28 +1965,28 @@
                                     {% set stats = match_stats[player.id] %}
                                     {% if stats.goal_times %}
                                         {% for time in stats.goal_times.split(',') if time.strip() %}
-                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Gol', 'jersey': stats.jersey_number}) %}{% endif %}
+                                            {% if all_events.append({'time': time.strip(), 'sort_time': time.strip()|match_time_sort, 'player': player.name, 'team': player.team.name, 'action': 'Gol', 'jersey': stats.jersey_number}) %}{% endif %}
                                         {% endfor %}
                                     {% endif %}
                                     {% if stats.assist_times %}
                                         {% for time in stats.assist_times.split(',') if time.strip() %}
-                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Assist', 'jersey': stats.jersey_number}) %}{% endif %}
+                                            {% if all_events.append({'time': time.strip(), 'sort_time': time.strip()|match_time_sort, 'player': player.name, 'team': player.team.name, 'action': 'Assist', 'jersey': stats.jersey_number}) %}{% endif %}
                                         {% endfor %}
                                     {% endif %}
                                     {% if stats.penalty_times %}
                                         {% for time in stats.penalty_times.split(',') if time.strip() %}
-                                            {% if all_events.append({'time': time.strip()|int, 'player': player.name, 'team': player.team.name, 'action': 'Penalità', 'jersey': stats.jersey_number}) %}{% endif %}
+                                            {% if all_events.append({'time': time.strip(), 'sort_time': time.strip()|match_time_sort, 'player': player.name, 'team': player.team.name, 'action': 'Penalità', 'jersey': stats.jersey_number}) %}{% endif %}
                                         {% endfor %}
                                     {% endif %}
                                 {% endfor %}
 
                                 {% if all_events %}
-                                    {% set sorted_events = all_events|sort(attribute='time') %}
+                                    {% set sorted_events = all_events|sort(attribute='sort_time') %}
                                     <div class="list-group">
                                         {% for event in sorted_events %}
                                             <div class="list-group-item d-flex justify-content-between align-items-center">
                                                 <div>
-                                                    <strong>{{ event.time }}'</strong> -
+                                                    <strong>{{ event.time|match_time_display }}</strong> -
                                                     {% if event.action == 'Gol' %}
                                                         <i class="fas fa-futbol text-success"></i>
                                                     {% elif event.action == 'Assist' %}
@@ -1999,7 +2001,7 @@
                                                     {% endif %}
                                                     <small class="text-muted">({{ event.team }})</small>
                                                 </div>
-                                                <span class="badge bg-light text-dark">{{ event.time }}'</span>
+                                                <span class="badge bg-light text-dark">{{ event.time|match_time_display }}</span>
                                             </div>
                                         {% endfor %}
                                     </div>
@@ -2086,7 +2088,7 @@
                 <div class="modal-body">
                     <div class="alert alert-info" role="alert">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Istruzioni:</strong> Inserisci il tempo (minuto) e la durata di ogni penalità.
+                        <strong>Istruzioni:</strong> Inserisci il tempo (minuto o minuto:secondi) e la durata di ogni penalità.
                         Puoi aggiungere più penalità per lo stesso giocatore.
                     </div>
 
@@ -2151,6 +2153,52 @@
             .filter(Boolean)
             .map((item) => allowDecimal ? Number.parseFloat(item) : Number.parseInt(item, 10))
             .filter((item) => Number.isFinite(item));
+    }
+
+    function timeToSeconds(value) {
+        if (value === null || value === undefined || value === '') return NaN;
+
+        const rawValue = String(value).trim().replace("'", '').replace('’', '');
+        if (!rawValue) return NaN;
+
+        if (rawValue.includes(':')) {
+            const parts = rawValue.split(':');
+            if (parts.length !== 2) return NaN;
+
+            const minutes = Number.parseInt(parts[0], 10);
+            const seconds = Number.parseInt(parts[1], 10);
+            if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || minutes < 0 || seconds < 0 || seconds > 59) {
+                return NaN;
+            }
+
+            return minutes * 60 + seconds;
+        }
+
+        const minutes = Number.parseFloat(rawValue.replace(',', '.'));
+        return Number.isFinite(minutes) && minutes >= 0 ? Math.round(minutes * 60) : NaN;
+    }
+
+    function secondsToTime(totalSeconds) {
+        if (!Number.isFinite(totalSeconds)) return '';
+
+        const roundedSeconds = Math.max(0, Math.round(totalSeconds));
+        const minutes = Math.floor(roundedSeconds / 60);
+        const seconds = roundedSeconds % 60;
+        return seconds === 0 ? String(minutes) : `${minutes}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function normalizeTimeInput(value) {
+        const totalSeconds = timeToSeconds(value);
+        return Number.isFinite(totalSeconds) ? secondsToTime(totalSeconds) : '';
+    }
+
+    function parseTimeValues(value) {
+        if (!value) return [];
+
+        return value
+            .split(',')
+            .map((item) => normalizeTimeInput(item))
+            .filter(Boolean);
     }
 
     function formatSheetNumber(value) {
@@ -2272,8 +2320,8 @@
     }
 
     function eventSortValue(value) {
-        const number = Number.parseFloat(value);
-        return Number.isFinite(number) ? number : 9999;
+        const seconds = timeToSeconds(value);
+        return Number.isFinite(seconds) ? seconds : 999999;
     }
 
     function buildGoalEvents(teamKey) {
@@ -2285,8 +2333,8 @@
             if (!isPlayerActive(player.id)) return;
 
             const stats = getPlayerStats(player.id);
-            const goalTimes = parseSheetValues(stats.goal_times || '');
-            const assistTimes = parseSheetValues(stats.assist_times || '');
+            const goalTimes = parseTimeValues(stats.goal_times || '');
+            const assistTimes = parseTimeValues(stats.assist_times || '');
             const goalCount = Math.max(Number.parseInt(stats.goals || 0, 10), goalTimes.length);
             const assistCount = Math.max(Number.parseInt(stats.assists || 0, 10), assistTimes.length);
 
@@ -2333,18 +2381,19 @@
             if (!isPlayerActive(player.id)) return;
 
             const stats = getPlayerStats(player.id);
-            const starts = parseSheetValues(stats.penalty_times || '');
+            const starts = parseTimeValues(stats.penalty_times || '');
             const durations = parseSheetValues(stats.penalty_durations || '', true);
             const eventCount = Math.max(starts.length, durations.length);
 
             for (let index = 0; index < eventCount; index += 1) {
                 const start = starts[index] ?? '';
                 const duration = durations[index] ?? '';
+                const startSeconds = timeToSeconds(start);
                 events.push({
                     playerId: player.id,
                     start,
                     duration,
-                    end: Number.isFinite(start) && Number.isFinite(duration) ? start + duration : ''
+                    end: Number.isFinite(startSeconds) && Number.isFinite(duration) ? secondsToTime(startSeconds + (duration * 60)) : ''
                 });
             }
         });
@@ -2382,17 +2431,27 @@
         const startInput = row.querySelector('.penalty-event-start-input');
         const durationInput = row.querySelector('.penalty-event-duration-input');
         const endInput = row.querySelector('.penalty-event-end-input');
-        const start = Number.parseFloat(startInput.value);
-        const duration = Number.parseFloat(durationInput.value);
-        const end = Number.parseFloat(endInput.value);
+        const startSeconds = timeToSeconds(startInput.value);
+        const duration = Number.parseFloat(durationInput.value.replace(',', '.'));
+        const endSeconds = timeToSeconds(endInput.value);
+        const normalizedStart = normalizeTimeInput(startInput.value);
+        const normalizedEnd = normalizeTimeInput(endInput.value);
 
-        if (source === 'end' && Number.isFinite(start) && Number.isFinite(end)) {
-            durationInput.value = formatSheetNumber(Math.max(0, end - start));
+        if (startInput.value.trim() && normalizedStart && startInput.value !== normalizedStart) {
+            startInput.value = normalizedStart;
+        }
+
+        if (endInput.value.trim() && normalizedEnd && endInput.value !== normalizedEnd) {
+            endInput.value = normalizedEnd;
+        }
+
+        if (source === 'end' && Number.isFinite(startSeconds) && Number.isFinite(endSeconds)) {
+            durationInput.value = formatSheetNumber(Math.max(0, endSeconds - startSeconds) / 60);
             return;
         }
 
-        if (Number.isFinite(start) && Number.isFinite(duration)) {
-            endInput.value = formatSheetNumber(start + duration);
+        if (Number.isFinite(startSeconds) && Number.isFinite(duration)) {
+            endInput.value = secondsToTime(startSeconds + (duration * 60));
         } else if (!endInput.value) {
             endInput.value = '';
         }
@@ -2403,11 +2462,42 @@
         if (input) input.value = value;
     }
 
-    function syncMatchSheetEvents() {
+    function getTeamScoreInput(teamKey) {
+        return document.getElementById(teamKey === 'team1' ? 'team1_score_main' : 'team2_score_main');
+    }
+
+    function setScoreInputValue(teamKey, score, options = {}) {
+        const input = getTeamScoreInput(teamKey);
+        if (!input) return;
+
+        if (options.preserveExistingEmptyScore && score === 0 && input.value !== '') {
+            return;
+        }
+
+        const nextValue = String(score);
+        if (input.value === nextValue) return;
+
+        input.value = nextValue;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function updateScoresFromGoalCounts(goalCounts, options = {}) {
+        const hasGoalEntries = (goalCounts.team1 || 0) + (goalCounts.team2 || 0) > 0;
+        const scoreOptions = {
+            ...options,
+            preserveExistingEmptyScore: Boolean(options.preserveExistingEmptyScore) && !hasGoalEntries
+        };
+
+        setScoreInputValue('team1', goalCounts.team1 || 0, scoreOptions);
+        setScoreInputValue('team2', goalCounts.team2 || 0, scoreOptions);
+    }
+
+    function syncMatchSheetEvents(options = {}) {
         syncAllLineupHiddenStates();
         refreshPlayerOptionLabels();
 
         const playerStats = {};
+        const goalCounts = { team1: 0, team2: 0 };
 
         Object.values(matchSheetTeams).flat().forEach((player) => {
             playerStats[player.id] = {
@@ -2422,26 +2512,38 @@
         });
 
         document.querySelectorAll('.goal-event-row').forEach((row) => {
-            const time = row.querySelector('.goal-time-input').value.trim();
+            const timeInput = row.querySelector('.goal-time-input');
+            const time = normalizeTimeInput(timeInput.value);
             const scorerId = row.querySelector('.goal-player-select').value;
             const assistId = row.querySelector('.assist-player-select').value;
+            const teamKey = row.dataset.team;
 
-            if (scorerId && time && playerStats[scorerId] && isPlayerActive(scorerId)) {
-                playerStats[scorerId].goals += 1;
-                playerStats[scorerId].goalTimes.push(time);
+            if (timeInput.value.trim() && time && timeInput.value !== time) {
+                timeInput.value = time;
             }
 
-            if (assistId && time && playerStats[assistId] && isPlayerActive(assistId)) {
+            if (scorerId && playerStats[scorerId] && isPlayerActive(scorerId)) {
+                playerStats[scorerId].goals += 1;
+                if (teamKey in goalCounts) goalCounts[teamKey] += 1;
+                if (time) playerStats[scorerId].goalTimes.push(time);
+            }
+
+            if (assistId && playerStats[assistId] && isPlayerActive(assistId)) {
                 playerStats[assistId].assists += 1;
-                playerStats[assistId].assistTimes.push(time);
+                if (time) playerStats[assistId].assistTimes.push(time);
             }
         });
 
         document.querySelectorAll('.penalty-event-row').forEach((row) => {
             const playerId = row.querySelector('.penalty-player-select').value;
-            const start = row.querySelector('.penalty-event-start-input').value.trim();
+            const startInput = row.querySelector('.penalty-event-start-input');
+            const start = normalizeTimeInput(startInput.value);
             const duration = row.querySelector('.penalty-event-duration-input').value.trim();
-            const durationNumber = Number.parseFloat(duration);
+            const durationNumber = Number.parseFloat(duration.replace(',', '.'));
+
+            if (startInput.value.trim() && start && startInput.value !== start) {
+                startInput.value = start;
+            }
 
             if (playerId && start && duration && playerStats[playerId] && isPlayerActive(playerId)) {
                 playerStats[playerId].penaltyTimes.push(start);
@@ -2461,6 +2563,12 @@
             setPlayerStat(playerId, 'penalty_durations', stats.penaltyDurations.join(','));
             setPlayerStat(playerId, 'penalties', formatSheetNumber(stats.penaltyTotal) || '0');
         });
+
+        if (options.updateScores) {
+            updateScoresFromGoalCounts(goalCounts, {
+                preserveExistingEmptyScore: Boolean(options.preserveExistingEmptyScore)
+            });
+        }
     }
 
     function initializeLineupManager() {
@@ -2489,7 +2597,7 @@
             checkbox.addEventListener('change', () => {
                 syncLineupHiddenState(checkbox.dataset.playerId);
                 refreshPlayerOptionLabels();
-                syncMatchSheetEvents();
+                syncMatchSheetEvents({ updateScores: true });
             });
         });
 
@@ -2518,17 +2626,22 @@
             });
         });
 
-        document.querySelectorAll('.goal-event-row input, .goal-event-row select, .penalty-event-row select').forEach((input) => {
-            input.addEventListener('input', syncMatchSheetEvents);
-            input.addEventListener('change', syncMatchSheetEvents);
+        document.querySelectorAll('.goal-event-row input, .goal-event-row select').forEach((input) => {
+            input.addEventListener('input', () => syncMatchSheetEvents({ updateScores: true }));
+            input.addEventListener('change', () => syncMatchSheetEvents({ updateScores: true }));
+        });
+
+        document.querySelectorAll('.penalty-event-row select').forEach((input) => {
+            input.addEventListener('input', () => syncMatchSheetEvents());
+            input.addEventListener('change', () => syncMatchSheetEvents());
         });
 
         const sheetForm = document.querySelector('.match-sheet')?.closest('form');
         if (sheetForm) {
-            sheetForm.addEventListener('submit', syncMatchSheetEvents);
+            sheetForm.addEventListener('submit', () => syncMatchSheetEvents({ updateScores: true }));
         }
 
-        syncMatchSheetEvents();
+        syncMatchSheetEvents({ updateScores: true, preserveExistingEmptyScore: true });
     }
 
     document.addEventListener('DOMContentLoaded', initializeEventMatchSheet);
@@ -2547,7 +2660,7 @@
         const playerStats = matchStatsData[playerId];
         if (!playerStats) return;
 
-        const penaltyTimes = playerStats.penalty_times ? playerStats.penalty_times.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t)) : [];
+        const penaltyTimes = playerStats.penalty_times ? parseTimeValues(playerStats.penalty_times) : [];
         const penaltyDurations = playerStats.penalty_durations ? playerStats.penalty_durations.split(',').map(d => parseFloat(d.trim())).filter(d => !isNaN(d)) : [];
 
         // Se non ci sono penalità, esci
@@ -2574,7 +2687,7 @@
             penaltyRow.className = 'penalty-row d-flex justify-content-between align-items-center mb-1 p-2 bg-light border rounded';
             penaltyRow.innerHTML = `
                 <div class="penalty-info">
-                    <small><strong>${time}'</strong> - ${duration} min</small>
+                    <small><strong>${time}</strong> - ${duration} min</small>
                 </div>
                 <button type="button" class="btn btn-danger btn-sm remove-penalty"
                         title="Rimuovi penalità">
@@ -2719,11 +2832,11 @@
                 <div class="row g-3 align-items-center">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">
-                            <i class="fas fa-clock me-1"></i>Tempo (minuto)
+                            <i class="fas fa-clock me-1"></i>Tempo
                         </label>
-                        <input type="number" class="form-control modal-penalty-time"
-                               placeholder="es. 25" min="1" max="60" step="1" value="${timeValue}">
-                        <div class="form-text">Inserisci il minuto della penalità</div>
+                        <input type="text" class="form-control modal-penalty-time"
+                               inputmode="numeric" placeholder="es. 25:30" value="${normalizeTimeInput(timeValue)}">
+                        <div class="form-text">Inserisci minuto o minuto:secondi</div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">
@@ -2753,7 +2866,16 @@
             const timeInput = penaltyRow.querySelector('.modal-penalty-time');
             const durationSelect = penaltyRow.querySelector('.modal-penalty-duration');
 
-            if (timeInput) timeInput.addEventListener('input', updateModalPenaltyTotal);
+            if (timeInput) {
+                timeInput.addEventListener('input', updateModalPenaltyTotal);
+                timeInput.addEventListener('change', () => {
+                    const normalizedTime = normalizeTimeInput(timeInput.value);
+                    if (timeInput.value.trim() && normalizedTime) {
+                        timeInput.value = normalizedTime;
+                    }
+                    updateModalPenaltyTotal();
+                });
+            }
             if (durationSelect) durationSelect.addEventListener('change', updateModalPenaltyTotal);
 
             // Aggiungi listener per rimuovere la penalità
@@ -2787,7 +2909,7 @@
                 const timeInput = row.querySelector('.modal-penalty-time');
                 const durationSelect = row.querySelector('.modal-penalty-duration');
 
-                if (timeInput && durationSelect && timeInput.value && durationSelect.value) {
+                if (timeInput && durationSelect && normalizeTimeInput(timeInput.value) && durationSelect.value) {
                     durations.push(parseFloat(durationSelect.value));
                 }
             });
@@ -2831,10 +2953,15 @@
 
                 // Copia le penalità dal modal al form principale
                 modalPenalties.forEach(modalPenalty => {
-                    const timeValue = modalPenalty.querySelector('.modal-penalty-time')?.value;
+                    const timeInput = modalPenalty.querySelector('.modal-penalty-time');
+                    const timeValue = normalizeTimeInput(timeInput?.value || '');
                     const durationValue = modalPenalty.querySelector('.modal-penalty-duration')?.value;
 
                     if (timeValue && durationValue) {
+                        if (timeInput.value !== timeValue) {
+                            timeInput.value = timeValue;
+                        }
+
                         penaltyCount++;
                         totalDuration += parseFloat(durationValue);
                         penaltyTimes.push(timeValue);
@@ -2847,7 +2974,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="penalty-info">
                                     <small class="text-muted">Minuto:</small>
-                                    <span class="fw-bold">${timeValue}'</span>
+                                    <span class="fw-bold">${timeValue}</span>
                                     <small class="text-muted ms-2">Durata:</small>
                                     <span class="text-danger fw-bold">${durationValue} min</span>
                                 </div>
@@ -2957,10 +3084,11 @@
                     remainingPenalties.forEach(row => {
                         const timeInput = row.querySelector('.penalty-time');
                         const durationInput = row.querySelector('.penalty-duration');
-                        if (timeInput && durationInput && timeInput.value && durationInput.value) {
-                            times.push(timeInput.value);
+                        const normalizedTime = normalizeTimeInput(timeInput?.value || '');
+                        if (timeInput && durationInput && normalizedTime && durationInput.value) {
+                            times.push(normalizedTime);
                             durations.push(durationInput.value);
-                            totalDuration += parseFloat(durationInput.value);
+                            totalDuration += parseFloat(durationInput.value.replace(',', '.'));
                         }
                     });
 
