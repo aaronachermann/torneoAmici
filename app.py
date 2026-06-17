@@ -428,6 +428,11 @@ class Player(db.Model):
 
         return stats
 
+
+DIRECT_SHOOTOUT_MATCH_NUMBERS = set(range(1, 35)) | {37, 38} | set(range(41, 45))
+OVERTIME_THEN_SHOOTOUT_MATCH_NUMBERS = {35, 36, 39, 40, 45, 46, 47, 48}
+
+
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
@@ -639,16 +644,35 @@ class Match(db.Model):
 
     def get_allowed_overtime_rules(self):
         """Restituisce le regole di overtime/rigori permesse per questa fase."""
+        match_number = self.get_match_number()
+        if match_number in DIRECT_SHOOTOUT_MATCH_NUMBERS:
+            return {
+                'allow_overtime': False,
+                'allow_shootout': True,
+                'requires_tiebreak': True,
+                'description': 'In caso di parità: direttamente ai rigori'
+            }
+
+        if match_number in OVERTIME_THEN_SHOOTOUT_MATCH_NUMBERS:
+            return {
+                'allow_overtime': True,
+                'allow_shootout': True,
+                'requires_tiebreak': True,
+                'description': 'In caso di parità: supplementari e poi rigori'
+            }
+
         if self.phase == 'quarterfinal':
             return {
                 'allow_overtime': False,
                 'allow_shootout': True,
+                'requires_tiebreak': True,
                 'description': 'Solo rigori (no overtime)'
             }
         elif self.phase == 'semifinal':
             return {
                 'allow_overtime': True,
                 'allow_shootout': True,
+                'requires_tiebreak': True,
                 'description': 'Overtime + rigori se necessario'
             }
         elif self.phase == 'final' or self.phase == 'placement':
@@ -658,12 +682,14 @@ class Match(db.Model):
                 return {
                     'allow_overtime': True,
                     'allow_shootout': True,
+                    'requires_tiebreak': True,
                     'description': 'Finale 1°-4°: Overtime + rigori se necessario'
                 }
             if placement in ['5-6', '7-8']:
                 return {
                     'allow_overtime': False,
                     'allow_shootout': True,
+                    'requires_tiebreak': True,
                     'description': 'Finale 5°-8°: Solo rigori (no overtime)'
                 }
 
@@ -679,6 +705,7 @@ class Match(db.Model):
                     return {
                         'allow_overtime': True,
                         'allow_shootout': True,
+                        'requires_tiebreak': True,
                         'description': 'Finale 1°-4°: Overtime + rigori se necessario'
                     }
 
@@ -686,6 +713,7 @@ class Match(db.Model):
             return {
                 'allow_overtime': False,
                 'allow_shootout': True,
+                'requires_tiebreak': True,
                 'description': 'Finale 5°-8°: Solo rigori (no overtime)'
             }
         else:
@@ -693,6 +721,7 @@ class Match(db.Model):
             return {
                 'allow_overtime': True,
                 'allow_shootout': True,
+                'requires_tiebreak': False,
                 'description': 'Overtime + rigori permessi'
             }
 
@@ -874,12 +903,10 @@ def validate_match_overtime_rules(match):
 
     rules = match.get_allowed_overtime_rules()
 
-    # Se è in pareggio, deve essere risolto nei playoff
-    if (match.team1_score == match.team2_score and
-        match.phase in ['quarterfinal', 'semifinal', 'final', 'placement']):
-
+    # Se è in pareggio, deve essere risolto quando la partita lo richiede.
+    if match.team1_score == match.team2_score and rules.get('requires_tiebreak'):
         if not (match.overtime or match.shootout):
-            return False, f"Pareggio non permesso in {match.phase}! Deve finire con overtime o rigori."
+            return False, f"Pareggio non permesso nella partita {match.get_match_number()}! {rules['description']}."
 
     # Controlla regole overtime
     if match.overtime and not rules['allow_overtime']:
@@ -1204,6 +1231,35 @@ def format_match_time_for_display(value):
     return normalized if ':' in normalized else f"{normalized}'"
 
 
+def add_minutes_to_match_time(start_time, duration_minutes):
+    start_seconds = match_time_sort_key(start_time)
+    if start_seconds == 999999:
+        return None
+
+    try:
+        duration_seconds = int(round(float(duration_minutes) * 60))
+    except (TypeError, ValueError):
+        return None
+
+    total_seconds = max(0, start_seconds + duration_seconds)
+    minutes, seconds = divmod(total_seconds, 60)
+    return str(minutes) if seconds == 0 else f"{minutes}:{seconds:02d}"
+
+
+def normalize_penalty_end_times(penalty_times, penalty_durations, penalty_end_times):
+    """Allinea i tempi di fine alle penalità, usando inizio+durata come default."""
+    end_times = []
+    event_count = max(len(penalty_times), len(penalty_durations), len(penalty_end_times))
+
+    for index in range(event_count):
+        explicit_end = penalty_end_times[index] if index < len(penalty_end_times) else None
+        start_time = penalty_times[index] if index < len(penalty_times) else None
+        duration = penalty_durations[index] if index < len(penalty_durations) else None
+        end_times.append(explicit_end or add_minutes_to_match_time(start_time, duration) or '')
+
+    return end_times
+
+
 class PlayerMatchStats(db.Model):
     """Statistiche di un giocatore in una singola partita."""
     __tablename__ = 'player_match_stats'
@@ -1221,6 +1277,7 @@ class PlayerMatchStats(db.Model):
     assists = db.Column(db.Integer, default=0)
     penalties = db.Column(db.Integer, default=0)
     penalty_durations = db.Column(db.Text)
+    penalty_end_times = db.Column(db.Text)
 
     # NUOVI CAMPI: Tempi per ogni azione
     goal_times = db.Column(db.Text)  # Es: "15,23:30,67" per gol con minuti ed eventuali secondi
@@ -1276,6 +1333,18 @@ class PlayerMatchStats(db.Model):
         else:
             self.penalty_times = None
 
+    def get_penalty_end_times_list(self):
+        """Restituisce una lista dei tempi di fine effettiva delle penalità."""
+        return parse_match_time_list(self.penalty_end_times)
+
+    def set_penalty_end_times_list(self, times_list):
+        """Imposta i tempi di fine effettiva delle penalità da una lista."""
+        normalized_times = parse_match_time_list(','.join(map(str, times_list))) if times_list else []
+        if normalized_times:
+            self.penalty_end_times = ','.join(normalized_times)
+        else:
+            self.penalty_end_times = None
+
     def get_penalty_durations_list(self):
         """Restituisce una lista delle durate delle penalità."""
         if not self.penalty_durations:
@@ -1316,11 +1385,14 @@ class PlayerMatchStats(db.Model):
         # NUOVA LOGICA per penalità con durate
         penalty_times = self.get_penalty_times_list()
         penalty_durations = self.get_penalty_durations_list()
+        penalty_end_times = self.get_penalty_end_times_list()
 
         if penalty_times and penalty_durations:
             penalty_info = []
             for i, (time, duration) in enumerate(zip(penalty_times, penalty_durations)):
-                penalty_info.append(f"{format_match_time_for_display(time)} ({duration}min)")
+                end_time = penalty_end_times[i] if i < len(penalty_end_times) else None
+                end_suffix = f" -> {format_match_time_for_display(end_time)}" if end_time else ""
+                penalty_info.append(f"{format_match_time_for_display(time)}{end_suffix} ({duration}min)")
 
             display_parts.append(f"Penalità: {', '.join(penalty_info)}")
 
@@ -2074,6 +2146,7 @@ def sync_match_data(match_id):
                 assist_times_str = saved_data.get(f'player_{player.id}_assist_times', '')
                 penalty_times_str = saved_data.get(f'player_{player.id}_penalty_times', '')
                 penalty_durations_str = saved_data.get(f'player_{player.id}_penalty_durations', '')
+                penalty_end_times_str = saved_data.get(f'player_{player.id}_penalty_end_times', '')
 
                 # Converti tempi in liste, supportando anche minuti:secondi.
                 goal_times = parse_match_time_list(goal_times_str)
@@ -2082,6 +2155,11 @@ def sync_match_data(match_id):
                 penalty_durations = []
                 if penalty_durations_str:
                     penalty_durations = [float(d.strip().replace(',', '.')) for d in penalty_durations_str.split(',') if d.strip()]
+                penalty_end_times = normalize_penalty_end_times(
+                    penalty_times,
+                    penalty_durations,
+                    parse_match_time_list(penalty_end_times_str)
+                )
 
                 # Calcola durata totale penalità
                 total_penalty_duration = sum(penalty_durations) if penalty_durations else penalties
@@ -2098,6 +2176,7 @@ def sync_match_data(match_id):
                     assist_times = []
                     penalty_times = []
                     penalty_durations = []
+                    penalty_end_times = []
 
                 # Trova o crea statistiche
                 stats = PlayerMatchStats.query.filter_by(
@@ -2117,6 +2196,7 @@ def sync_match_data(match_id):
                         assist_times=','.join(assist_times) if assist_times else None,
                         penalty_times=','.join(penalty_times) if penalty_times else None,
                         penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,
+                        penalty_end_times=','.join(penalty_end_times) if penalty_end_times else None,
                         is_best_player_team1=is_best_team1,
                         is_best_player_team2=is_best_team2,
                         is_removed=not is_active
@@ -2131,6 +2211,7 @@ def sync_match_data(match_id):
                     stats.assist_times = ','.join(assist_times) if assist_times else None
                     stats.penalty_times = ','.join(penalty_times) if penalty_times else None
                     stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None
+                    stats.penalty_end_times = ','.join(penalty_end_times) if penalty_end_times else None
                     stats.is_best_player_team1 = is_best_team1
                     stats.is_best_player_team2 = is_best_team2
                     stats.is_removed = not is_active
@@ -2231,6 +2312,7 @@ def get_current_match_data(match_id):
                     current_data[f'player_{player.id}_assist_times'] = stats.assist_times
                     current_data[f'player_{player.id}_penalty_times'] = stats.penalty_times
                     current_data[f'player_{player.id}_penalty_durations'] = stats.penalty_durations
+                    current_data[f'player_{player.id}_penalty_end_times'] = getattr(stats, 'penalty_end_times', None)
                     current_data[f'player_{player.id}_is_active'] = '0' if stats.is_removed else '1'
 
                     if stats.is_best_player_team1:
@@ -2248,6 +2330,7 @@ def get_current_match_data(match_id):
                     current_data[f'player_{player.id}_assist_times'] = stats.assist_times
                     current_data[f'player_{player.id}_penalty_times'] = stats.penalty_times
                     current_data[f'player_{player.id}_penalty_durations'] = stats.penalty_durations
+                    current_data[f'player_{player.id}_penalty_end_times'] = getattr(stats, 'penalty_end_times', None)
                     current_data[f'player_{player.id}_is_active'] = '0' if stats.is_removed else '1'
 
                     if stats.is_best_player_team2:
@@ -3368,7 +3451,7 @@ def handle_database_error(e):
 
 @app.route('/migrate_penalty_durations', methods=['POST'])
 def migrate_penalty_durations():
-    """Migrazione per aggiungere il campo penalty_durations."""
+    """Migrazione per aggiungere i campi avanzati delle penalità."""
     try:
         # Verifica se la tabella PlayerMatchStats esiste
         if not db.inspect(db.engine).has_table('player_match_stats'):
@@ -3379,18 +3462,27 @@ def migrate_penalty_durations():
         inspector = db.inspect(db.engine)
         existing_columns = [col['name'] for col in inspector.get_columns('player_match_stats')]
 
-        # Aggiungi la nuova colonna se non esiste
-        if 'penalty_durations' not in existing_columns:
-            try:
-                with db.engine.connect() as conn:
-                    conn.execute(db.text('ALTER TABLE player_match_stats ADD COLUMN penalty_durations TEXT'))
-                    conn.commit()
-                flash('[OK] Colonna penalty_durations aggiunta con successo!', 'success')
-            except Exception as e:
-                flash(f'[ERRORE] Errore nell\'aggiungere la colonna penalty_durations: {str(e)}', 'danger')
-                return redirect(url_for('index'))
+        columns_to_add = [
+            ('penalty_durations', 'TEXT'),
+            ('penalty_end_times', 'TEXT')
+        ]
+        columns_added = []
+
+        for column_name, column_type in columns_to_add:
+            if column_name not in existing_columns:
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(db.text(f'ALTER TABLE player_match_stats ADD COLUMN {column_name} {column_type}'))
+                        conn.commit()
+                    columns_added.append(column_name)
+                except Exception as e:
+                    flash(f'[ERRORE] Errore nell\'aggiungere la colonna {column_name}: {str(e)}', 'danger')
+                    return redirect(url_for('index'))
+
+        if columns_added:
+            flash(f'[OK] Colonne aggiunte con successo: {", ".join(columns_added)}', 'success')
         else:
-            flash('[INFO] La colonna penalty_durations è già presente.', 'info')
+            flash('[INFO] Le colonne avanzate delle penalità sono già presenti.', 'info')
 
     except Exception as e:
         flash(f'[ERRORE] Errore durante la migrazione: {str(e)}', 'danger')
@@ -3410,6 +3502,8 @@ def migrate_player_stats_schema():
             ('goal_times', 'TEXT'),
             ('assist_times', 'TEXT'),
             ('penalty_times', 'TEXT'),
+            ('penalty_durations', 'TEXT'),
+            ('penalty_end_times', 'TEXT'),
             ('jersey_number', 'INTEGER')
         ]
 
@@ -5427,6 +5521,7 @@ def match_detail(match_id):
                 # === NUOVA GESTIONE PENALITÀ CON DURATA ===
                 penalty_times_str = request.form.get(f'player_{player.id}_penalty_times', '').strip()
                 penalty_durations_str = request.form.get(f'player_{player.id}_penalty_durations', '').strip()
+                penalty_end_times_str = request.form.get(f'player_{player.id}_penalty_end_times', '').strip()
                 total_penalty_duration = float(request.form.get(f'player_{player.id}_penalties', 0) or 0)
 
                 # Converte i tempi e le durate in liste, supportando anche minuti:secondi.
@@ -5443,6 +5538,12 @@ def match_detail(match_id):
                 if len(penalty_times) != len(penalty_durations) and (penalty_times or penalty_durations):
                     flash(f'Errore: {player.name} ha {len(penalty_times)} tempi penalità ma {len(penalty_durations)} durate', 'danger')
                     continue
+
+                penalty_end_times = normalize_penalty_end_times(
+                    penalty_times,
+                    penalty_durations,
+                    parse_match_time_list(penalty_end_times_str)
+                )
 
                 # Converte altri tempi in liste.
                 goal_times = parse_match_time_list(goal_times_str)
@@ -5466,6 +5567,7 @@ def match_detail(match_id):
                     assist_times = []
                     penalty_times = []
                     penalty_durations = []
+                    penalty_end_times = []
 
                 # Trova o crea le statistiche per questo giocatore in questa partita
                 stats = PlayerMatchStats.query.filter_by(
@@ -5486,6 +5588,7 @@ def match_detail(match_id):
                         assist_times=','.join(assist_times) if assist_times else None,
                         penalty_times=','.join(penalty_times) if penalty_times else None,
                         penalty_durations=','.join(map(str, penalty_durations)) if penalty_durations else None,  # NUOVO CAMPO
+                        penalty_end_times=','.join(penalty_end_times) if penalty_end_times else None,
                         is_best_player_team1=is_best_team1,
                         is_best_player_team2=is_best_team2,
                         is_removed=not is_active
@@ -5501,6 +5604,7 @@ def match_detail(match_id):
                     stats.assist_times = ','.join(assist_times) if assist_times else None
                     stats.penalty_times = ','.join(penalty_times) if penalty_times else None
                     stats.penalty_durations = ','.join(map(str, penalty_durations)) if penalty_durations else None  # NUOVO CAMPO
+                    stats.penalty_end_times = ','.join(penalty_end_times) if penalty_end_times else None
                     stats.is_best_player_team1 = is_best_team1
                     stats.is_best_player_team2 = is_best_team2
                     stats.is_removed = not is_active
@@ -5552,6 +5656,7 @@ def match_detail(match_id):
                     'assist_times': stats.assist_times,
                     'penalty_times': stats.penalty_times,
                     'penalty_durations': stats.penalty_durations,  # NUOVO CAMPO
+                    'penalty_end_times': getattr(stats, 'penalty_end_times', None),
                     'is_best_player_team1': stats.is_best_player_team1,
                     'is_best_player_team2': stats.is_best_player_team2,
                     'is_removed': stats.is_removed,
@@ -5572,6 +5677,7 @@ def match_detail(match_id):
                     'assist_times': None,
                     'penalty_times': None,
                     'penalty_durations': None,  # NUOVO CAMPO
+                    'penalty_end_times': None,
                     'is_best_player_team1': False,
                     'is_best_player_team2': False,
                     'is_removed': False,
@@ -5589,6 +5695,7 @@ def match_detail(match_id):
                 'assist_times': None,
                 'penalty_times': None,
                 'penalty_durations': None,  # NUOVO CAMPO
+                'penalty_end_times': None,
                 'is_best_player_team1': False,
                 'is_best_player_team2': False,
                 'is_removed': False,
@@ -11098,6 +11205,24 @@ def reset_scores_only():
 _database_initialized = False
 
 
+def ensure_player_match_stats_schema():
+    """Aggiunge colonne non distruttive mancanti alla tabella statistiche partita."""
+    inspector = db.inspect(db.engine)
+    if not inspector.has_table('player_match_stats'):
+        return
+
+    existing_columns = {column['name'] for column in inspector.get_columns('player_match_stats')}
+    columns_to_add = [
+        ('penalty_end_times', 'TEXT')
+    ]
+
+    with db.engine.connect() as conn:
+        for column_name, column_type in columns_to_add:
+            if column_name not in existing_columns:
+                conn.execute(db.text(f'ALTER TABLE player_match_stats ADD COLUMN {column_name} {column_type}'))
+        conn.commit()
+
+
 def initialize_database(retries=5, retry_delay=5):
     global _database_initialized
     if _database_initialized:
@@ -11107,6 +11232,7 @@ def initialize_database(retries=5, retry_delay=5):
         for attempt in range(1, retries + 1):
             try:
                 db.create_all()
+                ensure_player_match_stats_schema()
                 print("Database inizializzato con successo")
                 create_admin_user()
                 _database_initialized = True

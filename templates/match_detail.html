@@ -1041,6 +1041,9 @@
                             <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalty_durations"
                                 name="player_{{ player.id }}_penalty_durations"
                                 value="{{ stats.penalty_durations if stats.penalty_durations else '' }}">
+                            <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalty_end_times"
+                                name="player_{{ player.id }}_penalty_end_times"
+                                value="{{ stats.penalty_end_times if stats.penalty_end_times else '' }}">
                             <input type="hidden" class="sheet-player-stat" data-player-id="{{ player.id }}" data-stat="penalties"
                                 name="player_{{ player.id }}_penalties"
                                 value="{{ stats.penalties if stats.penalties else 0 }}">
@@ -2383,17 +2386,19 @@
             const stats = getPlayerStats(player.id);
             const starts = parseTimeValues(stats.penalty_times || '');
             const durations = parseSheetValues(stats.penalty_durations || '', true);
-            const eventCount = Math.max(starts.length, durations.length);
+            const ends = parseTimeValues(stats.penalty_end_times || '');
+            const eventCount = Math.max(starts.length, durations.length, ends.length);
 
             for (let index = 0; index < eventCount; index += 1) {
                 const start = starts[index] ?? '';
                 const duration = durations[index] ?? '';
+                const manualEnd = ends[index] ?? '';
                 const startSeconds = timeToSeconds(start);
                 events.push({
                     playerId: player.id,
                     start,
                     duration,
-                    end: Number.isFinite(startSeconds) && Number.isFinite(duration) ? secondsToTime(startSeconds + (duration * 60)) : ''
+                    end: manualEnd || (Number.isFinite(startSeconds) && Number.isFinite(duration) ? secondsToTime(startSeconds + (duration * 60)) : '')
                 });
             }
         });
@@ -2445,8 +2450,7 @@
             endInput.value = normalizedEnd;
         }
 
-        if (source === 'end' && Number.isFinite(startSeconds) && Number.isFinite(endSeconds)) {
-            durationInput.value = formatSheetNumber(Math.max(0, endSeconds - startSeconds) / 60);
+        if (source === 'end') {
             return;
         }
 
@@ -2507,6 +2511,7 @@
                 assistTimes: [],
                 penaltyTimes: [],
                 penaltyDurations: [],
+                penaltyEndTimes: [],
                 penaltyTotal: 0
             };
         });
@@ -2537,7 +2542,9 @@
         document.querySelectorAll('.penalty-event-row').forEach((row) => {
             const playerId = row.querySelector('.penalty-player-select').value;
             const startInput = row.querySelector('.penalty-event-start-input');
+            const endInput = row.querySelector('.penalty-event-end-input');
             const start = normalizeTimeInput(startInput.value);
+            const end = normalizeTimeInput(endInput.value);
             const duration = row.querySelector('.penalty-event-duration-input').value.trim();
             const durationNumber = Number.parseFloat(duration.replace(',', '.'));
 
@@ -2545,9 +2552,14 @@
                 startInput.value = start;
             }
 
+            if (endInput.value.trim() && end && endInput.value !== end) {
+                endInput.value = end;
+            }
+
             if (playerId && start && duration && playerStats[playerId] && isPlayerActive(playerId)) {
                 playerStats[playerId].penaltyTimes.push(start);
                 playerStats[playerId].penaltyDurations.push(duration);
+                playerStats[playerId].penaltyEndTimes.push(end || (Number.isFinite(durationNumber) ? secondsToTime(timeToSeconds(start) + (durationNumber * 60)) : ''));
                 if (Number.isFinite(durationNumber)) {
                     playerStats[playerId].penaltyTotal += durationNumber;
                 }
@@ -2561,6 +2573,7 @@
             setPlayerStat(playerId, 'assist_times', stats.assistTimes.join(','));
             setPlayerStat(playerId, 'penalty_times', stats.penaltyTimes.join(','));
             setPlayerStat(playerId, 'penalty_durations', stats.penaltyDurations.join(','));
+            setPlayerStat(playerId, 'penalty_end_times', stats.penaltyEndTimes.join(','));
             setPlayerStat(playerId, 'penalties', formatSheetNumber(stats.penaltyTotal) || '0');
         });
 
@@ -2752,9 +2765,12 @@
                 let tieWarning = document.getElementById('tie-warning');
 
                 if (!tieWarning && score1 === score2 && score1 > 0 && !isOvertimeOrShootout) {
+                    const tieResolutionText = overtimeCheckbox && shootoutCheckbox ?
+                        'Seleziona OT o Rigori.' :
+                        (overtimeCheckbox ? 'Seleziona OT.' : 'Seleziona Rigori.');
                     const warningText = isPlayoff ?
-                        'Pareggio nei playoff non permesso! Deve finire con overtime o rigori.' :
-                        'Attenzione: pareggio nelle qualificazioni! Seleziona OT o Rigori.';
+                        `Pareggio non permesso! ${tieResolutionText}` :
+                        `Attenzione: pareggio da risolvere. ${tieResolutionText}`;
 
                     tieWarning = document.createElement('div');
                     tieWarning.id = 'tie-warning';
