@@ -1184,6 +1184,12 @@ def normalize_match_time_value(value):
 
         return f"{minutes}:{seconds:02d}"
 
+    if text_value.isdigit() and len(text_value) >= 4:
+        minutes = int(text_value[:-2])
+        seconds = int(text_value[-2:])
+        if seconds <= 59:
+            return f"{minutes}:{seconds:02d}"
+
     try:
         minute_value = float(text_value.replace(',', '.'))
     except ValueError:

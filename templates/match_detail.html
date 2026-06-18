@@ -579,6 +579,22 @@
             text-align: center;
         }
 
+        .sheet-input.time-input-has-warning {
+            box-shadow: inset 0 -2px 0 #b45309;
+        }
+
+        .time-input-warning {
+            color: #92400e;
+            display: block;
+            font-size: 0.66rem;
+            line-height: 1.05;
+            margin-top: 2px;
+        }
+
+        .time-input-warning[hidden] {
+            display: none;
+        }
+
         .player-name-cell {
             min-width: 118px;
         }
@@ -2158,10 +2174,35 @@
             .filter((item) => Number.isFinite(item));
     }
 
+    const MATCH_TIME_WARNING_SECONDS = 60 * 60;
+
+    function cleanTimeValue(value) {
+        return String(value ?? '').trim().replace(/[’']/g, '');
+    }
+
+    function isCompactClockTime(rawValue) {
+        return /^\d{4,}$/.test(rawValue);
+    }
+
+    function compactClockTimeToSeconds(rawValue) {
+        if (!isCompactClockTime(rawValue)) return NaN;
+
+        const minutes = Number.parseInt(rawValue.slice(0, -2), 10);
+        const seconds = Number.parseInt(rawValue.slice(-2), 10);
+        if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds > 59) return NaN;
+
+        return minutes * 60 + seconds;
+    }
+
+    function prefersClockTimeFormat(value) {
+        const rawValue = cleanTimeValue(value);
+        return rawValue.includes(':') || Number.isFinite(compactClockTimeToSeconds(rawValue));
+    }
+
     function timeToSeconds(value) {
         if (value === null || value === undefined || value === '') return NaN;
 
-        const rawValue = String(value).trim().replace("'", '').replace('’', '');
+        const rawValue = cleanTimeValue(value);
         if (!rawValue) return NaN;
 
         if (rawValue.includes(':')) {
@@ -2177,22 +2218,25 @@
             return minutes * 60 + seconds;
         }
 
+        const compactSeconds = compactClockTimeToSeconds(rawValue);
+        if (Number.isFinite(compactSeconds)) return compactSeconds;
+
         const minutes = Number.parseFloat(rawValue.replace(',', '.'));
         return Number.isFinite(minutes) && minutes >= 0 ? Math.round(minutes * 60) : NaN;
     }
 
-    function secondsToTime(totalSeconds) {
+    function secondsToTime(totalSeconds, options = {}) {
         if (!Number.isFinite(totalSeconds)) return '';
 
         const roundedSeconds = Math.max(0, Math.round(totalSeconds));
         const minutes = Math.floor(roundedSeconds / 60);
         const seconds = roundedSeconds % 60;
-        return seconds === 0 ? String(minutes) : `${minutes}:${String(seconds).padStart(2, '0')}`;
+        return seconds === 0 && !options.includeSeconds ? String(minutes) : `${minutes}:${String(seconds).padStart(2, '0')}`;
     }
 
     function normalizeTimeInput(value) {
         const totalSeconds = timeToSeconds(value);
-        return Number.isFinite(totalSeconds) ? secondsToTime(totalSeconds) : '';
+        return Number.isFinite(totalSeconds) ? secondsToTime(totalSeconds, { includeSeconds: prefersClockTimeFormat(value) }) : '';
     }
 
     function parseTimeValues(value) {
@@ -2202,6 +2246,108 @@
             .split(',')
             .map((item) => normalizeTimeInput(item))
             .filter(Boolean);
+    }
+
+    function getTimeWarningElement(input) {
+        let warning = input.parentElement?.querySelector('.time-input-warning');
+        if (!warning) {
+            warning = document.createElement('span');
+            warning.className = 'time-input-warning';
+            warning.hidden = true;
+            input.insertAdjacentElement('afterend', warning);
+        }
+
+        return warning;
+    }
+
+    function renderTimeInputWarning(input) {
+        const messages = [
+            input.dataset.timeLimitWarning || '',
+            input.dataset.goalOrderWarning || ''
+        ].filter(Boolean);
+        const warning = getTimeWarningElement(input);
+
+        if (messages.length) {
+            warning.textContent = messages.join(' ');
+            warning.hidden = false;
+            input.classList.add('time-input-has-warning');
+        } else {
+            warning.textContent = '';
+            warning.hidden = true;
+            input.classList.remove('time-input-has-warning');
+        }
+    }
+
+    function setTimeInputWarning(input, warningKey, message) {
+        input.dataset[warningKey] = message || '';
+        renderTimeInputWarning(input);
+    }
+
+    function validateTimeLimit(input) {
+        const rawValue = input.value.trim();
+        const seconds = timeToSeconds(rawValue);
+        let message = '';
+
+        if (rawValue && !Number.isFinite(seconds)) {
+            message = 'Tempo non valido.';
+        } else if (Number.isFinite(seconds) && seconds > MATCH_TIME_WARNING_SECONDS) {
+            message = 'Tempo sopra 60 min: controlla il valore.';
+        }
+
+        setTimeInputWarning(input, 'timeLimitWarning', message);
+    }
+
+    function validatePenaltyDurationLimit(input) {
+        const rawValue = input.value.trim();
+        const durationMinutes = Number.parseFloat(rawValue.replace(',', '.'));
+        let message = '';
+
+        if (rawValue && (!Number.isFinite(durationMinutes) || durationMinutes < 0)) {
+            message = 'Durata non valida.';
+        } else if (Number.isFinite(durationMinutes) && durationMinutes > 60) {
+            message = 'Durata sopra 60 min: controlla il valore.';
+        }
+
+        setTimeInputWarning(input, 'timeLimitWarning', message);
+    }
+
+    function finalizeTimeInput(input) {
+        const normalizedTime = normalizeTimeInput(input.value);
+        if (input.value.trim() && normalizedTime && input.value !== normalizedTime) {
+            input.value = normalizedTime;
+        }
+
+        validateTimeLimit(input);
+    }
+
+    function validateGoalTimeOrder(teamKey) {
+        const rows = Array.from(document.querySelectorAll(`.goal-event-row[data-team="${teamKey}"]`));
+        let previousSeconds = NaN;
+        let previousGoalNumber = '';
+
+        rows.forEach((row, index) => {
+            const input = row.querySelector('.goal-time-input');
+            const seconds = timeToSeconds(input.value);
+            let message = '';
+
+            if (Number.isFinite(seconds)) {
+                if (Number.isFinite(previousSeconds) && seconds < previousSeconds) {
+                    message = `Tempo più basso del gol ${previousGoalNumber}.`;
+                }
+
+                previousSeconds = seconds;
+                previousGoalNumber = row.querySelector('.row-number')?.textContent.trim() || String(index + 1);
+            }
+
+            setTimeInputWarning(input, 'goalOrderWarning', message);
+        });
+    }
+
+    function validateAllTimeWarnings() {
+        document.querySelectorAll('.goal-time-input, .penalty-event-start-input, .penalty-event-end-input').forEach(validateTimeLimit);
+        document.querySelectorAll('.penalty-event-duration-input').forEach(validatePenaltyDurationLimit);
+        validateGoalTimeOrder('team1');
+        validateGoalTimeOrder('team2');
     }
 
     function formatSheetNumber(value) {
@@ -2432,21 +2578,20 @@
         });
     }
 
-    function recalculatePenaltyEvent(row, source) {
+    function recalculatePenaltyEvent(row, source, options = {}) {
         const startInput = row.querySelector('.penalty-event-start-input');
         const durationInput = row.querySelector('.penalty-event-duration-input');
         const endInput = row.querySelector('.penalty-event-end-input');
         const startSeconds = timeToSeconds(startInput.value);
         const duration = Number.parseFloat(durationInput.value.replace(',', '.'));
-        const endSeconds = timeToSeconds(endInput.value);
         const normalizedStart = normalizeTimeInput(startInput.value);
         const normalizedEnd = normalizeTimeInput(endInput.value);
 
-        if (startInput.value.trim() && normalizedStart && startInput.value !== normalizedStart) {
+        if (options.finalizeTimes && startInput.value.trim() && normalizedStart && startInput.value !== normalizedStart) {
             startInput.value = normalizedStart;
         }
 
-        if (endInput.value.trim() && normalizedEnd && endInput.value !== normalizedEnd) {
+        if (options.finalizeTimes && endInput.value.trim() && normalizedEnd && endInput.value !== normalizedEnd) {
             endInput.value = normalizedEnd;
         }
 
@@ -2502,6 +2647,7 @@
 
         const playerStats = {};
         const goalCounts = { team1: 0, team2: 0 };
+        const shouldFinalizeTimes = Boolean(options.finalizeTimes);
 
         Object.values(matchSheetTeams).flat().forEach((player) => {
             playerStats[player.id] = {
@@ -2523,7 +2669,7 @@
             const assistId = row.querySelector('.assist-player-select').value;
             const teamKey = row.dataset.team;
 
-            if (timeInput.value.trim() && time && timeInput.value !== time) {
+            if (shouldFinalizeTimes && timeInput.value.trim() && time && timeInput.value !== time) {
                 timeInput.value = time;
             }
 
@@ -2548,11 +2694,11 @@
             const duration = row.querySelector('.penalty-event-duration-input').value.trim();
             const durationNumber = Number.parseFloat(duration.replace(',', '.'));
 
-            if (startInput.value.trim() && start && startInput.value !== start) {
+            if (shouldFinalizeTimes && startInput.value.trim() && start && startInput.value !== start) {
                 startInput.value = start;
             }
 
-            if (endInput.value.trim() && end && endInput.value !== end) {
+            if (shouldFinalizeTimes && endInput.value.trim() && end && endInput.value !== end) {
                 endInput.value = end;
             }
 
@@ -2624,24 +2770,57 @@
         fillPenaltyRows('team1');
         fillPenaltyRows('team2');
 
-        document.querySelectorAll('.penalty-event-row').forEach((row) => {
-            row.querySelector('.penalty-event-start-input').addEventListener('input', () => {
-                recalculatePenaltyEvent(row, 'start');
-                syncMatchSheetEvents();
-            });
-            row.querySelector('.penalty-event-duration-input').addEventListener('input', () => {
-                recalculatePenaltyEvent(row, 'duration');
-                syncMatchSheetEvents();
-            });
-            row.querySelector('.penalty-event-end-input').addEventListener('input', () => {
-                recalculatePenaltyEvent(row, 'end');
-                syncMatchSheetEvents();
+        document.querySelectorAll('.goal-event-row').forEach((row) => {
+            const timeInput = row.querySelector('.goal-time-input');
+            const syncGoalRow = () => syncMatchSheetEvents({ updateScores: true });
+            const finalizeGoalRow = () => {
+                finalizeTimeInput(timeInput);
+                syncMatchSheetEvents({ updateScores: true });
+                validateGoalTimeOrder(row.dataset.team);
+            };
+
+            timeInput.addEventListener('input', syncGoalRow);
+            timeInput.addEventListener('change', finalizeGoalRow);
+            timeInput.addEventListener('blur', finalizeGoalRow);
+
+            row.querySelectorAll('select').forEach((select) => {
+                select.addEventListener('input', syncGoalRow);
+                select.addEventListener('change', syncGoalRow);
             });
         });
 
-        document.querySelectorAll('.goal-event-row input, .goal-event-row select').forEach((input) => {
-            input.addEventListener('input', () => syncMatchSheetEvents({ updateScores: true }));
-            input.addEventListener('change', () => syncMatchSheetEvents({ updateScores: true }));
+        document.querySelectorAll('.penalty-event-row').forEach((row) => {
+            const startInput = row.querySelector('.penalty-event-start-input');
+            const durationInput = row.querySelector('.penalty-event-duration-input');
+            const endInput = row.querySelector('.penalty-event-end-input');
+            const finalizePenaltyRow = (source) => {
+                recalculatePenaltyEvent(row, source, { finalizeTimes: true });
+                finalizeTimeInput(startInput);
+                validatePenaltyDurationLimit(durationInput);
+                finalizeTimeInput(endInput);
+                syncMatchSheetEvents();
+            };
+
+            startInput.addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'start');
+                syncMatchSheetEvents();
+            });
+            startInput.addEventListener('change', () => finalizePenaltyRow('start'));
+            startInput.addEventListener('blur', () => finalizePenaltyRow('start'));
+
+            durationInput.addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'duration');
+                syncMatchSheetEvents();
+            });
+            durationInput.addEventListener('change', () => finalizePenaltyRow('duration'));
+            durationInput.addEventListener('blur', () => finalizePenaltyRow('duration'));
+
+            endInput.addEventListener('input', () => {
+                recalculatePenaltyEvent(row, 'end');
+                syncMatchSheetEvents();
+            });
+            endInput.addEventListener('change', () => finalizePenaltyRow('end'));
+            endInput.addEventListener('blur', () => finalizePenaltyRow('end'));
         });
 
         document.querySelectorAll('.penalty-event-row select').forEach((input) => {
@@ -2651,10 +2830,15 @@
 
         const sheetForm = document.querySelector('.match-sheet')?.closest('form');
         if (sheetForm) {
-            sheetForm.addEventListener('submit', () => syncMatchSheetEvents({ updateScores: true }));
+            sheetForm.addEventListener('submit', () => {
+                document.querySelectorAll('.goal-time-input, .penalty-event-start-input, .penalty-event-end-input').forEach(finalizeTimeInput);
+                syncMatchSheetEvents({ updateScores: true, finalizeTimes: true });
+                validateAllTimeWarnings();
+            });
         }
 
-        syncMatchSheetEvents({ updateScores: true, preserveExistingEmptyScore: true });
+        syncMatchSheetEvents({ updateScores: true, preserveExistingEmptyScore: true, finalizeTimes: true });
+        validateAllTimeWarnings();
     }
 
     document.addEventListener('DOMContentLoaded', initializeEventMatchSheet);
