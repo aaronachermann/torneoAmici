@@ -3536,6 +3536,7 @@
     });
 
     // Aggiungi metadata
+    data._sheet_state = this.collectSheetState();
     data._saved_at = new Date().toISOString();
     data._match_id = this.matchId;
 
@@ -3543,6 +3544,127 @@
 
     return data;
 }
+        collectSheetState() {
+            const getInputValue = (selector) => document.querySelector(selector)?.value || '';
+            const getCheckboxValue = (selector) => {
+                const input = document.querySelector(selector);
+                return input ? input.checked : false;
+            };
+            const collectRows = (selector, mapper) => Array.from(document.querySelectorAll(selector)).map(mapper);
+
+            const lineup = {};
+            document.querySelectorAll('.lineup-player-row[data-player-id]').forEach((row) => {
+                const playerId = row.dataset.playerId;
+                lineup[playerId] = {
+                    active: row.querySelector('.lineup-active-checkbox')?.checked ?? true,
+                    jerseyNumber: row.querySelector('.jersey-number-input')?.value || ''
+                };
+            });
+
+            return {
+                scores: {
+                    team1: getInputValue('#team1_score_main'),
+                    team2: getInputValue('#team2_score_main')
+                },
+                overtime: getCheckboxValue('#overtime_main'),
+                shootout: getCheckboxValue('#shootout_main'),
+                bestPlayers: {
+                    team1: getInputValue('#best_player_team1'),
+                    team2: getInputValue('#best_player_team2')
+                },
+                lineup,
+                goals: {
+                    team1: collectRows('.goal-event-row[data-team="team1"]', (row) => ({
+                        time: row.querySelector('.goal-time-input')?.value || '',
+                        scorerId: row.querySelector('.goal-player-select')?.value || '',
+                        assistId: row.querySelector('.assist-player-select')?.value || ''
+                    })),
+                    team2: collectRows('.goal-event-row[data-team="team2"]', (row) => ({
+                        time: row.querySelector('.goal-time-input')?.value || '',
+                        scorerId: row.querySelector('.goal-player-select')?.value || '',
+                        assistId: row.querySelector('.assist-player-select')?.value || ''
+                    }))
+                },
+                penalties: {
+                    team1: collectRows('.penalty-event-row[data-team="team1"]', (row) => ({
+                        playerId: row.querySelector('.penalty-player-select')?.value || '',
+                        duration: row.querySelector('.penalty-event-duration-input')?.value || '',
+                        start: row.querySelector('.penalty-event-start-input')?.value || '',
+                        end: row.querySelector('.penalty-event-end-input')?.value || ''
+                    })),
+                    team2: collectRows('.penalty-event-row[data-team="team2"]', (row) => ({
+                        playerId: row.querySelector('.penalty-player-select')?.value || '',
+                        duration: row.querySelector('.penalty-event-duration-input')?.value || '',
+                        start: row.querySelector('.penalty-event-start-input')?.value || '',
+                        end: row.querySelector('.penalty-event-end-input')?.value || ''
+                    }))
+                },
+                lineupPanelOpen: document.querySelector('.lineup-panel')?.open || false
+            };
+        }
+
+        populateSheetState(state) {
+            if (!state || typeof state !== 'object') return;
+
+            const setInputValue = (selector, value) => {
+                const input = document.querySelector(selector);
+                if (input && value !== undefined && value !== null) input.value = value;
+            };
+            const setCheckboxValue = (selector, value) => {
+                const input = document.querySelector(selector);
+                if (input) input.checked = Boolean(value);
+            };
+            const applyRows = (selector, rows, applier) => {
+                const domRows = Array.from(document.querySelectorAll(selector));
+                domRows.forEach((row, index) => applier(row, rows?.[index] || {}));
+            };
+
+            setInputValue('#team1_score_main', state.scores?.team1);
+            setInputValue('#team2_score_main', state.scores?.team2);
+            setCheckboxValue('#overtime_main', state.overtime);
+            setCheckboxValue('#shootout_main', state.shootout);
+            setInputValue('#best_player_team1', state.bestPlayers?.team1);
+            setInputValue('#best_player_team2', state.bestPlayers?.team2);
+
+            Object.entries(state.lineup || {}).forEach(([playerId, playerState]) => {
+                const checkbox = document.querySelector(`.lineup-active-checkbox[data-player-id="${playerId}"]`);
+                const numberInput = document.querySelector(`.jersey-number-input[data-player-id="${playerId}"]`);
+
+                if (checkbox && playerState.active !== undefined) checkbox.checked = Boolean(playerState.active);
+                if (numberInput && playerState.jerseyNumber !== undefined) {
+                    numberInput.value = playerState.jerseyNumber;
+                    numberInput.dataset.previousValue = playerState.jerseyNumber;
+                }
+                if (typeof syncLineupHiddenState === 'function') syncLineupHiddenState(playerId);
+            });
+
+            applyRows('.goal-event-row[data-team="team1"]', state.goals?.team1, (row, data) => {
+                row.querySelector('.goal-time-input').value = data.time || '';
+                row.querySelector('.goal-player-select').value = data.scorerId || '';
+                row.querySelector('.assist-player-select').value = data.assistId || '';
+            });
+            applyRows('.goal-event-row[data-team="team2"]', state.goals?.team2, (row, data) => {
+                row.querySelector('.goal-time-input').value = data.time || '';
+                row.querySelector('.goal-player-select').value = data.scorerId || '';
+                row.querySelector('.assist-player-select').value = data.assistId || '';
+            });
+            applyRows('.penalty-event-row[data-team="team1"]', state.penalties?.team1, (row, data) => {
+                row.querySelector('.penalty-player-select').value = data.playerId || '';
+                row.querySelector('.penalty-event-duration-input').value = data.duration || '';
+                row.querySelector('.penalty-event-start-input').value = data.start || '';
+                row.querySelector('.penalty-event-end-input').value = data.end || '';
+            });
+            applyRows('.penalty-event-row[data-team="team2"]', state.penalties?.team2, (row, data) => {
+                row.querySelector('.penalty-player-select').value = data.playerId || '';
+                row.querySelector('.penalty-event-duration-input').value = data.duration || '';
+                row.querySelector('.penalty-event-start-input').value = data.start || '';
+                row.querySelector('.penalty-event-end-input').value = data.end || '';
+            });
+
+            const lineupPanel = document.querySelector('.lineup-panel');
+            if (lineupPanel) lineupPanel.open = Boolean(state.lineupPanelOpen);
+        }
+
         // RIPOPOLAMENTO FORM
         populateForm(data) {
             Object.entries(data).forEach(([name, value]) => {
@@ -3561,11 +3683,20 @@
                 }
             });
 
+            this.populateSheetState(data._sheet_state);
+
             if (typeof applyLineupStateFromHiddenInputs === 'function') {
                 applyLineupStateFromHiddenInputs();
             }
             if (typeof syncMatchSheetEvents === 'function') {
-                syncMatchSheetEvents();
+                syncMatchSheetEvents({
+                    updateScores: true,
+                    finalizeTimes: true,
+                    preserveExistingEmptyScore: true
+                });
+            }
+            if (typeof validateAllTimeWarnings === 'function') {
+                validateAllTimeWarnings();
             }
 
             // Ricarica le penalità se necessario
@@ -3635,6 +3766,12 @@
                             this.onFieldChange();
                         });
                     });
+                });
+            });
+
+            document.querySelectorAll(`form[action*="/match/${this.matchId}/reset"]`).forEach((form) => {
+                form.addEventListener('submit', () => {
+                    this.clearSavedData({ silent: true });
                 });
             });
 
@@ -3772,9 +3909,11 @@
             this.syncWithServer();
         }
 
-        clearSavedData() {
+        clearSavedData(options = {}) {
             localStorage.removeItem(this.storageKey);
-            this.showStatus(' Dati locali cancellati', 'info', 2000);
+            if (!options.silent) {
+                this.showStatus(' Dati locali cancellati', 'info', 2000);
+            }
         }
 
         getStorageUsage() {
